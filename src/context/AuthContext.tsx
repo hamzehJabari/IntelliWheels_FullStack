@@ -76,13 +76,31 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     localStorage.setItem(STORAGE_KEYS.user, JSON.stringify(profile));
   }, []);
 
+  const fetchProfileForToken = useCallback(async (authToken: string, fallback?: UserProfile | null) => {
+    if (fallback) return fallback;
+    try {
+      const result = await getProfile(authToken);
+      if (result.success) {
+        return result.user;
+      }
+    } catch (err) {
+      console.warn('Unable to load profile after auth', err);
+    }
+    return null;
+  }, []);
+
   const handleLogin = useCallback(async (username: string, password: string) => {
     try {
       setLoading(true);
       setError(null);
       const response = await loginUser(username, password);
       if (response.success && response.token) {
-        persistAuth(response.token, response.user);
+        const profile = await fetchProfileForToken(response.token, response.user);
+        if (!profile) {
+          setError('Unable to load profile details');
+          return false;
+        }
+        persistAuth(response.token, profile);
         return true;
       }
       setError(response.error || 'Unable to login');
@@ -93,7 +111,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     } finally {
       setLoading(false);
     }
-  }, [persistAuth]);
+  }, [persistAuth, fetchProfileForToken]);
 
   const handleSignup = useCallback(async (username: string, email: string, password: string) => {
     try {
@@ -101,7 +119,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setError(null);
       const response = await signupUser(username, email, password);
       if (response.success && response.token) {
-        persistAuth(response.token, response.user);
+        const profile = await fetchProfileForToken(response.token, response.user);
+        if (!profile) {
+          setError('Unable to load profile details');
+          return false;
+        }
+        persistAuth(response.token, profile);
         return true;
       }
       setError(response.error || 'Unable to sign up');
@@ -112,7 +135,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     } finally {
       setLoading(false);
     }
-  }, [persistAuth]);
+  }, [persistAuth, fetchProfileForToken]);
 
   const handleLogout = useCallback(async () => {
     try {

@@ -287,7 +287,7 @@ interface VisionSuggestion extends VisionAttributes {
 }
 
 export function AppView() {
-  const { user, token, loading: authLoading, login, signup, logout, updateMyProfile, refreshProfile } = useAuth();
+  const { user, token, loading: authLoading, login, signup, logout, updateMyProfile, refreshProfile, error: authError, clearError } = useAuth();
   const [activePage, setActivePage] = useState<PageKey>('listings');
   const [serviceMode, setServiceMode] = useState<ServiceMode>('marketplace');
   const [theme, setTheme] = useState<ThemeMode>('light');
@@ -1227,6 +1227,9 @@ export function AppView() {
     <div className="grid gap-6 md:grid-cols-2">
       <div className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
         <h3 className="text-xl font-semibold text-slate-900">Sign In</h3>
+        {authError && (
+          <p className="mt-3 rounded-2xl bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-600">{authError}</p>
+        )}
         <form
           className="mt-4 space-y-4"
           onSubmit={async (event: React.FormEvent<HTMLFormElement>) => {
@@ -1234,7 +1237,13 @@ export function AppView() {
             const formData = new FormData(event.currentTarget);
             const username = String(formData.get('login-username'));
             const password = String(formData.get('login-password'));
-            await login(username, password);
+            clearError();
+            const success = await login(username, password);
+            if (success) {
+              showToast(`Welcome back, ${username}!`);
+            } else {
+              showToast('Unable to sign in. Please check your details.', 'error');
+            }
           }}
         >
           <input name="login-username" placeholder="Username" className={`w-full ${inputFieldClass}`} required />
@@ -1252,7 +1261,14 @@ export function AppView() {
             const username = String(formData.get('signup-username'));
             const email = String(formData.get('signup-email'));
             const password = String(formData.get('signup-password'));
-            await signup(username, email, password);
+            clearError();
+            const success = await signup(username, email, password);
+            if (success) {
+              showToast('Account created! You are now signed in.');
+              event.currentTarget.reset();
+            } else {
+              showToast('Unable to sign up. Please try again.', 'error');
+            }
           }}
         >
           <input name="signup-username" placeholder="Username" className={`w-full ${inputFieldClass}`} required />
@@ -1837,13 +1853,12 @@ export function AppView() {
         <div className="mx-auto max-w-7xl px-4 py-6">
           <div className="flex flex-wrap items-center justify-between gap-6">
             <div className="flex items-center gap-4 lg:gap-6">
-              <div className="-ml-2 inline-flex items-center justify-center rounded-[32px] bg-transparent p-0">
-                <img
-                  src="/intellliwheels_logo_concept_dynamic.png"
-                  alt="IntelliWheels logo"
-                  className="h-20 w-20 rounded-[28px] object-contain shadow-lg"
-                />
-              </div>
+              <img
+                src="/intellliwheels_logo_concept_dynamic.png"
+                alt="IntelliWheels logo"
+                className="-ml-2 h-24 w-auto object-contain"
+                draggable={false}
+              />
               <div>
               <p className={`text-sm uppercase tracking-wider ${headerMuted}`}>IntelliWheels</p>
               <h1 className="text-3xl font-bold">{copy.tagline}</h1>
