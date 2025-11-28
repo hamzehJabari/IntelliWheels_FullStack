@@ -1,253 +1,86 @@
-# IntelliWheels - Professional Car Catalog Platform
+## IntelliWheels Monorepo
 
-A modern, professional car catalog application with AI chatbot integration, built with Flask backend and modern JavaScript frontend.
+This folder now contains everything needed to run the IntelliWheels experience locally:
 
-## Features
+- **Frontend**: Next.js 16 / React 19 app (this folder root)
+- **Backend**: Flask API duplicated into `backend/`
+- **Shared assets**: DriveArabia SQL dump (`backend/data/Middle-East-GCC-Car-Database-by-Teoalida-SAMPLE.sql`), generated mock dataset (`src/data/cars.json`), models, uploads, etc.
 
-- 🚗 **Complete Car Catalog** - View, search, filter, and manage car listings
-- 🤖 **AI Chatbot** - Integrated Google Gemini AI for car-related questions
-- 💰 **AI Price Advisor** - Trainable regression model for instant fair-price estimates
-- 📷 **Vision Helper** - Gemini-powered photo analysis to auto-fill listing details
-- 🔍 **Semantic Search** - Vector-based discovery that understands natural language intents
-- ⭐ **Favorites System** - Save and manage favorite cars
-- 📊 **Excel Data Integration** - Reads from 5 Excel sheets (Make-Model-Year, Make-Model, Basic Specs, Engine Specs, Statistics)
-- 🎨 **Modern UI** - Professional, responsive design with smooth animations
-- 🔄 **Full CRUD Operations** - Create, Read, Update, Delete car listings via REST API
-- 💾 **SQLite Database** - Free, lightweight database solution
-
-## Tech Stack
-
-### Backend
-- Flask (Python web framework)
-- SQLite (Database)
-- Pandas (Excel processing)
-- Google Generative AI (Gemini)
-
-### Frontend
-- Vanilla JavaScript (ES6 Modules)
-- Tailwind CSS
-- Modern CSS with animations
-
-## Setup Instructions
-
-### 1. Install Python Dependencies
-
-```bash
-pip install -r requirements.txt
-```
-
-### 2. Ingest Excel Data to Database
-
-First, make sure your `cars.xlsx` file is in the project root with the following sheets:
-- Make-Model-Year
-- Make-Model
-- Basic Specs
-- Engine Specs
-- Statistics
-
-Then run the ingestion script:
-
-```bash
-python ingest_excel_to_db.py
-```
-
-### 3. Train the AI Helpers
-
-Run the training utilities whenever you refresh the catalog to keep the ML models in sync with the database:
-
-```bash
-# Train the fair-price regression pipeline and export models/fair_price_model.joblib
-python models/train_price_model.py
-
-# Build sentence-transformer embeddings for semantic search
-python models/build_embeddings.py
-```
-
-Both commands read from `intelliwheels.db` and write artifacts under `models/`. The Flask API automatically loads these files on startup.
-
-### 4. Configure Gemini API Key
-
-Edit `js/main.js` and replace `YOUR_GEMINI_API_KEY_HERE` with your actual Gemini API key:
-
-```javascript
-const GEMINI_API_KEY = "your-actual-api-key-here";
-```
-
-Alternatively, you can set it as an environment variable:
-
-```bash
-export GEMINI_API_KEY="your-actual-api-key-here"
-```
-
-### 5. Start the Backend Server
-
-```bash
-python app.py
-```
-
-The server will start on `http://localhost:5000`
-
-### 6. Open the Frontend
-
-Simply open `index.html` in your web browser, or use a local server:
-
-```bash
-# Using Python
-python -m http.server 8000
-
-# Using Node.js
-npx serve
-
-# Using PHP
-php -S localhost:8000
-```
-
-Then navigate to `http://localhost:8000` (or your chosen port)
-
-## API Endpoints
-
-### Cars
-- `GET /api/cars` - Get all cars (supports query params: make, search, sort, limit, offset)
-- `GET /api/cars/<id>` - Get a single car
-- `POST /api/cars` - Create a new car
-- `PATCH /api/cars/<id>` - Update a car
-- `DELETE /api/cars/<id>` - Delete a car
-
-### Makes
-- `GET /api/makes` - Get all unique car makes
-
-### Favorites
-- `GET /api/favorites` - Get user's favorite cars
-- `POST /api/favorites` - Add a car to favorites
-- `DELETE /api/favorites/<car_id>` - Remove a car from favorites
-
-### Chatbot
-- `POST /api/chatbot` - Send a message to the AI chatbot
-- `POST /api/listing-assistant` - Guided listing creation and editing via Gemini
-
-### AI Utilities
-- `POST /api/price-estimate` - Returns a fair-price prediction based on make/model/year/specs
-- `POST /api/vision-helper` - Upload a photo and get structured listing suggestions
-- `GET /api/semantic-search` - Natural-language search powered by vector embeddings
-
-### Health
-- `GET /api/health` - Health check endpoint
-
-## Project Structure
-
-```
-IntelliWheels/
-├── app.py                 # Flask backend server
-├── ingest_excel_to_db.py  # Excel data ingestion script
-├── requirements.txt       # Python dependencies
-├── intelliwheels.db       # SQLite database (created after ingestion)
-├── cars.xlsx              # Excel data file
-├── index.html             # Main HTML file
-├── css/
-│   └── style.css          # Enhanced modern styling
-├── models/
-│   ├── train_price_model.py   # Trains the fair-price regression pipeline
-│   ├── build_embeddings.py    # Generates semantic vectors for catalog search
-│   ├── fair_price_model.joblib
-│   └── car_embeddings.json
-└── js/
-    ├── main.js            # Main application logic
-    ├── api.js             # API client
-    └── ui.js              # UI rendering functions
-```
-
-## Features in Detail
-
-### Car Management
-- Browse all cars with beautiful card layouts
-- Search by make or model
-- Filter by make
-- Sort by price (low to high, high to low) or rating
-- View detailed car information in modal
-- Add new car listings
-- Edit existing listings (via API)
-- Delete car listings
-
-### AI Chatbot
-- Ask questions about cars, maintenance, specifications
-- Get recommendations and comparisons
-- Powered by Google Gemini AI
-
-### AI Price Advisor
-- Trained Gradient Boosting model with automatic feature engineering
-- Single endpoint (`/api/price-estimate`) used by the Add Listing form
-- Metrics stored in `models/fair_price_model_metrics.json`
-
-### Vision Helper
-- Upload any car photo and receive structured suggestions (make/model/year/etc.)
-- Gemini 1.5 Flash converts the picture into JSON the UI can auto-fill
-
-### Semantic Search
-- SentenceTransformer embeddings let users search with natural language prompts
-- `/api/semantic-search` returns similarity scores plus ready-to-render cars
-
-### Favorites
-- Save cars to favorites
-- Persistent storage (database + localStorage)
-- View all favorites in dedicated page
-
-### Data Management
-- Automatic ingestion from Excel
-- Support for multiple data sources
-- Statistics tracking
-- Engine specifications
-- Comprehensive car specifications
-
-## Development
-
-### Adding New Features
-
-1. **Backend**: Add new routes in `app.py`
-2. **Frontend**: Add API calls in `js/api.js`
-3. **UI**: Add rendering logic in `js/ui.js`
-4. **Styling**: Add styles in `css/style.css`
-
-### Database Schema
-
-The main `cars` table includes:
-- Basic info (make, model, year, price, currency)
-- Images (image_url, image_urls)
-- Ratings (rating, reviews)
-- Specifications (specs as JSON)
-- Engines (engines as JSON)
-- Statistics (statistics as JSON)
-- Source tracking (source_sheets)
-
-## Troubleshooting
-
-### Backend not starting
-- Make sure port 5000 is not in use
-- Check that all dependencies are installed
-- Verify Python version (3.7+)
-
-### Database errors
-- Run `ingest_excel_to_db.py` to initialize database
-- Check that `cars.xlsx` exists and has all 5 sheets
-
-### Chatbot not working
-- Verify Gemini API key is set correctly
-- Check browser console for API errors
-- Ensure backend server is running
-
-### CORS errors
-- Make sure Flask-CORS is installed
-- Check that backend is running on correct port
-- Verify API base URL in `js/api.js`
-
-## License
-
-This project is open source and available for use.
-
-## Contributing
-
-Feel free to submit issues and enhancement requests!
+Follow the steps below to boot both tiers.
 
 ---
 
-Built with ❤️ for car enthusiasts
+## 1. Frontend (Next.js)
 
+```bash
+npm install
+npm run dev
+```
+
+App runs on [http://localhost:3000](http://localhost:3000). Environment values live in `.env.local` (already created). Key variables:
+
+```
+NEXT_PUBLIC_API_BASE_URL=http://localhost:5000/api
+NEXT_PUBLIC_GEMINI_API_KEY=your-real-key
+```
+
+### DX helpers
+
+- `npm run lint` – ESLint/TypeScript diagnostics
+- `node scripts/convert-cars.mjs` – regenerate `src/data/cars.json` from `cars.xlsx` (used when backend is offline)
+
+---
+
+## 2. Backend (Flask) – `backend/`
+
+```bash
+cd backend
+python -m venv .venv
+.\.venv\Scripts\activate
+pip install -r requirements.txt
+
+# optional: install frontend deps if you need the legacy static files
+# npm install
+
+# load DriveArabia SQL dump into SQLite
+python ingest_excel_to_db.py
+
+# start the API
+python app.py
+```
+
+The API listens on `http://localhost:5000` (matching the frontend base URL). Auth, favorites, analytics, uploads, and Gemini helpers all route through these endpoints. If you want the root `http://localhost:5000/` page to link back to the UI, set `FRONTEND_ORIGIN=http://localhost:3000` before launching `app.py`.
+
+> **Tip:** rerun `python ingest_excel_to_db.py` whenever the SQL dump is updated so the API and embeddings remain in sync.
+
+---
+
+## 3. Data workflow
+
+- Source of truth: `backend/data/Middle-East-GCC-Car-Database-by-Teoalida-SAMPLE.sql` (Engine Specs dataset).
+- Offline/demo mode: run `node scripts/convert-cars.mjs` to bake the sheet into `src/data/cars.json`. The React app automatically falls back to those records whenever the backend is down or you are not authenticated.
+- Online mode: start the Flask API + database after running the SQL ingestion script; the React app will load live data (and still fall back if the server is unreachable).
+
+---
+
+## 4. Folder map
+
+| Path | Description |
+| --- | --- |
+| `/src` | Next.js app router code, contexts, components, lib helpers |
+| `/backend` | Full Flask backend (API, ingestion scripts, models, uploads) |
+| `/scripts/convert-cars.mjs` | XLSX → JSON converter for mock data |
+| `/cars.xlsx` | Legacy spreadsheet used by the mock-data converter |
+| `/backend/data/...sql` | DriveArabia sample dump used for ingestion |
+
+Uploads, embeddings, and trained models from the original project were copied intact so features like image analysis and price guidance continue to work once the backend is running.
+
+---
+
+## 5. Running everything together
+
+1. Start the backend (instructions above). Confirm you see `* Running on http://127.0.0.1:5000/` in the console.
+2. In a new terminal, start the frontend with `npm run dev`.
+3. Visit [http://localhost:3000](http://localhost:3000), sign up/log in, and you’ll see real inventory, favorites, and AI helpers. If the backend stops, the UI falls back to the generated dataset so you can still demo the experience.
+
+That’s it—you now have a self-contained workspace with both tiers plus data artifacts.

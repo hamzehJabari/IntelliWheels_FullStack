@@ -1,27 +1,29 @@
 {
-  "name": "intelliwheels",
-  "version": "1.0.0",
-  "description": "A modern, professional car catalog application with AI chatbot integration, built with Flask backend and modern JavaScript frontend.",
-  "main": "index.js",
+  "name": "intelliwheels-react-temp",
+  "version": "0.1.0",
+  "private": true,
   "scripts": {
-    "build:css": "tailwindcss -i ./css/tailwind.input.css -o ./css/tailwind.build.css --minify",
-    "watch:css": "tailwindcss -i ./css/tailwind.input.css -o ./css/tailwind.build.css --watch",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint"
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/MuhannadMelhem333/IntelliWheels.git"
+  "dependencies": {
+    "intelliwheels-react-temp": "file:",
+    "next": "16.0.5",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "xlsx": "^0.18.5"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "bugs": {
-    "url": "https://github.com/MuhannadMelhem333/IntelliWheels/issues"
-  },
-  "homepage": "https://github.com/MuhannadMelhem333/IntelliWheels#readme",
   "devDependencies": {
-    "autoprefixer": "^10.4.22",
-    "postcss": "^8.5.6",
-    "tailwindcss": "^3.4.13"
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "babel-plugin-react-compiler": "1.0.0",
+    "eslint": "^9",
+    "eslint-config-next": "16.0.5",
+    "tailwindcss": "^4",
+    "typescript": "^5"
   }
 }
