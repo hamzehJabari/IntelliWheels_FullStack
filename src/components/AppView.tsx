@@ -258,6 +258,8 @@ const DEFAULT_FILTERS: CarFilters = {
   sort: 'default',
 };
 
+const LISTINGS_PER_PAGE = 9;
+
 interface ToastState {
   type: 'success' | 'error' | 'info';
   message: string;
@@ -334,6 +336,7 @@ export function AppView() {
   const [chatInput, setChatInput] = useState('');
   const [chatBusy, setChatBusy] = useState(false);
   const [chatAttachment, setChatAttachment] = useState<{ preview: string; base64: string; mime: string } | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
   const [pendingGalleryUrl, setPendingGalleryUrl] = useState('');
   const serviceMenuRef = useRef<HTMLDivElement | null>(null);
   const navMenuRef = useRef<HTMLDivElement | null>(null);
@@ -1088,6 +1091,44 @@ export function AppView() {
     }
   }, [filteredCars, filters.sort]);
 
+  const totalPages = useMemo(() => Math.max(1, Math.ceil(sortedCars.length / LISTINGS_PER_PAGE)), [sortedCars.length]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filters.make, filters.search, filters.sort]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
+  const paginatedCars = useMemo(() => {
+    const start = (currentPage - 1) * LISTINGS_PER_PAGE;
+    return sortedCars.slice(start, start + LISTINGS_PER_PAGE);
+  }, [currentPage, sortedCars]);
+
+  const paginationWindow = useMemo(() => {
+    if (totalPages <= 5) {
+      return Array.from({ length: totalPages }, (_, index) => index + 1);
+    }
+    let start = Math.max(1, currentPage - 2);
+    let end = Math.min(totalPages, start + 4);
+    start = Math.max(1, end - 4);
+    return Array.from({ length: end - start + 1 }, (_, index) => start + index);
+  }, [currentPage, totalPages]);
+
+  const goToPage = useCallback(
+    (page: number) => {
+      const safePage = Math.min(Math.max(page, 1), totalPages);
+      setCurrentPage(safePage);
+      if (typeof window !== 'undefined') {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    },
+    [totalPages]
+  );
+
   const renderCarCard = (car: Car) => (
     <div
       key={car.id}
@@ -1479,8 +1520,78 @@ export function AppView() {
               </form>
             </div>
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {sortedCars.map((car) => renderCarCard(car))}
+              {paginatedCars.length === 0 ? (
+                <p className="col-span-full text-center text-slate-500">No listings match your filters yet.</p>
+              ) : (
+                paginatedCars.map((car) => renderCarCard(car))
+              )}
             </div>
+            {sortedCars.length > 0 && (
+              <div className="flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-slate-100 bg-white px-4 py-3 text-sm text-slate-600 shadow-sm">
+                <p>
+                  Showing {Math.min((currentPage - 1) * LISTINGS_PER_PAGE + 1, sortedCars.length)}-
+                  {Math.min(currentPage * LISTINGS_PER_PAGE, sortedCars.length)} of {sortedCars.length} listings
+                </p>
+                {totalPages > 1 && (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => goToPage(currentPage - 1)}
+                      disabled={currentPage === 1}
+                      className="rounded-2xl border border-slate-200 px-3 py-1 font-semibold text-slate-700 disabled:cursor-not-allowed disabled:border-slate-100 disabled:text-slate-300"
+                    >
+                      Prev
+                    </button>
+                    {paginationWindow[0] > 1 && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => goToPage(1)}
+                          className="rounded-2xl border border-slate-200 px-3 py-1 font-semibold text-slate-700"
+                        >
+                          1
+                        </button>
+                        {paginationWindow[0] > 2 && <span className="text-slate-400">…</span>}
+                      </>
+                    )}
+                    {paginationWindow.map((page) => (
+                      <button
+                        key={page}
+                        type="button"
+                        onClick={() => goToPage(page)}
+                        className={`rounded-2xl px-3 py-1 font-semibold ${
+                          currentPage === page ? 'bg-sky-600 text-white' : 'border border-slate-200 text-slate-700'
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    ))}
+                    {paginationWindow[paginationWindow.length - 1] < totalPages && (
+                      <>
+                        {paginationWindow[paginationWindow.length - 1] < totalPages - 1 && (
+                          <span className="text-slate-400">…</span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => goToPage(totalPages)}
+                          className="rounded-2xl border border-slate-200 px-3 py-1 font-semibold text-slate-700"
+                        >
+                          {totalPages}
+                        </button>
+                      </>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => goToPage(currentPage + 1)}
+                      disabled={currentPage === totalPages}
+                      className="rounded-2xl border border-slate-200 px-3 py-1 font-semibold text-slate-700 disabled:cursor-not-allowed disabled:border-slate-100 disabled:text-slate-300"
+                    >
+                      Next
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         );
       case 'favorites':
@@ -1725,17 +1836,68 @@ export function AppView() {
       <header className={`${headerSurfaceClass} border-b ${subtleBorderClass}`}>
         <div className="mx-auto max-w-7xl px-4 py-6">
           <div className="flex flex-wrap items-center justify-between gap-6">
-            <div>
+            <div className="flex items-center gap-4">
+              <button
+                type="button"
+                onClick={() => {
+                  setActivePage('listings');
+                  router.push('/');
+                }}
+                className="group relative inline-flex items-center justify-center rounded-2xl border border-transparent bg-white/10 p-2 transition hover:bg-white/20"
+                aria-label="Back to IntelliWheels home"
+              >
+                <img
+                  src="/intellliwheels_logo_concept_dynamic.png"
+                  alt="IntelliWheels logo"
+                  className="h-16 w-16 rounded-xl object-contain drop-shadow group-hover:scale-105"
+                />
+              </button>
+              <div>
               <p className={`text-sm uppercase tracking-wider ${headerMuted}`}>IntelliWheels</p>
               <h1 className="text-3xl font-bold">{copy.tagline}</h1>
               <p className={`mt-2 text-xs uppercase tracking-wide ${headerMuted}`}>
                 {copy.serviceCurrent}: {currentServiceLabel} • {currentServiceDescription}
               </p>
+              </div>
             </div>
             <div className="flex flex-wrap items-center gap-3 text-sm">
               <div className={`rounded-full px-4 py-1 text-xs font-semibold ${statusPillClass}`}>
                 {copy.statusLabel}: {token ? copy.statusAuthenticated : copy.statusGuest}
               </div>
+              {!user ? (
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActivePage('profile');
+                      setNavMenuOpen(false);
+                      setSettingsOpen(false);
+                    }}
+                    className="rounded-2xl border border-white/40 px-4 py-2 font-semibold text-white shadow"
+                  >
+                    Sign In
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActivePage('profile');
+                      setNavMenuOpen(false);
+                      setSettingsOpen(false);
+                    }}
+                    className="rounded-2xl bg-emerald-500 px-4 py-2 font-semibold text-white shadow hover:bg-emerald-400"
+                  >
+                    Sign Up
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => logout()}
+                  className="rounded-2xl border border-white/40 px-4 py-2 font-semibold text-white shadow hover:bg-white/10"
+                >
+                  Sign Out
+                </button>
+              )}
               <div ref={serviceMenuRef} className="relative">
                 <button
                   type="button"
@@ -1768,7 +1930,7 @@ export function AppView() {
                           className={`w-full px-4 py-3 text-left ${active ? navActiveItemClass : navIdleItemClass}`}
                         >
                           <span className="text-sm font-semibold">{copy[service.labelKey]}</span>
-                          <p className={`text-xs ${resolvedTheme === 'dark' ? 'text-slate-400' : 'text-slate-200/80'}`}>{copy[service.descriptionKey]}</p>
+                          <p className={`text-xs ${resolvedTheme === 'dark' ? 'text-slate-300' : 'text-slate-600'}`}>{copy[service.descriptionKey]}</p>
                         </button>
                       );
                     })}
@@ -1803,7 +1965,7 @@ export function AppView() {
                         className={`w-full px-4 py-3 text-left ${activePage === item.key ? navActiveItemClass : navIdleItemClass}`}
                       >
                         <span className="text-sm font-semibold">{item.label}</span>
-                        <p className={`text-xs ${resolvedTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>{item.description}</p>
+                        <p className={`text-xs ${resolvedTheme === 'dark' ? 'text-slate-300' : 'text-slate-600'}`}>{item.description}</p>
                       </button>
                     ))}
                   </div>
@@ -1817,7 +1979,7 @@ export function AppView() {
                     setServiceMenuOpen(false);
                     setNavMenuOpen(false);
                   }}
-                  className={`rounded-2xl px-4 py-2 font-semibold shadow ${resolvedTheme === 'dark' ? 'bg-blue-900/70 text-white' : 'bg-white/20 text-white'}`}
+                  className={`rounded-2xl px-4 py-2 font-semibold shadow ${resolvedTheme === 'dark' ? 'bg-blue-900/70 text-white border border-white/20' : 'bg-white text-slate-900 border border-slate-200'}`}
                 >
                   {copy.settingsButton}
                 </button>
