@@ -1,7 +1,6 @@
 """Ingest the DriveArabia SQL dump (Engine Specs table) into SQLite."""
 from __future__ import annotations
 
-import ast
 import json
 import re
 import sqlite3
@@ -162,49 +161,53 @@ def init_db() -> None:
 
 
 def load_sql_dump(path: Path) -> List[Dict[str, str]]:
+    """Load the MySQL dump by replaying it inside an in-memory SQLite DB."""
     if not path.exists():
         raise FileNotFoundError(f"SQL dump not found at {path}")
 
-    text = path.read_text(encoding="utf-8")
-    create_match = re.search(
-        r"CREATE TABLE `middle_east_gcc_car_database_sample`\s*\((.*?)\)\s*ENGINE",
-        text,
-        re.IGNORECASE | re.DOTALL,
-    )
-    if not create_match:
-        raise RuntimeError("Unable to locate CREATE TABLE statement in dump")
+    raw_sql = path.read_text(encoding="utf-8")
 
-    columns: List[str] = []
-    for line in create_match.group(1).splitlines():
-        line = line.strip().rstrip(',')
-        if not line or line.upper().startswith(("PRIMARY", "KEY", "UNIQUE")):
+    sanitized_lines: List[str] = []
+    skip_comment = False
+    for line in raw_sql.splitlines():
+        stripped = line.strip()
+        if not stripped:
             continue
-        column_match = re.match(r"`([^`]+)`", line)
-        if column_match:
-            columns.append(column_match.group(1))
+        if stripped.startswith("--"):
+            continue
+        if stripped.startswith("/*"):
+            skip_comment = True
+            if "*/" in stripped:
+                skip_comment = False
+            continue
+        if skip_comment:
+            if "*/" in stripped:
+                skip_comment = False
+            continue
+        upper = stripped.upper()
+        if upper.startswith(("SET ", "START TRANSACTION", "COMMIT", "UNLOCK TABLES", "LOCK TABLES")):
+            continue
+        if stripped.startswith("/*!") and stripped.endswith("*/;"):
+            continue
+        sanitized_lines.append(line)
 
-    if not columns:
-        raise RuntimeError("Failed to read table columns from SQL dump")
+    sanitized_sql = "\n".join(sanitized_lines)
+    sanitized_sql = re.sub(r"/\*!.*?\*/;", "", sanitized_sql, flags=re.DOTALL)
+    sanitized_sql = re.sub(r"\)\s*ENGINE=.*?;", ");", sanitized_sql, flags=re.IGNORECASE)
 
-    records: List[Dict[str, str]] = []
-    for insert_match in re.finditer(
-        r"INSERT INTO `middle_east_gcc_car_database_sample`.*?VALUES\s*(.*?);",
-        text,
-        re.IGNORECASE | re.DOTALL,
-    ):
-        block = insert_match.group(1)
-        python_block = "[" + block + "]"
-        python_block = re.sub(r"\bNULL\b", "None", python_block, flags=re.IGNORECASE)
-        python_block = python_block.replace("\r", "").replace("\n", "")
-        try:
-            tuples: Sequence[Sequence[str]] = ast.literal_eval(python_block)
-        except Exception as exc:
-            raise RuntimeError("Failed to parse SQL VALUES block") from exc
-        for row in tuples:
-            if len(row) != len(columns):
-                continue
-            records.append(dict(zip(columns, row)))
-    return records
+    conn = sqlite3.connect(":memory:")
+    try:
+        conn.executescript(sanitized_sql)
+        cursor = conn.cursor()
+        cursor.execute("PRAGMA table_info(middle_east_gcc_car_database_sample)")
+        columns = [column[1] for column in cursor.fetchall()]
+        if not columns:
+            raise RuntimeError("Failed to read table columns from SQL dump")
+        cursor.execute("SELECT * FROM middle_east_gcc_car_database_sample")
+        rows = cursor.fetchall()
+        return [dict(zip(columns, row)) for row in rows]
+    finally:
+        conn.close()
 
 
 def build_groups(records: Iterable[Dict[str, str]]) -> Dict[Tuple[str, str, int], CarGroup]:
