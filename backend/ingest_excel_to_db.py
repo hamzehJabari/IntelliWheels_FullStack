@@ -194,6 +194,7 @@ def load_sql_dump(path: Path) -> List[Dict[str, str]]:
     sanitized_sql = "\n".join(sanitized_lines)
     sanitized_sql = re.sub(r"/\*!.*?\*/;", "", sanitized_sql, flags=re.DOTALL)
     sanitized_sql = re.sub(r"\)\s*ENGINE=.*?;", ");", sanitized_sql, flags=re.IGNORECASE)
+    sanitized_sql = sanitized_sql.replace("\\'", "''")
 
     conn = sqlite3.connect(":memory:")
     try:
