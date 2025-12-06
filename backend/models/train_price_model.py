@@ -42,7 +42,7 @@ def load_data(db_path: Path) -> pd.DataFrame:
         raise FileNotFoundError(f"Database not found at {db_path}")
 
     query = (
-        "SELECT make, model, year, price, rating, reviews, specs "
+        "SELECT make, model, year, price, rating, reviews, specs, engines "
         "FROM cars WHERE price IS NOT NULL AND price > 0"
     )
     with sqlite3.connect(db_path) as conn:
@@ -58,7 +58,42 @@ def load_data(db_path: Path) -> pd.DataFrame:
         except json.JSONDecodeError:
             return {}
 
+    def parse_engines(raw: Any) -> Any:
+        if raw in (None, "", "null"):
+            return []
+        if isinstance(raw, list):
+            return raw
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError:
+            return []
+        return data if isinstance(data, list) else []
+
+    def extract_horsepower(rows: Any) -> Any:
+        if not rows:
+            return None
+        values = []
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            hp = row.get("powerHp") or row.get("horsepower") or row.get("power")
+            if hp is None:
+                continue
+            try:
+                values.append(float(hp))
+            except (TypeError, ValueError):
+                continue
+        if not values:
+            return None
+        return sum(values) / len(values)
+
     specs_df = df["specs"].apply(parse_specs).apply(pd.Series)
+    horsepower_from_engines = None
+    if "engines" in df.columns:
+        horsepower_from_engines = (
+            df["engines"].apply(parse_engines).apply(extract_horsepower)
+        )
+        df.drop(columns=["engines"], inplace=True)
     df = pd.concat([df.drop(columns=["specs"]), specs_df], axis=1)
 
     df.rename(
@@ -73,6 +108,13 @@ def load_data(db_path: Path) -> pd.DataFrame:
 
     # Basic cleanup
     df["body_style"].fillna("Unknown", inplace=True)
+    if "horsepower" in df.columns:
+        df["horsepower"] = pd.to_numeric(df["horsepower"], errors="coerce")
+    else:
+        df["horsepower"] = np.nan
+    if horsepower_from_engines is not None:
+        engine_hp_series = pd.to_numeric(horsepower_from_engines, errors="coerce")
+        df["horsepower"] = df["horsepower"].combine_first(engine_hp_series)
     df["horsepower"] = pd.to_numeric(df["horsepower"], errors="coerce")
     df["horsepower"].fillna(df["horsepower"].median(), inplace=True)
     df["rating"].fillna(df["rating"].median(), inplace=True)
