@@ -139,6 +139,9 @@ CHAT_SESSIONS = {}
 # In-memory session store for authentication
 AUTH_SESSIONS = {}  # {token: {user_id, username, created_at}}
 
+# Track database initialization so gunicorn workers don't race on startup
+DB_INITIALIZED = False
+
 # AI caches
 PRICE_MODEL_BUNDLE = None
 PRICE_MODEL_METADATA = {}
@@ -483,6 +486,24 @@ def migrate_favorites_table():
         conn.rollback()
     finally:
         conn.close()
+
+
+def ensure_database_ready():
+    """Initialize database schema once, even when running under gunicorn."""
+    global DB_INITIALIZED
+    if DB_INITIALIZED:
+        return
+    try:
+        init_db()
+        DB_INITIALIZED = True
+        print("✅ Database schema initialized")
+    except Exception as exc:
+        print(f"❌ Failed to initialize database: {exc}")
+        raise
+
+
+# Eagerly prepare the schema when the module is imported (Render/gunicorn)
+ensure_database_ready()
 
 # Database helper functions
 def get_db():
@@ -3463,7 +3484,7 @@ def swagger():
     return jsonify(swagger_spec)
 
 if __name__ == '__main__':
-    init_db()
+    ensure_database_ready()
     port = int(os.getenv('PORT') or os.getenv('FLASK_RUN_PORT') or 5000)
     host = os.getenv('FLASK_RUN_HOST', '0.0.0.0')
     public_host = 'localhost' if host in {'0.0.0.0', '::'} else host
