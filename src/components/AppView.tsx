@@ -1944,8 +1944,8 @@ export function AppView() {
                                 key={opt.value}
                                 onClick={() => setLanguage(opt.value)}
                                 className={`rounded-lg py-1.5 text-xs font-semibold transition ${language === opt.value
-                                    ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
-                                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400'
+                                  ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
+                                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400'
                                   }`}
                               >
                                 {opt.label}
