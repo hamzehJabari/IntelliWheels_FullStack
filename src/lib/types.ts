@@ -1,4 +1,4 @@
-export type CurrencyCode = 'AED' | 'USD' | 'EUR' | 'GBP' | 'SAR' | 'QAR' | 'BHD' | 'KWD' | 'OMR' | 'EGP' | 'MAD' | 'JOD' | string;
+export type CurrencyCode = 'JOD' | 'AED' | 'USD' | 'EUR' | 'GBP' | 'SAR' | 'QAR' | 'BHD' | 'KWD' | 'OMR' | 'EGP' | 'MAD' | string;
 
 export type SortOption = 'default' | 'price-asc' | 'price-desc' | 'rating-desc' | 'year-desc';
 

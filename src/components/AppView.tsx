@@ -143,6 +143,10 @@ const TRANSLATIONS = {
     dealerMetaTopMakes: 'Top makes',
     dealerInventoryTitle: 'Available cars',
     dealerContactCta: 'Contact dealer',
+    settingsLabel: 'Settings',
+    settingsTheme: 'Theme',
+    settingsLanguage: 'Language',
+    settingsCurrency: 'Currency',
     footerContact: 'Contact',
     footerSupport: 'Support',
     footerSocial: 'Social',
@@ -240,16 +244,16 @@ const LANGUAGE_OPTIONS = [
 const CURRENCY_OPTIONS: CurrencyCode[] = ['AED', 'USD', 'EUR', 'GBP', 'SAR', 'QAR', 'BHD', 'KWD', 'OMR', 'JOD'];
 
 const CURRENCY_RATES: Record<CurrencyCode, number> = {
-  AED: 1,
-  USD: 3.6725,
-  EUR: 3.99,
-  GBP: 4.66,
-  SAR: 0.98,
-  QAR: 1.0,
-  BHD: 9.74,
-  KWD: 11.95,
-  OMR: 9.55,
-  JOD: 5.19,
+  JOD: 1,
+  AED: 0.19,
+  USD: 0.71,
+  EUR: 0.65,
+  GBP: 0.56,
+  SAR: 0.19,
+  QAR: 0.19,
+  BHD: 0.53,
+  KWD: 0.43,
+  OMR: 2.15,
 };
 
 const DEFAULT_FILTERS: CarFilters = {
@@ -324,7 +328,7 @@ export function AppView() {
     videoUrl: '',
     description: '',
   });
-  const [currency, setCurrency] = useState<CurrencyCode>('AED');
+  const [currency, setCurrency] = useState<CurrencyCode>('JOD');
   const [language, setLanguage] = useState<'en' | 'ar'>('en');
   const [isDraggingImage, setIsDraggingImage] = useState(false);
   const [priceEstimate, setPriceEstimate] = useState<{ value: number; currency: string; range?: { low: number; high: number } } | null>(null);
@@ -1876,8 +1880,8 @@ export function AppView() {
                   key={item.key}
                   onClick={() => setActivePage(item.key as PageKey)}
                   className={`rounded-xl px-4 py-2 text-sm font-semibold transition-all ${activePage === item.key
-                      ? 'bg-slate-100/10 text-indigo-500 shadow-sm ring-1 ring-inset ring-slate-200/10 dark:text-indigo-400'
-                      : `text-slate-500 hover:bg-slate-100/5 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200`
+                    ? 'bg-slate-100/10 text-indigo-500 shadow-sm ring-1 ring-inset ring-slate-200/10 dark:text-indigo-400'
+                    : `text-slate-500 hover:bg-slate-100/5 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200`
                     }`}
                 >
                   {item.label}
@@ -1929,72 +1933,108 @@ export function AppView() {
                         </div>
                       </button>
                       <div className="my-2 h-px bg-slate-100 dark:bg-slate-800" />
-                      <div className="px-3 py-2">
-                        <p className="mb-2 text-xs font-bold text-slate-500">{copy.themeLabel}</p>
-                        <div className="grid grid-cols-3 gap-2">
-                          {THEME_OPTIONS.map((opt) => (
-                            <button
-                              key={opt.value}
-                              onClick={() => setTheme(opt.value)}
-                              className={`rounded-lg py-2 text-xs font-semibold transition ${theme === opt.value
+                      <div className="my-2 h-px bg-slate-100 dark:bg-slate-800" />
+                      <div className="space-y-4 px-3 py-2">
+                        {/* Language Selector */}
+                        <div>
+                          <label className="mb-1 block text-xs font-bold text-slate-500">{copy.settingsLanguage}</label>
+                          <div className="grid grid-cols-2 gap-2">
+                            {LANGUAGE_OPTIONS.map((opt) => (
+                              <button
+                                key={opt.value}
+                                onClick={() => setLanguage(opt.value)}
+                                className={`rounded-lg py-1.5 text-xs font-semibold transition ${language === opt.value
+                                    ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
+                                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400'
+                                  }`}
+                              >
+                                {opt.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Currency Selector */}
+                        <div>
+                          <label className="mb-1 block text-xs font-bold text-slate-500">{copy.settingsCurrency}</label>
+                          <select
+                            value={currency}
+                            onChange={(e) => setCurrency(e.target.value as CurrencyCode)}
+                            className="w-full appearance-none rounded-xl border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                          >
+                            {CURRENCY_OPTIONS.map((code) => (
+                              <option key={code} value={code}>{code}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {/* Theme Selector */}
+                        <div>
+                          <p className="mb-1 text-xs font-bold text-slate-500">{copy.themeLabel}</p>
+                          <div className="grid grid-cols-3 gap-2">
+                            {THEME_OPTIONS.map((opt) => (
+                              <button
+                                key={opt.value}
+                                onClick={() => setTheme(opt.value)}
+                                className={`rounded-lg py-2 text-xs font-semibold transition ${theme === opt.value
                                   ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/30'
                                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400'
-                                }`}
-                            >
-                              {copy[opt.labelKey]}
-                            </button>
-                          ))}
+                                  }`}
+                              >
+                                {copy[opt.labelKey]}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="mt-2">
+                          {!user ? (
+                            <div className="grid grid-cols-2 gap-2 p-1">
+                              <button onClick={() => { setActivePage('profile'); setSettingsOpen(false); }} className="rounded-xl border border-slate-200 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50">Sign In</button>
+                              <button onClick={() => { setActivePage('profile'); setSettingsOpen(false); }} className="rounded-xl bg-slate-900 py-2.5 text-sm font-bold text-white hover:bg-slate-800">Sign Up</button>
+                            </div>
+                          ) : (
+                            <button onClick={() => { logout(); setSettingsOpen(false); }} className="w-full rounded-xl border border-slate-200 py-2.5 text-center text-sm font-bold text-rose-600 hover:bg-rose-50 dark:border-slate-700 dark:hover:bg-rose-900/20">Sign Out</button>
+                          )}
                         </div>
                       </div>
-                      <div className="mt-2">
-                        {!user ? (
-                          <div className="grid grid-cols-2 gap-2 p-1">
-                            <button onClick={() => { setActivePage('profile'); setSettingsOpen(false); }} className="rounded-xl border border-slate-200 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50">Sign In</button>
-                            <button onClick={() => { setActivePage('profile'); setSettingsOpen(false); }} className="rounded-xl bg-slate-900 py-2.5 text-sm font-bold text-white hover:bg-slate-800">Sign Up</button>
-                          </div>
-                        ) : (
-                          <button onClick={() => { logout(); setSettingsOpen(false); }} className="w-full rounded-xl border border-slate-200 py-2.5 text-center text-sm font-bold text-rose-600 hover:bg-rose-50 dark:border-slate-700 dark:hover:bg-rose-900/20">Sign Out</button>
-                        )}
-                      </div>
                     </div>
-                  </div>
                 )}
-              </div>
+                  </div>
 
               {/* Mobile Menu Toggle */}
-              <button
-                className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 text-slate-600 md:hidden dark:border-slate-700 dark:text-slate-300"
-                onClick={() => setNavMenuOpen(!navMenuOpen)}
-              >
-                ☰
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Mobile Nav Drawer */}
-        {navMenuOpen && (
-          <div className="border-t border-slate-100 bg-white/95 px-4 py-4 backdrop-blur-xl dark:border-slate-800 dark:bg-slate-900/95 md:hidden">
-            <div className="space-y-1">
-              {[
-                { key: 'listings', label: copy.navCatalog },
-                { key: 'dealers', label: copy.navDealers },
-                { key: 'chatbot', label: copy.navChatbot },
-                { key: 'analytics', label: copy.navAnalytics },
-                { key: 'profile', label: copy.navProfile },
-              ].map((item) => (
                 <button
-                  key={item.key}
-                  onClick={() => { setActivePage(item.key as PageKey); setNavMenuOpen(false); }}
-                  className={`block w-full rounded-xl px-4 py-3 text-left font-semibold ${activePage === item.key ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/20 dark:text-indigo-400' : 'text-slate-600 hover:bg-slate-50 dark:text-slate-300'
-                    }`}
+                  className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 text-slate-600 md:hidden dark:border-slate-700 dark:text-slate-300"
+                  onClick={() => setNavMenuOpen(!navMenuOpen)}
                 >
-                  {item.label}
+                  ☰
                 </button>
-              ))}
+              </div>
             </div>
           </div>
-        )}
+
+          {/* Mobile Nav Drawer */}
+          {navMenuOpen && (
+            <div className="border-t border-slate-100 bg-white/95 px-4 py-4 backdrop-blur-xl dark:border-slate-800 dark:bg-slate-900/95 md:hidden">
+              <div className="space-y-1">
+                {[
+                  { key: 'listings', label: copy.navCatalog },
+                  { key: 'dealers', label: copy.navDealers },
+                  { key: 'chatbot', label: copy.navChatbot },
+                  { key: 'analytics', label: copy.navAnalytics },
+                  { key: 'profile', label: copy.navProfile },
+                ].map((item) => (
+                  <button
+                    key={item.key}
+                    onClick={() => { setActivePage(item.key as PageKey); setNavMenuOpen(false); }}
+                    className={`block w-full rounded-xl px-4 py-3 text-left font-semibold ${activePage === item.key ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/20 dark:text-indigo-400' : 'text-slate-600 hover:bg-slate-50 dark:text-slate-300'
+                      }`}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
       </header>
       <div className="mx-auto max-w-7xl space-y-8 px-4 py-10">
         <main className={`rounded-3xl ${mainSurfaceClass} p-6 shadow-lg`}>
@@ -2045,10 +2085,30 @@ function StatCard({ label, value }: { label: string; value: string }) {
 function convertCurrency(value?: number, fromCurrency: CurrencyCode = 'AED', toCurrency: CurrencyCode = 'AED') {
   if (value === undefined || value === null) return null;
   if (fromCurrency === toCurrency) return value;
-  const fromRate = CURRENCY_RATES[fromCurrency] ?? 1;
-  const toRate = CURRENCY_RATES[toCurrency] ?? 1;
-  const valueInAed = fromCurrency === 'AED' ? value : value * fromRate;
-  const converted = toCurrency === 'AED' ? valueInAed : valueInAed / toRate;
+
+  // Convert from source to JOD (Base) first
+  // Rates are defined as "How many JOD is 1 Unit of Source" ? NO
+  // Let's assume rates in CURRENCY_RATES are "Value of 1 [Key] in JOD"
+  // Wait, previous rates were based on AED. 
+  // Old: USD: 3.6725 (1 USD = 3.67 AED).
+  // New Base: JOD.
+  // Rate logic: 1 JOD = X Currency? OR 1 Currency = X JOD?
+  // Let's stick to: 1 [Key] = [Value] Base Currency (JOD).
+  // So if Base is JOD:
+  // USD = 0.709 (1 USD is 0.709 JOD)
+  // AED = 0.19  (1 AED is 0.19 JOD)
+
+  const fromRate = CURRENCY_RATES[fromCurrency as keyof typeof CURRENCY_RATES] ?? 1; // Value of 1 FromUnit in JOD
+  const toRate = CURRENCY_RATES[toCurrency as keyof typeof CURRENCY_RATES] ?? 1;     // Value of 1 ToUnit in JOD
+
+  // Convert Source to Base (JOD)
+  // Value * Rate = Value in JOD
+  const valueInBase = value * fromRate;
+
+  // Convert Base to Target
+  // ValueInBase / ToRate = Value in Target
+  const converted = valueInBase / toRate;
+
   return converted;
 }
 

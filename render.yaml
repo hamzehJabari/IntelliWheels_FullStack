@@ -10,6 +10,6 @@ services:
       - key: PYTHON_VERSION
         value: 3.11.9
       - key: GEMINI_API_KEY
-        sync: false
+        value: AIzaSyC2YkBLx32UpPW2D_qE4hKxdfqzhTWASOc
       - key: FRONTEND_ORIGIN
         value: https://intelliwheels.vercel.app
