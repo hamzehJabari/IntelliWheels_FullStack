@@ -17,16 +17,40 @@ from functools import wraps
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
+import logging
+import sys
+
+# Configure IO to handle utf-8 (for windows console/logs)
+sys.stdout.reconfigure(encoding='utf-8')
+sys.stderr.reconfigure(encoding='utf-8')
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(sys.stdout)
+    ]
+)
+logger = logging.getLogger("IntelliWheels")
 
 import numpy as np
 import pandas as pd
 
+# Environment controls
+DISABLE_AI = os.getenv('DISABLE_AI', 'false').lower() in ('true', '1', 'yes')
+
 try:
+    if DISABLE_AI:
+        raise ImportError("AI features disabled by configuration")
     import joblib
     JOBLIB_AVAILABLE = True
 except ImportError:
     JOBLIB_AVAILABLE = False
-    print("⚠️ Warning: joblib not installed. Install with: pip install joblib")
+    if not DISABLE_AI:
+        print("⚠️ Warning: joblib not installed. Install with: pip install joblib")
+    else:
+        print("ℹ️ AI Features (joblib) disabled via config")
 
 try:
     import requests
@@ -36,11 +60,16 @@ except ImportError:
     print("⚠️ Warning: requests not installed. Install with: pip install requests")
 
 try:
+    if DISABLE_AI:
+        raise ImportError("AI features disabled by configuration")
     from sentence_transformers import SentenceTransformer
     SENTENCE_TRANSFORMERS_AVAILABLE = True
 except ImportError:
     SENTENCE_TRANSFORMERS_AVAILABLE = False
-    print("⚠️ Warning: sentence-transformers not installed. Install with: pip install sentence-transformers")
+    if not DISABLE_AI:
+        print("⚠️ Warning: sentence-transformers not installed. Install with: pip install sentence-transformers")
+    else:
+        print("ℹ️ AI Features (sentence-transformers) disabled via config")
 
 try:
     from flask_swagger_ui import get_swaggerui_blueprint
@@ -50,7 +79,10 @@ except ImportError:
     print("⚠️ Warning: flask-swagger-ui not installed. Install with: pip install flask-swagger-ui")
 
 app = Flask(__name__)
-CORS(app)  # Enable CORS for frontend
+# Allow CORS for all domains, but support credentials if needed.
+# Configuring to allow Vercel frontend explicitly might be better for production,
+# but for now we enable all to rule out CORS issues.
+CORS(app, resources={r"/*": {"origins": "*"}})
 
 # Swagger UI configuration
 if SWAGGER_AVAILABLE:
@@ -375,10 +407,18 @@ def init_db():
             username TEXT NOT NULL UNIQUE,
             email TEXT NOT NULL UNIQUE,
             password_hash TEXT NOT NULL,
+            role TEXT DEFAULT 'user',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             last_login TIMESTAMP
         )
     ''')
+    
+    # Check for role column in users (migration)
+    cursor.execute("PRAGMA table_info(users)")
+    user_columns = {col[1] for col in cursor.fetchall()}
+    if 'role' not in user_columns:
+        cursor.execute("ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'user'")
+        print("✅ Added role column to users table")
     
     # User sessions table for persistent sessions
     cursor.execute('''
@@ -725,7 +765,7 @@ def get_user_from_token(token):
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute('''
-        SELECT u.id, u.username, u.email, us.token
+        SELECT u.id, u.username, u.email, u.role, us.token
         FROM users u
         INNER JOIN user_sessions us ON u.id = us.user_id
         WHERE us.token = ? AND (us.expires_at IS NULL OR us.expires_at > datetime('now'))
@@ -737,7 +777,8 @@ def get_user_from_token(token):
         user_info = {
             'user_id': row[0],
             'username': row[1],
-            'email': row[2]
+            'email': row[2],
+            'role': row[3]
         }
         AUTH_SESSIONS[token] = user_info
         return user_info
@@ -793,6 +834,8 @@ def signup():
         email = data.get('email', '').strip().lower()
         password = data.get('password', '')
         
+        logger.info(f"Signup attempt for user: {username}")
+        
         # Validation
         if not username or len(username) < 3:
             return jsonify({'success': False, 'error': 'Username must be at least 3 characters'}), 400
@@ -814,9 +857,10 @@ def signup():
         
         # Create user
         password_hash = hash_password(password)
+
         cursor.execute('''
-            INSERT INTO users (username, email, password_hash)
-            VALUES (?, ?, ?)
+            INSERT INTO users (username, email, password_hash, role)
+            VALUES (?, ?, ?, 'user')
         ''', (username, email, password_hash))
         
         user_id = cursor.lastrowid
@@ -835,7 +879,8 @@ def signup():
         AUTH_SESSIONS[token] = {
             'user_id': user_id,
             'username': username,
-            'email': email
+            'email': email,
+            'role': 'user'
         }
         
         return jsonify({
@@ -845,13 +890,16 @@ def signup():
             'user': {
                 'id': user_id,
                 'username': username,
-                'email': email
+                'email': email,
+                'role': 'user'
             }
         }), 201
         
     except sqlite3.IntegrityError:
+        logger.warning(f"Signup duplicate: {username} or {email}")
         return jsonify({'success': False, 'error': 'Username or email already exists'}), 400
     except Exception as e:
+        logger.error(f"Signup error: {str(e)}", exc_info=True)
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/auth/login', methods=['POST'])
@@ -877,7 +925,7 @@ def login():
         
         # Find user by username or email
         cursor.execute('''
-            SELECT id, username, email, password_hash
+            SELECT id, username, email, password_hash, role
             FROM users
             WHERE username = ? OR email = ?
         ''', (username_or_email, username_or_email.lower()))
@@ -887,11 +935,12 @@ def login():
             conn.close()
             return jsonify({'success': False, 'error': 'Invalid credentials'}), 401
         
-        user_id, username, email, password_hash = row
+        user_id, username, email, password_hash, role = row
         
         # Verify password
         if not verify_password(password, password_hash):
             conn.close()
+            logger.warning(f"Login failed for user: {username_or_email}")
             return jsonify({'success': False, 'error': 'Invalid credentials'}), 401
         
         # Update last login
@@ -913,7 +962,8 @@ def login():
         AUTH_SESSIONS[token] = {
             'user_id': user_id,
             'username': username,
-            'email': email
+            'email': email,
+            'role': role
         }
         
         return jsonify({
@@ -923,7 +973,8 @@ def login():
             'user': {
                 'id': user_id,
                 'username': username,
-                'email': email
+                'email': email,
+                'role': role
             }
         })
         
@@ -984,7 +1035,8 @@ def verify_session():
                 'user': {
                     'id': user['user_id'],
                     'username': user['username'],
-                    'email': user['email']
+                    'email': user['email'],
+                    'role': user.get('role', 'user')
                 }
             })
         else:
@@ -1021,6 +1073,7 @@ def get_profile():
                 'id': row[0],
                 'username': row[1],
                 'email': row[2],
+                'role': request.current_user.get('role', 'user'),
                 'created_at': row[3],
                 'last_login': row[4]
             }
@@ -1113,10 +1166,39 @@ def update_profile():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@app.route('/api/admin/set-role', methods=['POST'])
+@require_auth
+def set_user_role():
+    """Admin only: Set a user's role"""
+    try:
+        current_role = request.current_user.get('role')
+        if current_role != 'admin':
+             return jsonify({'success': False, 'error': 'Admin privileges required'}), 403
+        
+        data = request.get_json()
+        target_username = data.get('username')
+        new_role = data.get('role')
+        
+        if new_role not in ('user', 'dealer', 'admin'):
+             return jsonify({'success': False, 'error': 'Invalid role'}), 400
+        
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("UPDATE users SET role = ? WHERE username = ?", (new_role, target_username))
+        if cursor.rowcount == 0:
+             conn.close()
+             return jsonify({'success': False, 'error': 'User not found'}), 404
+        
+        conn.commit()
+        conn.close()
+        return jsonify({'success': True, 'message': f"User {target_username} is now a {new_role}"})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 # API Routes
 
 @app.route('/api/cars', methods=['GET'])
-@require_auth
+@app.route('/api/cars', methods=['GET'])
 def get_cars():
     """Get all cars with optional filtering and sorting"""
     try:
@@ -1190,7 +1272,7 @@ def get_cars():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/cars/<int:car_id>', methods=['GET'])
-@require_auth
+@app.route('/api/cars/<int:car_id>', methods=['GET'])
 def get_car(car_id):
     """Get a single car by ID"""
     try:
@@ -1464,7 +1546,7 @@ def upload_image():
         return jsonify({'success': False, 'error': str(exc)}), 500
 
 @app.route('/api/makes', methods=['GET'])
-@require_auth
+@app.route('/api/makes', methods=['GET'])
 def get_makes():
     """Get all unique car makes"""
     try:
@@ -1479,7 +1561,7 @@ def get_makes():
 
 
 @app.route('/api/dealers', methods=['GET'])
-@require_auth
+@app.route('/api/dealers', methods=['GET'])
 def list_dealers():
     """List active dealers with summary stats"""
     try:
@@ -1493,6 +1575,7 @@ def list_dealers():
                    MAX(c.updated_at) AS last_listing_at
             FROM users u
             JOIN cars c ON c.user_id = u.id
+            WHERE u.role = 'dealer'
             GROUP BY u.id
             ORDER BY total_listings DESC
         ''')
@@ -1547,14 +1630,14 @@ def list_dealers():
 
 
 @app.route('/api/dealers/<int:dealer_id>', methods=['GET'])
-@require_auth
+@app.route('/api/dealers/<int:dealer_id>', methods=['GET'])
 def get_dealer_detail(dealer_id):
     """Fetch a dealer profile with active inventory"""
     try:
         conn = get_db()
         cursor = conn.cursor()
 
-        cursor.execute('SELECT id, username, email, created_at FROM users WHERE id = ?', (dealer_id,))
+        cursor.execute('SELECT id, username, email, created_at FROM users WHERE id = ? AND role = "dealer"', (dealer_id,))
         dealer_row = cursor.fetchone()
         if not dealer_row:
             conn.close()
@@ -2391,6 +2474,22 @@ def get_ai_insights():
         
         rows = cursor.fetchall()
         cars = [car_row_to_dict(row) for row in rows]
+
+        def coerce_float(value):
+            if value in (None, '', 'null'):
+                return None
+            try:
+                return float(value)
+            except (TypeError, ValueError):
+                return None
+
+        def coerce_int(value):
+            if value in (None, '', 'null'):
+                return None
+            try:
+                return int(value)
+            except (TypeError, ValueError):
+                return None
         
         # Get user-specific stats
         cursor.execute('SELECT COUNT(*) FROM cars WHERE user_id = ?', (user_id,))
@@ -2410,44 +2509,98 @@ def get_ai_insights():
         total_cars = len(cars)
         total_makes = len(set(car['make'] for car in cars if car.get('make')))
         total_models = len(set(f"{car['make']} {car['model']}" for car in cars if car.get('make') and car.get('model')))
-        
+        currency_code = None
+        prices = []
+        ratings = []
+        years = []
+        for car in cars:
+            if not currency_code:
+                currency_code = car.get('currency') or 'AED'
+            price_val = coerce_float(car.get('price'))
+            if price_val is not None:
+                prices.append(price_val)
+            rating_val = coerce_float(car.get('rating'))
+            if rating_val is not None:
+                ratings.append(rating_val)
+            year_val = coerce_int(car.get('year'))
+            if year_val is not None:
+                years.append(year_val)
+
         # Price analysis
-        prices = [car['price'] for car in cars if car.get('price')]
         avg_price = sum(prices) / len(prices) if prices else 0
         min_price = min(prices) if prices else 0
         max_price = max(prices) if prices else 0
-        
+
         # Rating analysis
-        ratings = [car['rating'] for car in cars if car.get('rating')]
         avg_rating = sum(ratings) / len(ratings) if ratings else 0
-        top_rated = sorted(cars, key=lambda x: x.get('rating', 0), reverse=True)[:5]
-        
+        # Rating analysis
+        avg_rating = sum(ratings) / len(ratings) if ratings else 0
+        try:
+             top_rated = sorted(cars, key=lambda x: (coerce_float(x.get('rating')) or 0), reverse=True)[:5]
+        except Exception:
+             top_rated = []
+
         # Make distribution
         make_counts = {}
         for car in cars:
             make = car.get('make', 'Unknown')
             make_counts[make] = make_counts.get(make, 0) + 1
         top_makes = sorted(make_counts.items(), key=lambda x: x[1], reverse=True)[:10]
+
+        make_price_totals = defaultdict(list)
+        for car in cars:
+            make = car.get('make', 'Unknown')
+            price_val = coerce_float(car.get('price'))
+            if price_val is not None:
+                make_price_totals[make].append(price_val)
+
+        market_top_makes = []
+        for make, count in top_makes:
+            prices_for_make = make_price_totals.get(make, [])
+            avg_make_price = sum(prices_for_make) / len(prices_for_make) if prices_for_make else None
+            market_top_makes.append({
+                'make': make,
+                'listings': count,
+                'avg_price': round(avg_make_price, 2) if avg_make_price is not None else None
+            })
         
         # Year analysis
-        years = [car['year'] for car in cars if car.get('year')]
         avg_year = sum(years) / len(years) if years else 0
         newest_year = max(years) if years else None
         oldest_year = min(years) if years else None
         
         # Price range distribution
         price_ranges = {
-            'Budget (< 50K)': len([c for c in cars if c.get('price', 0) < 50000]),
-            'Mid-Range (50K-100K)': len([c for c in cars if 50000 <= c.get('price', 0) < 100000]),
-            'Premium (100K-200K)': len([c for c in cars if 100000 <= c.get('price', 0) < 200000]),
-            'Luxury (200K+)': len([c for c in cars if c.get('price', 0) >= 200000])
+            'Budget (< 50K)': 0,
+            'Mid-Range (50K-100K)': 0,
+            'Premium (100K-200K)': 0,
+            'Luxury (200K+)': 0,
+            'Unpriced': 0
         }
+        for car in cars:
+            price_val = coerce_float(car.get('price'))
+            if price_val is None:
+                price_ranges['Unpriced'] += 1
+                continue
+            if price_val < 50000:
+                price_ranges['Budget (< 50K)'] += 1
+            elif price_val < 100000:
+                price_ranges['Mid-Range (50K-100K)'] += 1
+            elif price_val < 200000:
+                price_ranges['Premium (100K-200K)'] += 1
+            else:
+                price_ranges['Luxury (200K+)'] += 1
+        price_distribution = [
+            {'bucket': bucket, 'count': count}
+            for bucket, count in price_ranges.items()
+        ]
         
         # Currency distribution
         currency_counts = {}
         for car in cars:
             currency = car.get('currency', 'AED')
             currency_counts[currency] = currency_counts.get(currency, 0) + 1
+        currency_code = currency_code or 'AED'
         
         # Generate personalized AI insights using Gemini
         api_key = os.getenv('GEMINI_API_KEY')
@@ -2528,9 +2681,10 @@ Provide concise, personalized, actionable insights about market trends, popular 
                     'max_price': round(max_price, 2),
                     'average_rating': round(avg_rating, 2),
                     'average_year': round(avg_year, 0) if avg_year else None,
-                    'year_range': {'oldest': oldest_year, 'newest': newest_year}
+                    'year_range': {'oldest': oldest_year, 'newest': newest_year},
+                    'currency': currency_code
                 },
-                'top_makes': [{'make': make, 'count': count} for make, count in top_makes],
+                'market_top_makes': market_top_makes,
                 'top_rated_cars': [{
                     'id': car['id'],
                     'make': car.get('make'),
@@ -2538,7 +2692,7 @@ Provide concise, personalized, actionable insights about market trends, popular 
                     'rating': car.get('rating', 0),
                     'price': car.get('price', 0)
                 } for car in top_rated],
-                'price_distribution': price_ranges,
+                'price_distribution': price_distribution,
                 'currency_distribution': currency_counts,
                 'ai_insights': insights_text
             }

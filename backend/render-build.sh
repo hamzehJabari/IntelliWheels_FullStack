@@ -16,10 +16,14 @@ else
   python ingest_excel_to_db.py
 fi
 
-echo "[render-build] Training fair-price model"
-python models/train_price_model.py
+if [ "${DISABLE_AI:-false}" = "true" ] || [ "${DISABLE_AI:-false}" = "1" ]; then
+  echo "[render-build] Skipping AI model training (DISABLE_AI is set)"
+else
+  echo "[render-build] Training fair-price model"
+  python models/train_price_model.py || echo "⚠️ Price model training failed, continuing..."
 
-echo "[render-build] Building semantic embeddings"
-python models/build_embeddings.py
+  echo "[render-build] Building semantic embeddings"
+  python models/build_embeddings.py || echo "⚠️ Embedding build failed, continuing..."
+fi
 
 echo "[render-build] Build pipeline completed"

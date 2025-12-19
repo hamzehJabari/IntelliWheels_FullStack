@@ -392,8 +392,8 @@ export function AppView() {
   const statusPillClass = token
     ? 'border border-emerald-400/40 bg-emerald-500/10 text-emerald-300'
     : resolvedTheme === 'dark'
-    ? 'border border-blue-500/30 bg-blue-900/40 text-blue-200'
-    : 'border border-slate-200 bg-white/20 text-white';
+      ? 'border border-blue-500/30 bg-blue-900/40 text-blue-200'
+      : 'border border-slate-200 bg-white/20 text-white';
   const subtleBorderClass = resolvedTheme === 'dark' ? 'border-blue-900/30' : 'border-sky-900/40';
   const navActiveItemClass = resolvedTheme === 'dark'
     ? 'bg-blue-900/60 text-slate-50'
@@ -684,14 +684,14 @@ export function AppView() {
         .map((session) =>
           session.id === sessionId
             ? {
-                ...session,
-                messages: messages.slice(-CHAT_HISTORY_LIMIT),
-                updatedAt: new Date().toISOString(),
-                title:
-                  session.title === 'New Chat' && messages.length
-                    ? messages.find((msg) => msg.role === 'user')?.text.slice(0, 60) || 'Chat'
-                    : session.title,
-              }
+              ...session,
+              messages: messages.slice(-CHAT_HISTORY_LIMIT),
+              updatedAt: new Date().toISOString(),
+              title:
+                session.title === 'New Chat' && messages.length
+                  ? messages.find((msg) => msg.role === 'user')?.text.slice(0, 60) || 'Chat'
+                  : session.title,
+            }
             : session
         )
         .sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1))
@@ -1027,14 +1027,14 @@ export function AppView() {
         assistantMode === 'listing'
           ? await handleListingAssistantMessage({ query: message, history: historyPayload }, token)
           : await handleChatbotMessage(
-              {
-                query: message,
-                history: historyPayload,
-                imageBase64: chatAttachment?.base64,
-                imageMimeType: chatAttachment?.mime,
-              },
-              token
-            );
+            {
+              query: message,
+              history: historyPayload,
+              imageBase64: chatAttachment?.base64,
+              imageMimeType: chatAttachment?.mime,
+            },
+            token
+          );
 
       const assistantMessage: ChatMessage = {
         id: `assistant-${Date.now()}`,
@@ -1148,9 +1148,8 @@ export function AppView() {
         />
         <button
           onClick={() => toggleFavorite(car)}
-          className={`absolute right-3 top-3 rounded-full px-3 py-1 text-xs font-semibold ${
-            favorites.includes(car.id) ? 'bg-rose-500 text-white' : 'bg-white/90 text-slate-900'
-          }`}
+          className={`absolute right-3 top-3 rounded-full px-3 py-1 text-xs font-semibold ${favorites.includes(car.id) ? 'bg-rose-500 text-white' : 'bg-white/90 text-slate-900'
+            }`}
         >
           {favorites.includes(car.id) ? 'Favorited' : 'Favorite'}
         </button>
@@ -1257,7 +1256,8 @@ export function AppView() {
           className="mt-4 space-y-4"
           onSubmit={async (event: React.FormEvent<HTMLFormElement>) => {
             event.preventDefault();
-            const formData = new FormData(event.currentTarget);
+            const formElement = event.currentTarget;
+            const formData = new FormData(formElement);
             const username = String(formData.get('signup-username'));
             const email = String(formData.get('signup-email'));
             const password = String(formData.get('signup-password'));
@@ -1265,7 +1265,7 @@ export function AppView() {
             const success = await signup(username, email, password);
             if (success) {
               showToast('Account created! You are now signed in.');
-              event.currentTarget.reset();
+              formElement.reset();
             } else {
               showToast('Unable to sign up. Please try again.', 'error');
             }
@@ -1305,7 +1305,8 @@ export function AppView() {
             className="mt-4 space-y-3"
             onSubmit={async (event: React.FormEvent<HTMLFormElement>) => {
               event.preventDefault();
-              const formData = new FormData(event.currentTarget);
+              const formElement = event.currentTarget;
+              const formData = new FormData(formElement);
               const username = formData.get('profile-username')?.toString();
               const email = formData.get('profile-email')?.toString();
               const current_password = formData.get('profile-current-password')?.toString();
@@ -1313,7 +1314,7 @@ export function AppView() {
               const result = await updateMyProfile({ username, email, current_password, password });
               if (result) {
                 showToast('Profile updated');
-                event.currentTarget.reset();
+                formElement.reset();
               }
             }}
           >
@@ -1342,9 +1343,8 @@ export function AppView() {
             <button
               key={session.id}
               onClick={() => setActiveSessionId(session.id)}
-              className={`w-full rounded-2xl px-3 py-2 text-left text-sm ${
-                session.id === activeSessionId ? 'bg-sky-50 text-slate-900' : 'bg-slate-50 text-slate-500'
-              }`}
+              className={`w-full rounded-2xl px-3 py-2 text-left text-sm ${session.id === activeSessionId ? 'bg-sky-50 text-slate-900' : 'bg-slate-50 text-slate-500'
+                }`}
             >
               <span className="block font-semibold">{session.title}</span>
               <span className="text-xs">{new Date(session.updatedAt).toLocaleString()}</span>
@@ -1443,9 +1443,8 @@ export function AppView() {
             <button
               key={filter}
               onClick={() => setAnalyticsFilter(filter as 'all' | 'my' | 'favorites')}
-              className={`rounded-2xl px-4 py-2 text-sm font-semibold ${
-                analyticsFilter === filter ? 'bg-sky-600 text-white' : 'border border-slate-200 bg-white text-slate-600'
-              }`}
+              className={`rounded-2xl px-4 py-2 text-sm font-semibold ${analyticsFilter === filter ? 'bg-sky-600 text-white' : 'border border-slate-200 bg-white text-slate-600'
+                }`}
             >
               {camelToTitle(filter)}
             </button>
@@ -1575,9 +1574,8 @@ export function AppView() {
                         key={page}
                         type="button"
                         onClick={() => goToPage(page)}
-                        className={`rounded-2xl px-3 py-1 font-semibold ${
-                          currentPage === page ? 'bg-sky-600 text-white' : 'border border-slate-200 text-slate-700'
-                        }`}
+                        className={`rounded-2xl px-3 py-1 font-semibold ${currentPage === page ? 'bg-sky-600 text-white' : 'border border-slate-200 text-slate-700'
+                          }`}
                       >
                         {page}
                       </button>
@@ -1849,218 +1847,154 @@ export function AppView() {
   return (
     <div className={`${backgroundClass} min-h-screen`} dir={direction}>
       {renderToast()}
-      <header className={`${headerSurfaceClass} border-b ${subtleBorderClass}`}>
-        <div className="mx-auto max-w-7xl px-4 py-6">
-          <div className="flex flex-wrap items-center justify-between gap-6">
-            <div className="flex items-center gap-4 lg:gap-6">
-              <img
-                src="/intellliwheels_logo_concept_dynamic.png"
-                alt="IntelliWheels logo"
-                className="-ml-2 h-24 w-auto object-contain"
-                draggable={false}
-              />
-              <div>
-              <p className={`text-sm uppercase tracking-wider ${headerMuted}`}>IntelliWheels</p>
-              <h1 className="text-3xl font-bold">{copy.tagline}</h1>
-              <p className={`mt-2 text-xs uppercase tracking-wide ${headerMuted}`}>
-                {copy.serviceCurrent}: {currentServiceLabel} • {currentServiceDescription}
-              </p>
+      <header className={`sticky top-0 z-50 border-b backdrop-blur-md transition-colors duration-300 ${headerSurfaceClass} ${subtleBorderClass}`}>
+        <div className="mx-auto flex h-20 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center gap-8">
+            {/* Logo */}
+            <div
+              className="group flex cursor-pointer items-center gap-3"
+              onClick={() => setActivePage('listings')}
+            >
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 shadow-lg transition-transform group-hover:scale-105">
+                <span className="text-xl font-bold text-white">IW</span>
+              </div>
+              <div className="hidden flex-col md:flex">
+                <span className={`text-xl font-bold tracking-tight ${resolvedTheme === 'dark' ? 'text-white' : 'text-slate-900'}`}>IntelliWheels</span>
+                <span className={`text-[10px] font-bold uppercase tracking-wider ${headerMuted}`}>Automotive Intelligence</span>
               </div>
             </div>
-            <div className="flex flex-wrap items-center gap-3 text-sm">
-              <div className={`rounded-full px-4 py-1 text-xs font-semibold ${statusPillClass}`}>
-                {copy.statusLabel}: {token ? copy.statusAuthenticated : copy.statusGuest}
-              </div>
-              <div ref={serviceMenuRef} className="relative">
+
+            {/* Desktop Nav */}
+            <nav className="hidden items-center gap-1 md:flex">
+              {[
+                { key: 'listings', label: copy.navCatalog },
+                { key: 'dealers', label: copy.navDealers },
+                { key: 'chatbot', label: copy.navChatbot },
+                { key: 'analytics', label: copy.navAnalytics },
+              ].map((item) => (
                 <button
-                  type="button"
-                  onClick={() => {
-                    setServiceMenuOpen((prev) => !prev);
-                    setNavMenuOpen(false);
-                    setSettingsOpen(false);
-                  }}
-                  className="flex items-center gap-2 rounded-2xl bg-blue-800/90 px-4 py-2 text-sm font-semibold text-white shadow-lg"
+                  key={item.key}
+                  onClick={() => setActivePage(item.key as PageKey)}
+                  className={`rounded-xl px-4 py-2 text-sm font-semibold transition-all ${activePage === item.key
+                      ? 'bg-slate-100/10 text-indigo-500 shadow-sm ring-1 ring-inset ring-slate-200/10 dark:text-indigo-400'
+                      : `text-slate-500 hover:bg-slate-100/5 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200`
+                    }`}
                 >
-                  {copy.serviceMenuCta}
-                  <span className="text-xs text-slate-200">{currentServiceLabel}</span>
-                  <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                    <path d="M5.23 7.21a.75.75 0 011.06.02L10 11.17l3.71-3.94a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0L5.21 8.27a.75.75 0 01.02-1.06z" />
-                  </svg>
+                  {item.label}
                 </button>
-                {serviceMenuOpen && (
-                  <div className={`absolute right-0 z-20 mt-2 w-72 rounded-2xl border ${resolvedTheme === 'dark' ? 'border-slate-700 bg-slate-900' : 'border-slate-200 bg-white'} shadow-2xl`}>
-                    {SERVICE_CONFIG.map((service) => {
-                      const active = serviceMode === service.key;
-                      return (
-                        <button
-                          key={service.key}
-                          type="button"
-                          onClick={() => {
-                            setServiceMode(service.key);
-                            setActivePage(service.defaultPage);
-                            setServiceMenuOpen(false);
-                          }}
-                          className={`w-full px-4 py-3 text-left ${active ? navActiveItemClass : navIdleItemClass}`}
-                        >
-                          <span className="text-sm font-semibold">{copy[service.labelKey]}</span>
-                          <p className={`text-xs ${resolvedTheme === 'dark' ? 'text-slate-300' : 'text-slate-600'}`}>{copy[service.descriptionKey]}</p>
-                        </button>
-                      );
-                    })}
+              ))}
+            </nav>
+          </div>
+
+          {/* Right Actions */}
+          <div className="flex items-center gap-4">
+            <div className={`hidden h-8 w-px md:block ${resolvedTheme === 'dark' ? 'bg-slate-800' : 'bg-slate-200'}`} />
+
+            <div className="flex items-center gap-2">
+              {/* Search Trigger (Visual Only for now) */}
+              <button className={`hidden rounded-full p-2 text-slate-500 transition hover:bg-slate-100 dark:hover:bg-slate-800 sm:block`}>
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+                </svg>
+              </button>
+
+              {/* Settings Toggle */}
+              <div className="relative" ref={settingsMenuRef}>
+                <button
+                  onClick={() => setSettingsOpen(!settingsOpen)}
+                  className={`flex items-center gap-2 rounded-full border p-1 pr-4 transition-all hover:shadow-md ${statusPillClass}`}
+                >
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-900 text-xs font-bold text-white dark:bg-white dark:text-slate-900">
+                    {user?.username?.[0]?.toUpperCase() || 'G'}
                   </div>
-                )}
-              </div>
-              <div ref={navMenuRef} className="relative">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setNavMenuOpen((prev) => !prev);
-                    setServiceMenuOpen(false);
-                    setSettingsOpen(false);
-                  }}
-                  className={`flex items-center gap-2 rounded-2xl px-4 py-2 font-semibold ${resolvedTheme === 'dark' ? 'bg-blue-900/60 text-slate-100' : 'bg-white/10 text-white'} shadow`}
-                >
-                  {copy.navMenuLabel}
-                  <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                    <path d="M5.23 7.21a.75.75 0 011.06.02L10 11.17l3.71-3.94a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0L5.21 8.27a.75.75 0 01.02-1.06z" />
-                  </svg>
+                  <span className="text-xs font-bold">{user ? user.username : copy.statusGuest}</span>
+                  <span className="text-xs opacity-50">▼</span>
                 </button>
-                {navMenuOpen && (
-                  <div className={`absolute right-0 z-20 mt-2 w-72 rounded-2xl border ${resolvedTheme === 'dark' ? 'border-slate-700 bg-slate-900' : 'border-slate-200 bg-white'} shadow-2xl`}>
-                    {navItems.map((item) => (
-                      <button
-                        key={item.key}
-                        type="button"
-                        onClick={() => {
-                          setActivePage(item.key);
-                          setNavMenuOpen(false);
-                        }}
-                        className={`w-full px-4 py-3 text-left ${activePage === item.key ? navActiveItemClass : navIdleItemClass}`}
-                      >
-                        <span className="text-sm font-semibold">{item.label}</span>
-                        <p className={`text-xs ${resolvedTheme === 'dark' ? 'text-slate-300' : 'text-slate-600'}`}>{item.description}</p>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-              <div ref={settingsMenuRef} className="relative">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSettingsOpen((prev) => !prev);
-                    setServiceMenuOpen(false);
-                    setNavMenuOpen(false);
-                  }}
-                  className={`rounded-2xl px-4 py-2 font-semibold shadow ${resolvedTheme === 'dark' ? 'bg-blue-900/70 text-white border border-white/20' : 'bg-white text-slate-900 border border-slate-200'}`}
-                >
-                  {copy.settingsButton}
-                </button>
+
                 {settingsOpen && (
-                  <div className={`absolute ${direction === 'rtl' ? 'left-0' : 'right-0'} z-20 mt-2 w-80 rounded-3xl border border-slate-200 bg-white text-slate-900 shadow-2xl`}>
-                    <div className="space-y-4 p-4 text-left">
-                      <div>
-                        <p className="text-base font-semibold text-slate-900">{copy.settingsTitle}</p>
-                        <p className="text-sm text-slate-600">{copy.settingsSubtitle}</p>
-                      </div>
-                      <div className="space-y-3 text-sm text-slate-900">
+                  <div className={`absolute right-0 top-full mt-4 w-72 origin-top-right overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-2xl ring-1 ring-black/5 dark:border-slate-800 dark:bg-slate-900`}>
+                    <div className="bg-slate-50 px-6 py-4 dark:bg-slate-800/50">
+                      <p className="text-xs font-bold uppercase tracking-wider text-slate-500">{copy.settingsTitle}</p>
+                      <p className="text-sm text-slate-400">{copy.settingsSubtitle}</p>
+                    </div>
+                    <div className="p-2">
+                      <button
+                        onClick={() => { setActivePage('profile'); setSettingsOpen(false); }}
+                        className="flex w-full items-center gap-3 rounded-2xl p-3 text-left hover:bg-slate-50 dark:hover:bg-slate-800"
+                      >
+                        <span className="flex h-10 w-10 items-center justify-center rounded-full bg-indigo-50 text-xl dark:bg-indigo-900/30">👤</span>
                         <div>
-                          <label className="text-xs uppercase tracking-wide text-slate-900">{copy.selectorsLanguage}</label>
-                          <select
-                            value={language}
-                            onChange={(event) => setLanguage(event.target.value as 'en' | 'ar')}
-                            className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900"
-                          >
-                            {LANGUAGE_OPTIONS.map((option) => (
-                              <option key={option.value} value={option.value} className="text-slate-900">
-                                {option.label}
-                              </option>
-                            ))}
-                          </select>
+                          <p className={`font-semibold text-sm ${resolvedTheme === 'dark' ? 'text-slate-200' : 'text-slate-900'}`}>{user ? copy.settingsProfileCta : copy.settingsProfileGuest}</p>
+                          <p className="text-xs text-slate-500">{user?.email || 'Manage account'}</p>
                         </div>
-                        <div>
-                          <label className="text-xs uppercase tracking-wide text-slate-900">{copy.selectorsCurrency}</label>
-                          <select
-                            value={currency}
-                            onChange={(event) => setCurrency(event.target.value as CurrencyCode)}
-                            className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900"
-                          >
-                            {CURRENCY_OPTIONS.map((code) => (
-                              <option key={code} value={code} className="text-slate-900">
-                                {code}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                        <div>
-                          <label className="text-xs uppercase tracking-wide text-slate-900">{copy.themeLabel}</label>
-                          <select
-                            value={theme}
-                            onChange={(event) => setTheme(event.target.value as ThemeMode)}
-                            className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900"
-                          >
-                            {THEME_OPTIONS.map((option) => (
-                              <option key={option.value} value={option.value} className="text-slate-900">
-                                {copy[option.labelKey]}
-                              </option>
-                            ))}
-                          </select>
+                      </button>
+                      <div className="my-2 h-px bg-slate-100 dark:bg-slate-800" />
+                      <div className="px-3 py-2">
+                        <p className="mb-2 text-xs font-bold text-slate-500">{copy.themeLabel}</p>
+                        <div className="grid grid-cols-3 gap-2">
+                          {THEME_OPTIONS.map((opt) => (
+                            <button
+                              key={opt.value}
+                              onClick={() => setTheme(opt.value)}
+                              className={`rounded-lg py-2 text-xs font-semibold transition ${theme === opt.value
+                                  ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/30'
+                                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400'
+                                }`}
+                            >
+                              {copy[opt.labelKey]}
+                            </button>
+                          ))}
                         </div>
                       </div>
-                      <div className="space-y-3 border-t border-slate-200 pt-3 text-sm">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSettingsOpen(false);
-                            setActivePage('profile');
-                          }}
-                          className="w-full rounded-2xl border border-slate-200 px-4 py-2 font-semibold text-slate-900"
-                        >
-                          {user ? copy.settingsProfileCta : copy.settingsProfileGuest}
-                        </button>
+                      <div className="mt-2">
                         {!user ? (
-                          <div className="space-y-2">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setSettingsOpen(false);
-                                setActivePage('profile');
-                              }}
-                              className="w-full rounded-2xl bg-slate-900 px-4 py-2 font-semibold text-white"
-                            >
-                              Sign In
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setSettingsOpen(false);
-                                setActivePage('profile');
-                              }}
-                              className="w-full rounded-2xl bg-emerald-500 px-4 py-2 font-semibold text-white"
-                            >
-                              Sign Up
-                            </button>
+                          <div className="grid grid-cols-2 gap-2 p-1">
+                            <button onClick={() => { setActivePage('profile'); setSettingsOpen(false); }} className="rounded-xl border border-slate-200 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50">Sign In</button>
+                            <button onClick={() => { setActivePage('profile'); setSettingsOpen(false); }} className="rounded-xl bg-slate-900 py-2.5 text-sm font-bold text-white hover:bg-slate-800">Sign Up</button>
                           </div>
                         ) : (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setSettingsOpen(false);
-                              logout();
-                            }}
-                            className="w-full rounded-2xl border border-slate-200 px-4 py-2 font-semibold text-slate-900"
-                          >
-                            Sign Out
-                          </button>
+                          <button onClick={() => { logout(); setSettingsOpen(false); }} className="w-full rounded-xl border border-slate-200 py-2.5 text-center text-sm font-bold text-rose-600 hover:bg-rose-50 dark:border-slate-700 dark:hover:bg-rose-900/20">Sign Out</button>
                         )}
                       </div>
                     </div>
                   </div>
                 )}
               </div>
+
+              {/* Mobile Menu Toggle */}
+              <button
+                className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 text-slate-600 md:hidden dark:border-slate-700 dark:text-slate-300"
+                onClick={() => setNavMenuOpen(!navMenuOpen)}
+              >
+                ☰
+              </button>
             </div>
           </div>
         </div>
+
+        {/* Mobile Nav Drawer */}
+        {navMenuOpen && (
+          <div className="border-t border-slate-100 bg-white/95 px-4 py-4 backdrop-blur-xl dark:border-slate-800 dark:bg-slate-900/95 md:hidden">
+            <div className="space-y-1">
+              {[
+                { key: 'listings', label: copy.navCatalog },
+                { key: 'dealers', label: copy.navDealers },
+                { key: 'chatbot', label: copy.navChatbot },
+                { key: 'analytics', label: copy.navAnalytics },
+                { key: 'profile', label: copy.navProfile },
+              ].map((item) => (
+                <button
+                  key={item.key}
+                  onClick={() => { setActivePage(item.key as PageKey); setNavMenuOpen(false); }}
+                  className={`block w-full rounded-xl px-4 py-3 text-left font-semibold ${activePage === item.key ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/20 dark:text-indigo-400' : 'text-slate-600 hover:bg-slate-50 dark:text-slate-300'
+                    }`}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </header>
       <div className="mx-auto max-w-7xl space-y-8 px-4 py-10">
         <main className={`rounded-3xl ${mainSurfaceClass} p-6 shadow-lg`}>
