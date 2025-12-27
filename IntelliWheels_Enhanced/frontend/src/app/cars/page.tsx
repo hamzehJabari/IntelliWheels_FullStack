@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { getCars } from '@/lib/api';
+import { fetchCars } from '@/lib/api';
 
 export default function CarsPage() {
   const [cars, setCars] = useState<any[]>([]);
@@ -10,7 +10,7 @@ export default function CarsPage() {
   useEffect(() => {
     async function load() {
       try {
-        const data = await getCars();
+        const data = await fetchCars({ make: 'all', search: '', sort: 'default' });
         setCars(data.cars || []);
       } catch (e) {
         console.error(e);
