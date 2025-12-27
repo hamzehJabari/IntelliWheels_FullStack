@@ -38,3 +38,6 @@ def create_app(test_config=None):
     app.register_blueprint(system.bp)
 
     return app
+
+# Expose app instance for 'gunicorn app:app'
+app = create_app()
