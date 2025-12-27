@@ -1,7 +1,7 @@
 services:
   - type: web
     name: intelliwheels-backend
-    rootDir: IntelliWheels_Enhanced/backend
+    rootDir: backend
     env: python
     plan: starter
     buildCommand: bash render-build.sh
@@ -10,6 +10,6 @@ services:
       - key: PYTHON_VERSION
         value: 3.11.9
       - key: GEMINI_API_KEY
-        value: AIzaSyC2YkBLx32UpPW2D_qE4hKxdfqzhTWASOc
+        value: AIzaSyA_SnXtl1eSAt0FFV3bLTOJQz1oulD-PYI
       - key: FRONTEND_ORIGIN
         value: https://intelliwheels.vercel.app

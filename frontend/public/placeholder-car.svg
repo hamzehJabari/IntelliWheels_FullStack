@@ -1,0 +1,21 @@
+<svg width="600" height="360" viewBox="0 0 600 360" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#e0f2ff" />
+      <stop offset="100%" stop-color="#c7d2fe" />
+    </linearGradient>
+  </defs>
+  <rect width="600" height="360" rx="32" fill="url(#grad)" />
+  <g fill="none" stroke="#0f172a" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M120 240 L170 180 L430 180 L480 240 Z" fill="rgba(15,23,42,0.08)" />
+    <circle cx="190" cy="250" r="32" fill="white" />
+    <circle cx="410" cy="250" r="32" fill="white" />
+    <circle cx="190" cy="250" r="16" />
+    <circle cx="410" cy="250" r="16" />
+    <path d="M220 150 Q300 80 380 150" />
+    <path d="M230 210 L370 210" />
+  </g>
+  <text x="50%" y="70%" dominant-baseline="middle" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="28" fill="#0f172a" opacity="0.55">
+    IntelliWheels Preview
+  </text>
+</svg>
