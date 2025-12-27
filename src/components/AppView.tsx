@@ -1408,7 +1408,9 @@ export function AppView() {
               <span>Attached image</span>
               <button onClick={() => setChatAttachment(null)} className="text-xs text-rose-500">Remove</button>
             </div>
-          )}name="chat-input"
+          )}
+          <textarea
+            name="chat-input"
             id="chat-input"
             value={chatInput}
             onChange={(event) => setChatInput(event.target.value)}
@@ -1420,9 +1422,7 @@ export function AppView() {
               Attach Image
               <input
                 name="chat-attachment"
-                id="chat-attachment"lassName="cursor-pointer rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-900">
-              Attach Image
-              <input
+                id="chat-attachment"
                 type="file"
                 accept="image/*"
                 className="hidden"
