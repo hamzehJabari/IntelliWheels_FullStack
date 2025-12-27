@@ -1886,7 +1886,7 @@ export function AppView() {
     <div className={`${backgroundClass} min-h-screen`} dir={direction}>
       {renderToast()}
       <header className={`sticky top-0 z-50 border-b backdrop-blur-md transition-colors duration-300 ${headerSurfaceClass} ${subtleBorderClass}`}>
-        <div className="mx-auto flex h-20 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+        <div className="mx-auto flex h-28 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-8">
             {/* Logo */}
             <div
@@ -1896,7 +1896,7 @@ export function AppView() {
               <img
                 src="/intellliwheels_logo_concept_dynamic_NO_BG.png"
                 alt="IntelliWheels"
-                className="h-16 w-auto object-contain transition-transform group-hover:scale-105"
+                className="h-24 w-auto object-contain transition-transform group-hover:scale-105"
               />
             </div>
 
@@ -1912,7 +1912,7 @@ export function AppView() {
                 <button
                   key={item.key}
                   onClick={() => setActivePage(item.key as PageKey)}
-                  className={`rounded-xl px-4 py-2 text-sm font-semibold transition-all ${activePage === item.key
+                  className={`rounded-xl px-4 py-2 text-xl font-semibold transition-all ${activePage === item.key
                     ? 'bg-slate-100/10 text-indigo-500 shadow-sm ring-1 ring-inset ring-slate-200/10 dark:text-indigo-400'
                     : `text-slate-500 hover:bg-slate-100/5 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200`
                     }`}
