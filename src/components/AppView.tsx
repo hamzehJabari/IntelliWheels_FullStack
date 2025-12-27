@@ -483,9 +483,10 @@ export function AppView() {
   useEffect(() => {
     const allowedPages = SERVICE_NAV_MAP[serviceMode] ?? NAV_CONFIG.map((item) => item.key);
     // Don't force redirect if trying to access pages that might be conditionally allowed or are valid
-    if (!allowedPages.includes(activePage) && activePage !== 'addListing') {
-      // Check if 'add_listing' is valid for this mode generally, or just allow it if user is logged in
-      // For now, let's trust the user selection unless it's completely invalid
+    // Explicitly allow 'chatbot', 'analytics', 'add_listing' to prevent flashing/redirect loops
+    const alwaysAllowed = ['chatbot', 'analytics', 'add_listing', 'profile'];
+
+    if (!allowedPages.includes(activePage) && !alwaysAllowed.includes(activePage)) {
       if (activePage !== 'profile') {
         setActivePage(allowedPages[0] ?? 'listings');
       }
@@ -1792,8 +1793,8 @@ export function AppView() {
                     <input
                       type="file"
                       accept="image/*"
-                    name="gallery-url"
-                    id="gallery-url"
+                      name="gallery-url"
+                      id="gallery-url"
                       multiple
                       className="hidden"
                       onChange={(event) => handleGalleryUpload(event.target.files)}
@@ -1817,8 +1818,8 @@ export function AppView() {
                   )}
                   {listingForm.galleryImages.map((url, index) => (
                     <div key={`${url}-${index}`} className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white">
-                    name="video-url"
-                    id="video-url"
+                      name="video-url"
+                      id="video-url"
                       <img src={url} alt={`Gallery ${index + 1}`} className="h-32 w-full object-cover" />
                       <button type="button" className="absolute right-2 top-2 rounded-full bg-white/90 px-2 py-1 text-xs font-semibold text-rose-500" onClick={() => handleRemoveGalleryImage(index)}>
                         {copy.galleryRemove}
@@ -1893,7 +1894,7 @@ export function AppView() {
               onClick={() => setActivePage('listings')}
             >
               <img
-                src="/intellliwheels_logo_concept_dynamic.png"
+                src="/intellliwheels_logo_concept_dynamic_NO_BG.png"
                 alt="IntelliWheels"
                 className="h-16 w-auto object-contain transition-transform group-hover:scale-105"
               />

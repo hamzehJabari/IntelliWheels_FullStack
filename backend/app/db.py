@@ -49,6 +49,7 @@ def init_db(app):
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS cars (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                owner_id INTEGER,
                 make TEXT NOT NULL,
                 model TEXT NOT NULL,
                 year INTEGER,
@@ -62,6 +63,33 @@ def init_db(app):
                 media_gallery JSON,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        # Create Dealers Table
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS dealers (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                location TEXT,
+                rating REAL DEFAULT 0,
+                reviews_count INTEGER DEFAULT 0,
+                image_url TEXT,
+                contact_email TEXT,
+                contact_phone TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        # Create Favorites Table
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS favorites (
+                user_id INTEGER NOT NULL,
+                car_id INTEGER NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (user_id, car_id),
+                FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+                FOREIGN KEY (car_id) REFERENCES cars (id) ON DELETE CASCADE
             )
         ''')
         

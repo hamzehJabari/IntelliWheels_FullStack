@@ -32,11 +32,14 @@ def create_app(test_config=None):
     init_db(app)
 
     # Register Blueprints
-    from .routes import cars, ai, system, auth
+    from .routes import cars, ai, system, auth, dealers, favorites, listings
     app.register_blueprint(cars.bp)
     app.register_blueprint(ai.bp)
     app.register_blueprint(system.bp)
     app.register_blueprint(auth.bp)
+    app.register_blueprint(dealers.bp)
+    app.register_blueprint(favorites.bp)
+    app.register_blueprint(listings.bp)
 
     return app
 
