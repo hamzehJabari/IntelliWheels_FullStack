@@ -1693,7 +1693,9 @@ export function AppView() {
         return (
           <div className="grid gap-6 lg:grid-cols-[1.2fr,0.8fr]">
             <form className="space-y-4 rounded-3xl border border-slate-100 bg-white p-6 shadow-sm" onSubmit={handleListingSubmit}>
-              <divname="listing-make"
+              <div className="grid gap-4 md:grid-cols-2">
+                <select
+                  name="listing-make"
                   id="listing-make"
                   value={listingForm.make}
                   onChange={(event) => handleMakeSelect(event.target.value)}
@@ -1758,9 +1760,7 @@ export function AppView() {
                 />
                 <input name="listing-image" id="listing-image" value={listingForm.image} onChange={(event) => handleListingInput('image', event.target.value)} placeholder="Image URL" className={inputFieldClass} />
               </div>
-              <textarea name="listing-description" id="listing-description"value={listingForm.image} onChange={(event) => handleListingInput('image', event.target.value)} placeholder="Image URL" className={inputFieldClass} />
-              </div>
-              <textarea value={listingForm.description} onChange={(event) => handleListingInput('description', event.target.value)} placeholder="Description" className={`h-32 w-full ${inputFieldClass}`}
+              <textarea name="listing-description" id="listing-description" value={listingForm.description} onChange={(event) => handleListingInput('description', event.target.value)} placeholder="Description" className={`h-32 w-full ${inputFieldClass}`}
               />
               <div className="flex flex-wrap gap-3">
                 <button type="button" className="rounded-2xl bg-sky-600 px-4 py-2 text-sm font-semibold text-white" onClick={handlePriceAssist}>
