@@ -80,11 +80,17 @@ def signup():
 @bp.route('/login', methods=['POST'])
 def login():
     data = request.json
-    email = data.get('email')
+    # Frontend sends 'username' but user might enter email there too.
+    # We will treat the input as an identifier that checks both columns.
+    identifier = data.get('username') or data.get('email')
     password = data.get('password')
 
+    if not identifier or not password:
+        return jsonify({'success': False, 'error': 'Missing credentials'}), 400
+
     db = get_db()
-    user = db.execute('SELECT * FROM users WHERE email = ?', (email,)).fetchone()
+    # Check against both username and email
+    user = db.execute('SELECT * FROM users WHERE email = ? OR username = ?', (identifier, identifier)).fetchone()
 
     if user and check_password_hash(user['password_hash'], password):
         token = generate_token()

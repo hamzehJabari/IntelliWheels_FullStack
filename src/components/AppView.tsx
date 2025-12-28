@@ -387,8 +387,8 @@ export function AppView() {
     ? 'bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-slate-100'
     : 'bg-gradient-to-br from-slate-50 via-white to-sky-50 text-slate-900';
   const headerSurfaceClass = resolvedTheme === 'dark'
-    ? 'bg-[#06122A] text-slate-100'
-    : 'bg-gradient-to-r from-sky-900 via-slate-900 to-slate-800 text-white';
+    ? 'bg-slate-900/90 border-b border-slate-800/60 text-slate-100'
+    : 'bg-white/80 border-b border-slate-200/60 text-slate-900';
   const mainSurfaceClass = resolvedTheme === 'dark'
     ? 'border-slate-800 bg-slate-900/80 text-slate-100'
     : 'border-slate-100 bg-white/90 text-slate-900';
