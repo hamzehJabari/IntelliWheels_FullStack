@@ -1,6 +1,10 @@
 import os
 import sys
 
+# Load environment variables from .env file
+from dotenv import load_dotenv
+load_dotenv()
+
 # Ensure the current directory is in the path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 

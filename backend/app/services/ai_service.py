@@ -1,7 +1,15 @@
 import os
 import json
 import joblib
+import base64
 from flask import current_app
+
+try:
+    import google.generativeai as genai
+    GEMINI_AVAILABLE = True
+except ImportError:
+    GEMINI_AVAILABLE = False
+    genai = None
 
 class AIService:
     _instance = None
@@ -9,6 +17,23 @@ class AIService:
     def __init__(self):
         self.price_model = None
         self.embeddings = None
+        self.gemini_model = None
+        self._init_gemini()
+        
+    def _init_gemini(self):
+        if not GEMINI_AVAILABLE:
+            print("Warning: google-generativeai not installed")
+            return
+        api_key = os.environ.get('GEMINI_API_KEY')
+        if api_key:
+            try:
+                genai.configure(api_key=api_key)
+                self.gemini_model = genai.GenerativeModel('gemini-1.5-flash')
+                print("Gemini AI initialized successfully")
+            except Exception as e:
+                print(f"Failed to initialize Gemini: {e}")
+        else:
+            print("Warning: GEMINI_API_KEY not set")
         
     @classmethod
     def get_instance(cls):
@@ -33,28 +58,75 @@ class AIService:
 
     def estimate_price(self, make, model, year, specs):
         self.load_models()
-        # if not self.price_model:
-        #     return None
-            
-        # Simplified prediction logic wrapper
-        # In a real refactor, we'd move the dataframe construction here
-        return 50000 # Mock return for structure demonstration
+        return 50000  # Mock return for structure demonstration
 
     def chat(self, message, history, image_base64=None):
-        # Gemini integration logic
-        api_key = os.environ.get('GEMINI_API_KEY')
-        if not api_key:
-             return "I am the IntelliWheels AI Assistant. (AI Key missing)"
+        if not self.gemini_model:
+            # Re-attempt initialization in case env was loaded after service init
+            self._init_gemini()
+            
+        if not self.gemini_model:
+            return "I am the IntelliWheels AI Assistant. The AI service is currently unavailable. Please try again later."
 
-        # In a real implementation, we would initialize the Gemini client here
-        # import google.generativeai as genai
-        # genai.configure(api_key=api_key)
-        # model = genai.GenerativeModel('gemini-pro')
-        # ...
-        
-        if image_base64:
-            return "I analyzed the image you sent. It appears to be a vehicle. I can help you list it or estimate its price."
-        return "I am the IntelliWheels AI Assistant. I can help you find cars, estimate prices, or create listings."
+        try:
+            # Build conversation context
+            system_prompt = """You are IntelliWheels AI Assistant, an expert automotive consultant for a car marketplace in the Middle East (primarily Jordan/GCC region). 
+You help users:
+- Find and compare cars
+- Estimate fair market prices
+- Create car listings
+- Answer automotive questions
+- Analyze car images
+
+Be helpful, concise, and knowledgeable about cars. Prices are typically in JOD (Jordanian Dinar) or AED (UAE Dirham)."""
+
+            # Build message content
+            contents = []
+            
+            # Add history context
+            if history:
+                history_text = "\n".join([f"{'User' if h.get('role') == 'user' else 'Assistant'}: {h.get('text', '')}" for h in history[-5:]])
+                contents.append(f"Previous conversation:\n{history_text}\n\n")
+            
+            # Add current message
+            contents.append(f"User: {message}")
+            
+            # Handle image if provided
+            if image_base64:
+                try:
+                    # Remove data URL prefix if present
+                    if ',' in image_base64:
+                        image_base64 = image_base64.split(',')[1]
+                    
+                    image_data = base64.b64decode(image_base64)
+                    image_part = {
+                        'mime_type': 'image/jpeg',
+                        'data': image_data
+                    }
+                    
+                    response = self.gemini_model.generate_content([
+                        system_prompt,
+                        "\n".join(contents),
+                        "Please analyze this car image and provide details about the vehicle:",
+                        image_part
+                    ])
+                except Exception as e:
+                    print(f"Image processing error: {e}")
+                    response = self.gemini_model.generate_content([
+                        system_prompt,
+                        "\n".join(contents)
+                    ])
+            else:
+                response = self.gemini_model.generate_content([
+                    system_prompt,
+                    "\n".join(contents)
+                ])
+            
+            return response.text
+            
+        except Exception as e:
+            print(f"Gemini API error: {e}")
+            return f"I apologize, but I encountered an issue processing your request. Please try again."
 
     def semantic_search(self, query, limit):
         # Mock implementation
@@ -88,29 +160,135 @@ class AIService:
         ]
 
     def analyze_image(self, image_base64):
-        # Mock implementation
-        return {
-            "make": "Toyota",
-            "model": "Camry",
-            "year": 2022,
-            "bodyStyle": "Sedan",
-            "estimatedPrice": 82000,
-            "conditionDescription": "The car appears to be in excellent condition with no visible damage."
-        }
+        if not self.gemini_model:
+            self._init_gemini()
+            
+        if not self.gemini_model:
+            return {
+                "make": "Unknown",
+                "model": "Unknown",
+                "year": 2023,
+                "bodyStyle": "Unknown",
+                "estimatedPrice": 0,
+                "conditionDescription": "AI service unavailable"
+            }
 
-    def listing_assistant(self, query, history):
-        # Mock implementation
-        return {
-            "success": True,
-            "response": "I can help you draft a listing. Based on your request, I've prepared a draft.",
-            "action_type": "draft",
-            "listing_data": {
+        try:
+            # Remove data URL prefix if present
+            if ',' in image_base64:
+                image_base64 = image_base64.split(',')[1]
+            
+            image_data = base64.b64decode(image_base64)
+            image_part = {
+                'mime_type': 'image/jpeg',
+                'data': image_data
+            }
+            
+            prompt = """Analyze this car image and provide the following information in JSON format:
+{
+    "make": "manufacturer name",
+    "model": "model name",
+    "year": estimated year as number,
+    "bodyStyle": "Sedan/SUV/Coupe/Hatchback/Truck/Van/Convertible",
+    "estimatedPrice": estimated price in AED as number,
+    "conditionDescription": "brief description of visible condition"
+}
+
+Only respond with the JSON, no other text."""
+
+            response = self.gemini_model.generate_content([prompt, image_part])
+            
+            # Parse JSON from response
+            response_text = response.text.strip()
+            # Remove markdown code blocks if present
+            if response_text.startswith('```'):
+                response_text = response_text.split('```')[1]
+                if response_text.startswith('json'):
+                    response_text = response_text[4:]
+            response_text = response_text.strip()
+            
+            return json.loads(response_text)
+            
+        except Exception as e:
+            print(f"Image analysis error: {e}")
+            return {
                 "make": "Toyota",
                 "model": "Camry",
-                "year": 2023,
-                "price": 85000,
-                "description": "Automatically generated draft based on conversation."
+                "year": 2022,
+                "bodyStyle": "Sedan",
+                "estimatedPrice": 82000,
+                "conditionDescription": "Unable to analyze image. Default values provided."
             }
-        }
+
+    def listing_assistant(self, query, history):
+        if not self.gemini_model:
+            self._init_gemini()
+            
+        if not self.gemini_model:
+            return {
+                "success": True,
+                "response": "I can help you draft a listing, but the AI service is currently unavailable.",
+                "action_type": None,
+                "listing_data": None
+            }
+
+        try:
+            system_prompt = """You are a car listing assistant for IntelliWheels marketplace. Help users create car listings.
+When you have enough information to create a listing, respond with JSON in this format:
+{
+    "response": "your helpful message",
+    "action_type": "draft",
+    "listing_data": {
+        "make": "...",
+        "model": "...",
+        "year": number,
+        "price": number,
+        "description": "..."
+    }
+}
+
+If you need more information, just respond normally without the listing_data."""
+
+            history_text = ""
+            if history:
+                history_text = "\n".join([f"{'User' if h.get('role') == 'user' else 'Assistant'}: {h.get('text', '')}" for h in history[-5:]])
+            
+            response = self.gemini_model.generate_content([
+                system_prompt,
+                f"Conversation history:\n{history_text}\n\nUser: {query}"
+            ])
+            
+            response_text = response.text.strip()
+            
+            # Try to parse as JSON
+            try:
+                if response_text.startswith('```'):
+                    response_text = response_text.split('```')[1]
+                    if response_text.startswith('json'):
+                        response_text = response_text[4:]
+                response_text = response_text.strip()
+                data = json.loads(response_text)
+                return {
+                    "success": True,
+                    "response": data.get("response", response_text),
+                    "action_type": data.get("action_type"),
+                    "listing_data": data.get("listing_data")
+                }
+            except json.JSONDecodeError:
+                return {
+                    "success": True,
+                    "response": response.text,
+                    "action_type": None,
+                    "listing_data": None
+                }
+                
+        except Exception as e:
+            print(f"Listing assistant error: {e}")
+            return {
+                "success": True,
+                "response": "I encountered an issue. Please try again.",
+                "action_type": None,
+                "listing_data": None
+            }
 
 ai_service = AIService.get_instance()

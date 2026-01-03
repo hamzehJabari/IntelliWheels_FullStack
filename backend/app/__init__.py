@@ -12,6 +12,7 @@ def create_app(test_config=None):
         SECRET_KEY='dev',
         DATABASE=os.path.join(app.root_path, '..', 'intelliwheels.db'),
         UPLOAD_FOLDER=os.path.join(app.root_path, '..', 'uploads'),
+        MAX_CONTENT_LENGTH=16 * 1024 * 1024,  # 16MB max upload
     )
 
     if test_config is None:
@@ -26,9 +27,21 @@ def create_app(test_config=None):
         os.makedirs(app.instance_path)
     except OSError:
         pass
+    
+    # Ensure uploads folder exists
+    try:
+        os.makedirs(app.config['UPLOAD_FOLDER'])
+    except OSError:
+        pass
 
-    # Initialize extensions
-    CORS(app, resources={r"/api/*": {"origins": "*"}})
+    # Initialize CORS with comprehensive settings
+    CORS(app, 
+         resources={r"/api/*": {"origins": "*"}},
+         supports_credentials=True,
+         allow_headers=["Content-Type", "Authorization", "X-Requested-With"],
+         methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+         expose_headers=["Content-Type", "Authorization"])
+    
     init_db(app)
 
     # Register Blueprints
