@@ -296,6 +296,7 @@ interface VisionSuggestion extends VisionAttributes {
 
 export function AppView() {
   const { user, token, loading: authLoading, login, signup, logout, updateMyProfile, refreshProfile, error: authError, clearError } = useAuth();
+  const [mounted, setMounted] = useState(false);
   const [activePage, setActivePage] = useState<PageKey>('listings');
   const [serviceMode, setServiceMode] = useState<ServiceMode>('marketplace');
   const [theme, setTheme] = useState<ThemeMode>('light');
@@ -397,7 +398,7 @@ export function AppView() {
   const selectorClass = resolvedTheme === 'dark'
     ? 'rounded-2xl border border-slate-700 bg-slate-900/60 px-3 py-2 text-sm text-slate-100'
     : 'rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900';
-  const statusPillClass = token
+  const statusPillClass = mounted && token
     ? 'border border-emerald-400/40 bg-emerald-500/10 text-emerald-300'
     : resolvedTheme === 'dark'
       ? 'border border-blue-500/30 bg-blue-900/40 text-blue-200'
@@ -433,6 +434,10 @@ export function AppView() {
 
   const chatSession = useMemo(() => chatSessions.find((session) => session.id === activeSessionId) ?? null, [chatSessions, activeSessionId]);
   const chatMessages = chatSession?.messages ?? [];
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -1942,9 +1947,9 @@ export function AppView() {
                   className={`flex items-center gap-2 rounded-full border p-1 pr-4 transition-all hover:shadow-md ${statusPillClass}`}
                 >
                   <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-900 text-xs font-bold text-white dark:bg-white dark:text-slate-900">
-                    {user?.username?.[0]?.toUpperCase() || 'G'}
+                    {mounted && user?.username?.[0]?.toUpperCase() || 'G'}
                   </div>
-                  <span className="text-xs font-bold">{user ? user.username : copy.statusGuest}</span>
+                  <span className="text-xs font-bold">{mounted && user ? user.username : copy.statusGuest}</span>
                   <span className="text-xs opacity-50">▼</span>
                 </button>
 
@@ -1961,8 +1966,8 @@ export function AppView() {
                       >
                         <span className="flex h-10 w-10 items-center justify-center rounded-full bg-indigo-50 text-xl dark:bg-indigo-900/30">👤</span>
                         <div>
-                          <p className={`font-semibold text-sm ${resolvedTheme === 'dark' ? 'text-slate-200' : 'text-slate-900'}`}>{user ? copy.settingsProfileCta : copy.settingsProfileGuest}</p>
-                          <p className="text-xs text-slate-500">{user?.email || 'Manage account'}</p>
+                          <p className={`font-semibold text-sm ${resolvedTheme === 'dark' ? 'text-slate-200' : 'text-slate-900'}`}>{mounted && user ? copy.settingsProfileCta : copy.settingsProfileGuest}</p>
+                          <p className="text-xs text-slate-500">{mounted && user?.email ? user.email : 'Manage account'}</p>
                         </div>
                       </button>
                       <div className="my-2 h-px bg-slate-100 dark:bg-slate-800" />
