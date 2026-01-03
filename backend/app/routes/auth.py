@@ -130,5 +130,5 @@ def verify_session():
     user = get_user_from_token(token)
     
     if user:
-        return jsonify({'success': True, 'user': user})
-    return jsonify({'success': False, 'error': 'Invalid or expired token'}), 401
+        return jsonify({'success': True, 'authenticated': True, 'user': user})
+    return jsonify({'success': False, 'authenticated': False, 'error': 'Invalid or expired token'}), 401
