@@ -8,12 +8,15 @@ bp = Blueprint('cars', __name__, url_prefix='/api/cars')
 def car_row_to_dict(row):
     """Helper to convert DB row to dictionary with parsed JSON fields."""
     d = dict(row)
-    for field in ['specs', 'engines', 'statistics', 'gallery_images', 'media_gallery']:
+    for field in ['specs', 'engines', 'statistics', 'gallery_images', 'media_gallery', 'image_urls', 'source_sheets']:
         if d.get(field):
             try:
                 d[field] = json.loads(d[field])
             except:
                 d[field] = None
+    # Map image_url to image for frontend compatibility
+    if d.get('image_url') and not d.get('image'):
+        d['image'] = d['image_url']
     return d
 
 @bp.route('', methods=['GET'])

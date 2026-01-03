@@ -84,9 +84,6 @@ async function apiRequest<T = any>(path: string, options: RequestOptions<T> = {}
 }
 
 export async function fetchCars(filters: CarFilters, signal?: AbortSignal, token?: string | null) {
-  if (!token) {
-    return { success: true, cars: filterLocalCars(filters) };
-  }
   const params = new URLSearchParams();
   if (filters.make && filters.make !== 'all') params.append('make', filters.make);
   if (filters.search) params.append('search', filters.search);
