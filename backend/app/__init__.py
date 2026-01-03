@@ -9,7 +9,7 @@ def create_app(test_config=None):
     
     # Configuration
     app.config.from_mapping(
-        SECRET_KEY='dev',
+        SECRET_KEY=os.environ.get('SECRET_KEY', 'dev'),
         DATABASE=os.path.join(app.root_path, '..', 'intelliwheels.db'),
         UPLOAD_FOLDER=os.path.join(app.root_path, '..', 'uploads'),
         MAX_CONTENT_LENGTH=16 * 1024 * 1024,  # 16MB max upload
@@ -34,13 +34,14 @@ def create_app(test_config=None):
     except OSError:
         pass
 
-    # Initialize CORS with comprehensive settings
+    # Initialize CORS - allow all origins for API routes
     CORS(app, 
-         resources={r"/api/*": {"origins": "*"}},
-         supports_credentials=True,
-         allow_headers=["Content-Type", "Authorization", "X-Requested-With"],
-         methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-         expose_headers=["Content-Type", "Authorization"])
+         resources={r"/api/*": {
+             "origins": ["*"],
+             "methods": ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+             "allow_headers": ["Content-Type", "Authorization", "X-Requested-With", "Accept"],
+             "supports_credentials": False
+         }})
     
     init_db(app)
 
