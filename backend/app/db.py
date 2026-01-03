@@ -55,6 +55,7 @@ def init_db(app):
                 year INTEGER,
                 price REAL,
                 currency TEXT DEFAULT 'JOD',
+                image TEXT,
                 description TEXT,
                 specs JSON,
                 engines JSON,
@@ -99,25 +100,25 @@ def init_db(app):
         car_count = cursor.execute('SELECT COUNT(*) FROM cars').fetchone()[0]
         if car_count == 0:
             sample_cars = [
-                ('Toyota', 'Camry', 2023, 28000, 'JOD', 'Reliable sedan with excellent fuel economy', '{"horsepower": 203, "engine": "2.5L 4-Cylinder", "transmission": "Automatic", "fuelType": "Gasoline"}'),
-                ('BMW', '3 Series', 2022, 45000, 'JOD', 'Luxury sports sedan with premium features', '{"horsepower": 255, "engine": "2.0L Turbo", "transmission": "Automatic", "fuelType": "Gasoline"}'),
-                ('Mercedes-Benz', 'C-Class', 2023, 52000, 'JOD', 'Elegant luxury sedan with advanced technology', '{"horsepower": 255, "engine": "2.0L Turbo", "transmission": "9-Speed Automatic", "fuelType": "Gasoline"}'),
-                ('Honda', 'Accord', 2023, 26000, 'JOD', 'Spacious and comfortable mid-size sedan', '{"horsepower": 192, "engine": "1.5L Turbo", "transmission": "CVT", "fuelType": "Gasoline"}'),
-                ('Lexus', 'ES', 2022, 48000, 'JOD', 'Premium luxury sedan with smooth ride', '{"horsepower": 302, "engine": "3.5L V6", "transmission": "8-Speed Automatic", "fuelType": "Gasoline"}'),
-                ('Audi', 'A4', 2023, 47000, 'JOD', 'German engineering with quattro AWD', '{"horsepower": 201, "engine": "2.0L TFSI", "transmission": "7-Speed S tronic", "fuelType": "Gasoline"}'),
-                ('Nissan', 'Altima', 2023, 24000, 'JOD', 'Affordable sedan with modern styling', '{"horsepower": 188, "engine": "2.5L 4-Cylinder", "transmission": "CVT", "fuelType": "Gasoline"}'),
-                ('Hyundai', 'Sonata', 2023, 23000, 'JOD', 'Feature-packed sedan with great warranty', '{"horsepower": 191, "engine": "2.5L 4-Cylinder", "transmission": "8-Speed Automatic", "fuelType": "Gasoline"}'),
-                ('Kia', 'K5', 2023, 25000, 'JOD', 'Stylish design with turbocharged performance', '{"horsepower": 180, "engine": "1.6L Turbo", "transmission": "8-Speed Automatic", "fuelType": "Gasoline"}'),
-                ('Mazda', '6', 2022, 27000, 'JOD', 'Sporty handling with upscale interior', '{"horsepower": 187, "engine": "2.5L 4-Cylinder", "transmission": "6-Speed Automatic", "fuelType": "Gasoline"}'),
-                ('Toyota', 'Land Cruiser', 2023, 85000, 'JOD', 'Legendary off-road SUV with luxury features', '{"horsepower": 409, "engine": "3.5L Twin-Turbo V6", "transmission": "10-Speed Automatic", "fuelType": "Gasoline"}'),
-                ('Range Rover', 'Sport', 2023, 95000, 'JOD', 'Premium luxury SUV with dynamic capability', '{"horsepower": 395, "engine": "3.0L Inline-6", "transmission": "8-Speed Automatic", "fuelType": "Gasoline"}'),
-                ('Porsche', 'Cayenne', 2023, 110000, 'JOD', 'Sports car performance in an SUV', '{"horsepower": 348, "engine": "3.0L V6 Turbo", "transmission": "8-Speed Tiptronic", "fuelType": "Gasoline"}'),
-                ('BMW', 'X5', 2023, 75000, 'JOD', 'Versatile luxury SUV with powerful engines', '{"horsepower": 335, "engine": "3.0L Turbo I6", "transmission": "8-Speed Automatic", "fuelType": "Gasoline"}'),
-                ('Mercedes-Benz', 'GLE', 2023, 78000, 'JOD', 'Spacious luxury SUV with cutting-edge tech', '{"horsepower": 255, "engine": "2.0L Turbo", "transmission": "9-Speed Automatic", "fuelType": "Gasoline"}'),
+                ('Toyota', 'Camry', 2023, 28000, 'JOD', 'https://images.unsplash.com/photo-1621007947382-bb3c3994e3fb?w=800', 'Reliable sedan with excellent fuel economy', '{"horsepower": 203, "engine": "2.5L 4-Cylinder", "transmission": "Automatic", "fuelType": "Gasoline"}'),
+                ('BMW', '3 Series', 2022, 45000, 'JOD', 'https://images.unsplash.com/photo-1555215695-3004980ad54e?w=800', 'Luxury sports sedan with premium features', '{"horsepower": 255, "engine": "2.0L Turbo", "transmission": "Automatic", "fuelType": "Gasoline"}'),
+                ('Mercedes-Benz', 'C-Class', 2023, 52000, 'JOD', 'https://images.unsplash.com/photo-1618843479313-40f8afb4b4d8?w=800', 'Elegant luxury sedan with advanced technology', '{"horsepower": 255, "engine": "2.0L Turbo", "transmission": "9-Speed Automatic", "fuelType": "Gasoline"}'),
+                ('Honda', 'Accord', 2023, 26000, 'JOD', 'https://images.unsplash.com/photo-1606611013016-969c19ba27bb?w=800', 'Spacious and comfortable mid-size sedan', '{"horsepower": 192, "engine": "1.5L Turbo", "transmission": "CVT", "fuelType": "Gasoline"}'),
+                ('Lexus', 'ES', 2022, 48000, 'JOD', 'https://images.unsplash.com/photo-1583267746897-2cf415887172?w=800', 'Premium luxury sedan with smooth ride', '{"horsepower": 302, "engine": "3.5L V6", "transmission": "8-Speed Automatic", "fuelType": "Gasoline"}'),
+                ('Audi', 'A4', 2023, 47000, 'JOD', 'https://images.unsplash.com/photo-1606664515524-ed2f786a0bd6?w=800', 'German engineering with quattro AWD', '{"horsepower": 201, "engine": "2.0L TFSI", "transmission": "7-Speed S tronic", "fuelType": "Gasoline"}'),
+                ('Nissan', 'Altima', 2023, 24000, 'JOD', 'https://images.unsplash.com/photo-1609521263047-f8f205293f24?w=800', 'Affordable sedan with modern styling', '{"horsepower": 188, "engine": "2.5L 4-Cylinder", "transmission": "CVT", "fuelType": "Gasoline"}'),
+                ('Hyundai', 'Sonata', 2023, 23000, 'JOD', 'https://images.unsplash.com/photo-1629897048514-3dd7414fe72a?w=800', 'Feature-packed sedan with great warranty', '{"horsepower": 191, "engine": "2.5L 4-Cylinder", "transmission": "8-Speed Automatic", "fuelType": "Gasoline"}'),
+                ('Kia', 'K5', 2023, 25000, 'JOD', 'https://images.unsplash.com/photo-1619682817481-e994891cd1f5?w=800', 'Stylish design with turbocharged performance', '{"horsepower": 180, "engine": "1.6L Turbo", "transmission": "8-Speed Automatic", "fuelType": "Gasoline"}'),
+                ('Mazda', '6', 2022, 27000, 'JOD', 'https://images.unsplash.com/photo-1612825173281-9a193378527e?w=800', 'Sporty handling with upscale interior', '{"horsepower": 187, "engine": "2.5L 4-Cylinder", "transmission": "6-Speed Automatic", "fuelType": "Gasoline"}'),
+                ('Toyota', 'Land Cruiser', 2023, 85000, 'JOD', 'https://images.unsplash.com/photo-1594502184342-2e12f877aa73?w=800', 'Legendary off-road SUV with luxury features', '{"horsepower": 409, "engine": "3.5L Twin-Turbo V6", "transmission": "10-Speed Automatic", "fuelType": "Gasoline"}'),
+                ('Range Rover', 'Sport', 2023, 95000, 'JOD', 'https://images.unsplash.com/photo-1606016159991-dfe4f2746ad5?w=800', 'Premium luxury SUV with dynamic capability', '{"horsepower": 395, "engine": "3.0L Inline-6", "transmission": "8-Speed Automatic", "fuelType": "Gasoline"}'),
+                ('Porsche', 'Cayenne', 2023, 110000, 'JOD', 'https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=800', 'Sports car performance in an SUV', '{"horsepower": 348, "engine": "3.0L V6 Turbo", "transmission": "8-Speed Tiptronic", "fuelType": "Gasoline"}'),
+                ('BMW', 'X5', 2023, 75000, 'JOD', 'https://images.unsplash.com/photo-1617531653332-bd46c24f2068?w=800', 'Versatile luxury SUV with powerful engines', '{"horsepower": 335, "engine": "3.0L Turbo I6", "transmission": "8-Speed Automatic", "fuelType": "Gasoline"}'),
+                ('Mercedes-Benz', 'GLE', 2023, 78000, 'JOD', 'https://images.unsplash.com/photo-1520031441872-265e4ff70366?w=800', 'Spacious luxury SUV with cutting-edge tech', '{"horsepower": 255, "engine": "2.0L Turbo", "transmission": "9-Speed Automatic", "fuelType": "Gasoline"}'),
             ]
             
             cursor.executemany(
-                'INSERT INTO cars (make, model, year, price, currency, description, specs) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                'INSERT INTO cars (make, model, year, price, currency, image, description, specs) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
                 sample_cars
             )
             
