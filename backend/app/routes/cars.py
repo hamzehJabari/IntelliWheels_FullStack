@@ -112,7 +112,7 @@ def create_car():
         price = float(price)
     
     # Sanitize text fields
-    currency = sanitize_string(data.get('currency', 'AED'))[:10]
+    currency = sanitize_string(data.get('currency', 'JOD'))[:10]
     description = sanitize_string(data.get('description', ''))[:5000]
     
     # Handle specs as JSON
@@ -120,15 +120,31 @@ def create_car():
     if not isinstance(specs, dict):
         specs = {}
     
+    # Handle image fields
+    image_url = sanitize_string(data.get('image', ''))[:500]
+    video_url = sanitize_string(data.get('videoUrl', ''))[:500]
+    
+    # Handle gallery images as JSON array
+    gallery_images = data.get('galleryImages', [])
+    if not isinstance(gallery_images, list):
+        gallery_images = []
+    gallery_images = [sanitize_string(url)[:500] for url in gallery_images if isinstance(url, str)]
+    
+    # Handle media gallery as JSON array
+    media_gallery = data.get('mediaGallery', [])
+    if not isinstance(media_gallery, list):
+        media_gallery = []
+    
     db = get_db()
     try:
         cursor = db.execute(
-            '''INSERT INTO cars (make, model, year, price, currency, description, specs)
-               VALUES (?, ?, ?, ?, ?, ?, ?)''',
-            (make, model, year, price, currency, description, json.dumps(specs))
+            '''INSERT INTO cars (make, model, year, price, currency, description, specs, image_url, video_url, gallery_images, media_gallery)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+            (make, model, year, price, currency, description, json.dumps(specs), image_url, video_url, json.dumps(gallery_images), json.dumps(media_gallery))
         )
         db.commit()
         return jsonify({'success': True, 'id': cursor.lastrowid}), 201
     except Exception as e:
         print(f"Create car error: {e}")
         return jsonify({'success': False, 'error': 'Failed to create listing'}), 500
+

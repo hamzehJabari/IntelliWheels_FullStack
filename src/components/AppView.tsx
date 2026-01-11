@@ -1680,8 +1680,9 @@ export function AppView() {
               <div className="rounded-3xl border border-slate-100 bg-white p-4 shadow-sm">
                 <div className="grid gap-4 md:grid-cols-3">
                   <select value={filters.make} name="filter-make" id="filter-make" onChange={(event) => setFilters((prev) => ({ ...prev, make: event.target.value }))} className={inputFieldClass}>
-                    {makes.map((make) => (
-                      <option key={make} value={make}>{camelToTitle(make)}</option>
+                    <option value="all">All Makes</option>
+                    {allVehicleMakes.map((make) => (
+                      <option key={make} value={make}>{make}</option>
                     ))}
                   </select>
                   <input
@@ -1712,7 +1713,7 @@ export function AppView() {
                     placeholder="e.g. Luxury hybrid SUV under 150k"
                     className={`flex-1 ${inputFieldClass}`}
                   />
-                  <button className="rounded-2xl bg-sky-600 px-4 py-2 text-sm font-semibold text-white">
+                  <button type="submit" className="rounded-2xl bg-sky-600 px-4 py-2 text-sm font-semibold text-white">
                     {semanticLoading ? 'Searching...' : 'Search'}
                   </button>
                 </div>
