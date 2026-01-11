@@ -89,3 +89,137 @@ def get_my_listings():
     except Exception:
         # Fallback if column missing (safe fail)
         return jsonify({'success': True, 'cars': []})
+
+
+@bp.route('/my-listings/analytics', methods=['GET'])
+def get_my_listings_analytics():
+    """Get analytics for user's own listings."""
+    token = request.headers.get('Authorization', '').replace('Bearer ', '')
+    user = get_user_from_token(token)
+    
+    if not user:
+        return jsonify({'success': False, 'error': 'Authentication required'}), 401
+    
+    db = get_db()
+    
+    try:
+        # Get all user's listings
+        cursor = db.execute('SELECT * FROM cars WHERE owner_id = ?', (user['id'],))
+        cars = [car_row_to_dict(row) for row in cursor.fetchall()]
+        
+        if not cars:
+            return jsonify({
+                'success': True,
+                'analytics': {
+                    'total_listings': 0,
+                    'total_value': 0,
+                    'average_price': 0,
+                    'price_range': {'min': 0, 'max': 0},
+                    'listings_by_make': [],
+                    'listings_by_year': [],
+                    'listings_by_body_style': [],
+                    'recent_listings': [],
+                    'performance': {
+                        'total_views': 0,
+                        'total_favorites': 0,
+                        'avg_rating': 0
+                    }
+                }
+            })
+        
+        # Calculate analytics
+        prices = [c.get('price', 0) or 0 for c in cars if c.get('price')]
+        total_value = sum(prices)
+        avg_price = total_value / len(prices) if prices else 0
+        
+        # Listings by make
+        make_counts = {}
+        for car in cars:
+            make = car.get('make', 'Unknown')
+            make_counts[make] = make_counts.get(make, 0) + 1
+        listings_by_make = [{'make': k, 'count': v} for k, v in sorted(make_counts.items(), key=lambda x: -x[1])]
+        
+        # Listings by year
+        year_counts = {}
+        for car in cars:
+            year = car.get('year', 'Unknown')
+            if year:
+                year_counts[year] = year_counts.get(year, 0) + 1
+        listings_by_year = [{'year': k, 'count': v} for k, v in sorted(year_counts.items(), key=lambda x: -x[0] if isinstance(x[0], int) else 0)]
+        
+        # Listings by body style
+        body_counts = {}
+        for car in cars:
+            specs = car.get('specs') or {}
+            body = specs.get('bodyStyle', 'Unknown') if isinstance(specs, dict) else 'Unknown'
+            body_counts[body] = body_counts.get(body, 0) + 1
+        listings_by_body_style = [{'bodyStyle': k, 'count': v} for k, v in sorted(body_counts.items(), key=lambda x: -x[1])]
+        
+        # Get favorites count for user's cars
+        car_ids = [c['id'] for c in cars]
+        favorites_count = 0
+        if car_ids:
+            placeholders = ','.join(['?'] * len(car_ids))
+            fav_cursor = db.execute(f'SELECT COUNT(*) as count FROM favorites WHERE car_id IN ({placeholders})', car_ids)
+            favorites_count = fav_cursor.fetchone()['count']
+        
+        # Get average rating for user's cars
+        avg_rating = 0
+        if car_ids:
+            placeholders = ','.join(['?'] * len(car_ids))
+            rating_cursor = db.execute(f'SELECT AVG(rating) as avg_rating FROM reviews WHERE car_id IN ({placeholders})', car_ids)
+            result = rating_cursor.fetchone()
+            avg_rating = round(result['avg_rating'], 1) if result['avg_rating'] else 0
+        
+        # Recent listings (last 5)
+        recent = sorted(cars, key=lambda x: x.get('created_at', ''), reverse=True)[:5]
+        recent_listings = [{
+            'id': c['id'],
+            'make': c.get('make'),
+            'model': c.get('model'),
+            'price': c.get('price'),
+            'created_at': c.get('created_at')
+        } for c in recent]
+        
+        return jsonify({
+            'success': True,
+            'analytics': {
+                'total_listings': len(cars),
+                'total_value': total_value,
+                'average_price': round(avg_price, 2),
+                'price_range': {
+                    'min': min(prices) if prices else 0,
+                    'max': max(prices) if prices else 0
+                },
+                'listings_by_make': listings_by_make,
+                'listings_by_year': listings_by_year,
+                'listings_by_body_style': listings_by_body_style,
+                'recent_listings': recent_listings,
+                'performance': {
+                    'total_views': 0,  # TODO: implement view tracking
+                    'total_favorites': favorites_count,
+                    'avg_rating': avg_rating
+                }
+            }
+        })
+        
+    except Exception as e:
+        print(f"My listings analytics error: {e}")
+        return jsonify({
+            'success': True,
+            'analytics': {
+                'total_listings': 0,
+                'total_value': 0,
+                'average_price': 0,
+                'price_range': {'min': 0, 'max': 0},
+                'listings_by_make': [],
+                'listings_by_year': [],
+                'listings_by_body_style': [],
+                'recent_listings': [],
+                'performance': {
+                    'total_views': 0,
+                    'total_favorites': 0,
+                    'avg_rating': 0
+                }
+            }
+        })

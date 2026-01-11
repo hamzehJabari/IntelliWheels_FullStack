@@ -12,10 +12,12 @@ import {
   fetchDealers,
   fetchMakes,
   fetchMyListings,
+  fetchMyListingsAnalytics,
   getAnalytics,
   getPriceEstimate,
   handleChatbotMessage,
   handleListingAssistantMessage,
+  MyListingsAnalytics,
   removeFavorite,
   semanticSearch,
   updateListing,
@@ -297,6 +299,8 @@ export function AppView() {
   const [dealersLoading, setDealersLoading] = useState(false);
   const [favorites, setFavorites] = useState<number[]>([]);
   const [myListings, setMyListings] = useState<Car[]>([]);
+  const [myListingsAnalytics, setMyListingsAnalytics] = useState<MyListingsAnalytics | null>(null);
+  const [myListingsAnalyticsLoading, setMyListingsAnalyticsLoading] = useState(false);
   const [analyticsData, setAnalyticsData] = useState<AnalyticsInsights | null>(null);
   const [analyticsFilter, setAnalyticsFilter] = useState<'all' | 'my' | 'favorites'>('all');
   const [semanticQuery, setSemanticQuery] = useState('');
@@ -625,6 +629,7 @@ export function AppView() {
     if (!token) {
       setFavorites([]);
       setMyListings([]);
+      setMyListingsAnalytics(null);
       return;
     }
 
@@ -646,6 +651,27 @@ export function AppView() {
     }
     hydrateAuthorizedData();
   }, [token]);
+
+  // Load my listings analytics when on myListings page
+  useEffect(() => {
+    if (!token || activePage !== 'myListings') {
+      return;
+    }
+    async function loadMyListingsAnalytics() {
+      setMyListingsAnalyticsLoading(true);
+      try {
+        const response = await fetchMyListingsAnalytics(token);
+        if (response.success) {
+          setMyListingsAnalytics(response.analytics);
+        }
+      } catch (err) {
+        console.warn('Failed to load my listings analytics', err);
+      } finally {
+        setMyListingsAnalyticsLoading(false);
+      }
+    }
+    loadMyListingsAnalytics();
+  }, [token, activePage]);
 
   useEffect(() => {
     if (!token) {
@@ -1871,31 +1897,141 @@ export function AppView() {
       case 'myListings':
         if (!requireAuth()) return null;
         return (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {myListings.map((car) => (
-              <div key={car.id} className="rounded-3xl border border-slate-100 bg-white p-4 shadow-sm">
-                <div className="flex gap-3">
-                  <img src={getCarImage(car)} alt={car.model} className="h-24 w-32 rounded-2xl object-cover" />
-                  <div className="flex-1">
-                    <h3 className="text-lg font-semibold text-slate-900">{car.make} {car.model}</h3>
-                    <p className="text-sm text-slate-500">{car.year}</p>
-                    <p className="text-xl font-bold text-emerald-600">{formatPrice(car.price, car.currency)}</p>
-                    {car.odometerKm ? (
-                      <p className="text-xs text-slate-500">{car.odometerKm.toLocaleString()} km</p>
-                    ) : null}
-                  </div>
+          <div className="space-y-6">
+            {/* Analytics Summary Cards */}
+            {myListingsAnalytics && (
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="rounded-3xl border border-slate-100 bg-gradient-to-br from-emerald-50 to-emerald-100 p-5 shadow-sm">
+                  <p className="text-xs uppercase text-emerald-700">Total Listings</p>
+                  <p className="mt-1 text-3xl font-bold text-emerald-900">{myListingsAnalytics.total_listings}</p>
                 </div>
-                <div className="mt-4 flex gap-3">
-                  <button className="flex-1 rounded-2xl bg-slate-900/5 py-2 text-sm font-semibold text-slate-900" onClick={() => handleOpenCarDetails(car.id)}>
-                    View
-                  </button>
-                  <button className="flex-1 rounded-2xl bg-rose-500 py-2 text-sm font-semibold text-white" onClick={() => handleDeleteListing(car.id)}>
-                    Delete
-                  </button>
+                <div className="rounded-3xl border border-slate-100 bg-gradient-to-br from-blue-50 to-blue-100 p-5 shadow-sm">
+                  <p className="text-xs uppercase text-blue-700">Total Value</p>
+                  <p className="mt-1 text-2xl font-bold text-blue-900">{formatPrice(myListingsAnalytics.total_value, 'JOD')}</p>
+                </div>
+                <div className="rounded-3xl border border-slate-100 bg-gradient-to-br from-amber-50 to-amber-100 p-5 shadow-sm">
+                  <p className="text-xs uppercase text-amber-700">Avg Price</p>
+                  <p className="mt-1 text-2xl font-bold text-amber-900">{formatPrice(myListingsAnalytics.average_price, 'JOD')}</p>
+                </div>
+                <div className="rounded-3xl border border-slate-100 bg-gradient-to-br from-purple-50 to-purple-100 p-5 shadow-sm">
+                  <p className="text-xs uppercase text-purple-700">Favorites</p>
+                  <p className="mt-1 text-3xl font-bold text-purple-900">{myListingsAnalytics.performance.total_favorites}</p>
+                  {myListingsAnalytics.performance.avg_rating > 0 && (
+                    <p className="text-sm text-purple-700">★ {myListingsAnalytics.performance.avg_rating} avg rating</p>
+                  )}
                 </div>
               </div>
-            ))}
-            {myListings.length === 0 && <p className="text-slate-500">No personal listings yet.</p>}
+            )}
+
+            {/* Analytics Charts Row */}
+            {myListingsAnalytics && myListingsAnalytics.total_listings > 0 && (
+              <div className="grid gap-4 lg:grid-cols-2">
+                {/* Listings by Make */}
+                {myListingsAnalytics.listings_by_make.length > 0 && (
+                  <div className="rounded-3xl border border-slate-100 bg-white p-5 shadow-sm">
+                    <h3 className="mb-4 text-sm font-semibold uppercase text-slate-500">Listings by Make</h3>
+                    <div className="space-y-2">
+                      {myListingsAnalytics.listings_by_make.slice(0, 5).map((item) => (
+                        <div key={item.make} className="flex items-center gap-3">
+                          <div className="h-2 flex-1 rounded-full bg-slate-100 overflow-hidden">
+                            <div
+                              className="h-full rounded-full bg-emerald-500"
+                              style={{ width: `${(item.count / myListingsAnalytics.total_listings) * 100}%` }}
+                            />
+                          </div>
+                          <span className="min-w-[80px] text-sm text-slate-700">{item.make}</span>
+                          <span className="text-sm font-semibold text-slate-900">{item.count}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Price Range */}
+                <div className="rounded-3xl border border-slate-100 bg-white p-5 shadow-sm">
+                  <h3 className="mb-4 text-sm font-semibold uppercase text-slate-500">Price Range</h3>
+                  <div className="flex items-end justify-between gap-4">
+                    <div>
+                      <p className="text-xs text-slate-500">Lowest</p>
+                      <p className="text-xl font-bold text-slate-900">{formatPrice(myListingsAnalytics.price_range.min, 'JOD')}</p>
+                    </div>
+                    <div className="flex-1 h-1 bg-gradient-to-r from-emerald-300 via-amber-300 to-rose-300 rounded-full" />
+                    <div className="text-right">
+                      <p className="text-xs text-slate-500">Highest</p>
+                      <p className="text-xl font-bold text-slate-900">{formatPrice(myListingsAnalytics.price_range.max, 'JOD')}</p>
+                    </div>
+                  </div>
+                  {myListingsAnalytics.listings_by_body_style.length > 0 && (
+                    <div className="mt-4 pt-4 border-t border-slate-100">
+                      <p className="text-xs text-slate-500 mb-2">Body Styles</p>
+                      <div className="flex flex-wrap gap-2">
+                        {myListingsAnalytics.listings_by_body_style.map((item) => (
+                          <span key={item.bodyStyle} className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
+                            {item.bodyStyle} ({item.count})
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Loading state for analytics */}
+            {myListingsAnalyticsLoading && !myListingsAnalytics && (
+              <div className="rounded-3xl border border-slate-100 bg-white p-6 text-center text-slate-500">
+                Loading your listings analytics...
+              </div>
+            )}
+
+            {/* Listings Header */}
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-semibold text-slate-900">Your Listings ({myListings.length})</h2>
+              <button
+                onClick={() => setActivePage('addListing')}
+                className="rounded-2xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
+              >
+                + Add New
+              </button>
+            </div>
+
+            {/* Listings Grid */}
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {myListings.map((car) => (
+                <div key={car.id} className="rounded-3xl border border-slate-100 bg-white p-4 shadow-sm hover:shadow-md transition-shadow">
+                  <div className="flex gap-3">
+                    <img src={getCarImage(car)} alt={car.model} className="h-24 w-32 rounded-2xl object-cover" />
+                    <div className="flex-1">
+                      <h3 className="text-lg font-semibold text-slate-900">{car.make} {car.model}</h3>
+                      <p className="text-sm text-slate-500">{car.year}</p>
+                      <p className="text-xl font-bold text-emerald-600">{formatPrice(car.price, car.currency)}</p>
+                      {car.odometerKm ? (
+                        <p className="text-xs text-slate-500">{car.odometerKm.toLocaleString()} km</p>
+                      ) : null}
+                    </div>
+                  </div>
+                  <div className="mt-4 flex gap-3">
+                    <button className="flex-1 rounded-2xl bg-slate-900/5 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-900/10" onClick={() => handleOpenCarDetails(car.id)}>
+                      View
+                    </button>
+                    <button className="flex-1 rounded-2xl bg-rose-500 py-2 text-sm font-semibold text-white hover:bg-rose-600" onClick={() => handleDeleteListing(car.id)}>
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            {myListings.length === 0 && (
+              <div className="rounded-3xl border border-dashed border-slate-200 bg-slate-50 p-8 text-center">
+                <p className="text-slate-500 mb-4">No personal listings yet.</p>
+                <button
+                  onClick={() => setActivePage('addListing')}
+                  className="rounded-2xl bg-emerald-600 px-6 py-3 text-sm font-semibold text-white hover:bg-emerald-700"
+                >
+                  Create Your First Listing
+                </button>
+              </div>
+            )}
           </div>
         );
       case 'addListing':

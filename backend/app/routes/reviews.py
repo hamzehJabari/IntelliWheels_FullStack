@@ -14,44 +14,56 @@ def get_car_reviews(car_id):
     
     db = get_db()
     
-    # Get reviews with user info
-    cursor = db.execute('''
-        SELECT r.id, r.car_id, r.user_id, r.rating, r.comment, r.created_at, r.updated_at,
-               u.name as user_name
-        FROM reviews r
-        JOIN users u ON r.user_id = u.id
-        WHERE r.car_id = ?
-        ORDER BY r.created_at DESC
-    ''', (car_id,))
-    
-    reviews = []
-    for row in cursor.fetchall():
-        reviews.append({
-            'id': row['id'],
-            'car_id': row['car_id'],
-            'user_id': row['user_id'],
-            'user_name': row['user_name'],
-            'rating': row['rating'],
-            'comment': row['comment'],
-            'created_at': row['created_at'],
-            'updated_at': row['updated_at']
+    try:
+        # Get reviews with user info - use username, not name
+        cursor = db.execute('''
+            SELECT r.id, r.car_id, r.user_id, r.rating, r.comment, r.created_at, r.updated_at,
+                   u.username as user_name
+            FROM reviews r
+            JOIN users u ON r.user_id = u.id
+            WHERE r.car_id = ?
+            ORDER BY r.created_at DESC
+        ''', (car_id,))
+        
+        reviews = []
+        for row in cursor.fetchall():
+            reviews.append({
+                'id': row['id'],
+                'car_id': row['car_id'],
+                'user_id': row['user_id'],
+                'user_name': row['user_name'],
+                'rating': row['rating'],
+                'comment': row['comment'],
+                'created_at': row['created_at'],
+                'updated_at': row['updated_at']
+            })
+        
+        # Calculate average rating
+        avg_cursor = db.execute('''
+            SELECT AVG(rating) as avg_rating, COUNT(*) as count
+            FROM reviews WHERE car_id = ?
+        ''', (car_id,))
+        stats = avg_cursor.fetchone()
+        
+        return jsonify({
+            'success': True,
+            'reviews': reviews,
+            'stats': {
+                'average_rating': round(stats['avg_rating'], 1) if stats['avg_rating'] else 0,
+                'total_reviews': stats['count']
+            }
         })
-    
-    # Calculate average rating
-    avg_cursor = db.execute('''
-        SELECT AVG(rating) as avg_rating, COUNT(*) as count
-        FROM reviews WHERE car_id = ?
-    ''', (car_id,))
-    stats = avg_cursor.fetchone()
-    
-    return jsonify({
-        'success': True,
-        'reviews': reviews,
-        'stats': {
-            'average_rating': round(stats['avg_rating'], 1) if stats['avg_rating'] else 0,
-            'total_reviews': stats['count']
-        }
-    })
+    except Exception as e:
+        print(f"Get reviews error: {e}")
+        # Return empty reviews rather than 500 error
+        return jsonify({
+            'success': True,
+            'reviews': [],
+            'stats': {
+                'average_rating': 0,
+                'total_reviews': 0
+            }
+        })
 
 
 @bp.route('/car/<int:car_id>', methods=['POST'])

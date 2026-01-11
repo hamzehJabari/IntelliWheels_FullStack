@@ -93,7 +93,7 @@ def semantic_search():
     return jsonify({'success': True, 'results': results})
 
 @bp.route('/vision-helper', methods=['POST'])
-@rate_limit(max_requests=10, window_seconds=60)  # More restrictive for vision
+@rate_limit(max_requests=30, window_seconds=60)  # Increased limit for better UX
 def vision_helper():
     user = require_auth()
     if not user:

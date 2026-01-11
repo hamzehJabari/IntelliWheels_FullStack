@@ -184,6 +184,26 @@ export async function fetchMyListings(token: string | null) {
   return apiRequest<{ success: boolean; cars: Car[] }>(`/my-listings`, { token });
 }
 
+export interface MyListingsAnalytics {
+  total_listings: number;
+  total_value: number;
+  average_price: number;
+  price_range: { min: number; max: number };
+  listings_by_make: Array<{ make: string; count: number }>;
+  listings_by_year: Array<{ year: number | string; count: number }>;
+  listings_by_body_style: Array<{ bodyStyle: string; count: number }>;
+  recent_listings: Array<{ id: number; make: string; model: string; price: number; created_at: string }>;
+  performance: {
+    total_views: number;
+    total_favorites: number;
+    avg_rating: number;
+  };
+}
+
+export async function fetchMyListingsAnalytics(token: string | null) {
+  return apiRequest<{ success: boolean; analytics: MyListingsAnalytics }>(`/my-listings/analytics`, { token });
+}
+
 export async function signupUser(username: string, email: string, password: string) {
   return apiRequest<{ success: boolean; token: string; user: UserProfile; error?: string }>(`/auth/signup`, {
     method: 'POST',
