@@ -36,7 +36,8 @@ async function apiRequest<T = any>(path: string, options: RequestOptions<T> = {}
   } = options;
 
   const finalHeaders = new Headers(headers ?? {});
-  if (!isFormData) {
+  // Only set Content-Type for non-GET requests that have a body
+  if (!isFormData && method !== 'GET' && body !== undefined) {
     finalHeaders.set('Content-Type', 'application/json');
   }
   if (token) {

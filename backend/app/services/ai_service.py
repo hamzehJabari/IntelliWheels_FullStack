@@ -205,8 +205,9 @@ Be helpful, concise, and knowledgeable about cars. Prices are typically in JOD (
             return "I apologize, but I encountered an issue processing your request. Please try again."
 
     def semantic_search(self, query, limit):
-        """Search cars using keyword matching on make, model, and description."""
+        """Search cars using smart keyword matching on make, model, specs, and price."""
         import sqlite3
+        import re
         from flask import current_app
         
         try:
@@ -215,22 +216,71 @@ Be helpful, concise, and knowledgeable about cars. Prices are typically in JOD (
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             
-            # Search by make, model, or specs (simple keyword search)
-            search_term = f"%{query}%"
-            cursor.execute('''
+            # Parse price constraints from query (e.g., "under 50k", "below 100000")
+            max_price = None
+            min_price = None
+            price_pattern = r'(?:under|below|less than|max|<)\s*(\d+)\s*k?'
+            price_match = re.search(price_pattern, query.lower())
+            if price_match:
+                price_val = int(price_match.group(1))
+                max_price = price_val * 1000 if price_val < 1000 else price_val
+            
+            min_price_pattern = r'(?:over|above|more than|min|>)\s*(\d+)\s*k?'
+            min_price_match = re.search(min_price_pattern, query.lower())
+            if min_price_match:
+                price_val = int(min_price_match.group(1))
+                min_price = price_val * 1000 if price_val < 1000 else price_val
+            
+            # Extract keywords, removing price-related terms
+            clean_query = re.sub(r'(?:under|below|less than|over|above|more than|max|min|<|>)\s*\d+\s*k?', '', query.lower())
+            keywords = [w.strip() for w in clean_query.split() if len(w.strip()) > 2]
+            
+            # Map common terms to makes/attributes
+            luxury_makes = ['mercedes', 'bmw', 'audi', 'lexus', 'porsche', 'bentley', 'rolls', 'maserati', 'jaguar', 'land rover', 'range rover']
+            fuel_types = {'petrol': 'petrol', 'gasoline': 'petrol', 'diesel': 'diesel', 'hybrid': 'hybrid', 'electric': 'electric', 'ev': 'electric'}
+            
+            # Build dynamic query
+            conditions = []
+            params = []
+            
+            for keyword in keywords:
+                if keyword == 'luxury':
+                    luxury_conditions = ' OR '.join(['make LIKE ?' for _ in luxury_makes])
+                    conditions.append(f'({luxury_conditions})')
+                    params.extend([f'%{make}%' for make in luxury_makes])
+                elif keyword in fuel_types:
+                    conditions.append('(specs LIKE ? OR specs LIKE ?)')
+                    params.extend([f'%{keyword}%', f'%{fuel_types[keyword]}%'])
+                elif keyword not in ['car', 'cars', 'suv', 'sedan', 'the', 'and', 'with']:
+                    conditions.append('(make LIKE ? OR model LIKE ? OR specs LIKE ?)')
+                    params.extend([f'%{keyword}%', f'%{keyword}%', f'%{keyword}%'])
+            
+            # Add price conditions
+            if max_price:
+                conditions.append('price <= ?')
+                params.append(max_price)
+            if min_price:
+                conditions.append('price >= ?')
+                params.append(min_price)
+            
+            # If no conditions, do a general search
+            if not conditions:
+                search_term = f'%{query}%'
+                conditions.append('(make LIKE ? OR model LIKE ? OR specs LIKE ?)')
+                params.extend([search_term, search_term, search_term])
+            
+            where_clause = ' AND '.join(conditions) if conditions else '1=1'
+            
+            sql = f'''
                 SELECT id, make, model, year, price, currency, image_url, specs
                 FROM cars
-                WHERE make LIKE ? OR model LIKE ? OR specs LIKE ?
-                ORDER BY 
-                    CASE 
-                        WHEN make LIKE ? THEN 1
-                        WHEN model LIKE ? THEN 2
-                        ELSE 3
-                    END,
-                    year DESC
+                WHERE {where_clause}
+                ORDER BY year DESC, price ASC
                 LIMIT ?
-            ''', (search_term, search_term, search_term, search_term, search_term, limit))
+            '''
+            params.append(limit)
             
+            cursor.execute(sql, params)
             rows = cursor.fetchall()
             conn.close()
             
@@ -250,11 +300,11 @@ Be helpful, concise, and knowledgeable about cars. Prices are typically in JOD (
                         "model": row['model'],
                         "year": row['year'],
                         "price": row['price'],
-                        "currency": row['currency'] or 'AED',
+                        "currency": row['currency'] or 'JOD',
                         "image": row['image_url'],
                         "description": specs.get('overview', f"{row['make']} {row['model']} {row['year']}")
                     },
-                    "similarity": round(0.95 - (i * 0.05), 2)  # Decreasing similarity score
+                    "similarity": round(0.95 - (i * 0.05), 2)
                 })
             
             return results
