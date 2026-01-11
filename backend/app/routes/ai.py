@@ -1,12 +1,11 @@
 from flask import Blueprint, request, jsonify
 from ..services.ai_service import ai_service
-from ..security import rate_limit, sanitize_string, validate_text_field, require_auth
+from ..security import sanitize_string, validate_text_field, require_auth
 
 bp = Blueprint('ai', __name__, url_prefix='/api')
 
 
 @bp.route('/chatbot', methods=['POST'])
-@rate_limit(max_requests=20, window_seconds=60)  # 20 messages per minute
 def chatbot():
     # Optional auth check - chatbot can work for guests too
     user = require_auth()
@@ -46,7 +45,6 @@ def chatbot():
     return jsonify({'success': True, 'response': response})
 
 @bp.route('/price-estimate', methods=['POST'])
-@rate_limit(max_requests=30, window_seconds=60)
 def price_estimate():
     if not request.is_json:
         return jsonify({'success': False, 'error': 'Content-Type must be application/json'}), 400
@@ -76,7 +74,6 @@ def price_estimate():
     })
 
 @bp.route('/semantic-search', methods=['GET'])
-@rate_limit(max_requests=30, window_seconds=60)
 def semantic_search():
     query = sanitize_string(request.args.get('q', ''))[:500]
     if not query:
@@ -93,7 +90,6 @@ def semantic_search():
     return jsonify({'success': True, 'results': results})
 
 @bp.route('/vision-helper', methods=['POST'])
-@rate_limit(max_requests=30, window_seconds=60)  # Increased limit for better UX
 def vision_helper():
     user = require_auth()
     if not user:
@@ -133,7 +129,6 @@ def vision_helper():
     return jsonify({'success': True, 'attributes': attributes})
 
 @bp.route('/listing-assistant', methods=['POST'])
-@rate_limit(max_requests=15, window_seconds=60)
 def listing_assistant():
     user = require_auth()
     if not user:
@@ -159,7 +154,6 @@ def listing_assistant():
     return jsonify(response)
 
 @bp.route('/analytics/insights', methods=['GET'])
-@rate_limit(max_requests=30, window_seconds=60)
 def analytics_insights():
     # Return mock/aggregated insights for now
     insights = {

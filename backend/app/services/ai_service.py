@@ -14,13 +14,15 @@ except ImportError:
 class AIService:
     _instance = None
     
-    # Model names to try in order of preference
-    # Free tier works best with gemini-1.5-flash and gemini-pro
+    # Model names for FREE tier (as of late 2024/2025)
+    # gemini-1.5 is NO LONGER free - use gemini-2.0-flash or gemini-pro
     GEMINI_MODELS = [
-        'gemini-1.5-flash',           # Free tier - fast and efficient
-        'gemini-1.5-pro',             # Free tier - more capable
-        'gemini-pro',                 # Legacy free tier fallback
-        'gemini-2.0-flash-exp',       # Experimental (may not be available)
+        'gemini-2.0-flash',               # Current free tier model
+        'gemini-2.0-flash-exp',           # Experimental version
+        'models/gemini-2.0-flash',        # With prefix
+        'models/gemini-2.0-flash-exp',    # With prefix
+        'gemini-pro',                     # Legacy free model
+        'models/gemini-pro',              # With prefix
     ]
     
     def __init__(self):
@@ -28,65 +30,88 @@ class AIService:
         self.embeddings = None
         self.gemini_model = None
         self.active_model_name = None
+        self._init_error = None
         self._init_gemini()
         
     def _init_gemini(self):
         if not GEMINI_AVAILABLE:
             print("Warning: google-generativeai not installed")
+            self._init_error = "google-generativeai package not installed"
             return
         api_key = os.environ.get('GEMINI_API_KEY')
         if not api_key or len(api_key) < 10:
             print("Warning: GEMINI_API_KEY not set or invalid")
+            self._init_error = "GEMINI_API_KEY not set"
             return
             
         try:
             genai.configure(api_key=api_key)
             
-            # First, try to list available models to help debug
+            # List available models to find the right one
+            available_model_names = []
             try:
-                available_models = []
                 for m in genai.list_models():
                     methods = getattr(m, 'supported_generation_methods', [])
                     if 'generateContent' in methods:
-                        available_models.append(m.name)
-                if available_models:
-                    print(f"Available Gemini models: {available_models[:5]}...")
+                        available_model_names.append(m.name)
+                print(f"Available Gemini models: {available_model_names[:10]}")
             except Exception as e:
-                print(f"Could not list models (non-critical): {e}")
-                available_models = []
+                print(f"Could not list models: {e}")
+                # Continue anyway - we'll try our predefined list
             
             # Try to use a model from the environment variable first
             env_model = os.environ.get('GEMINI_TEXT_MODEL')
-            models_to_try = [env_model] + self.GEMINI_MODELS if env_model else self.GEMINI_MODELS
+            models_to_try = ([env_model] if env_model else []) + self.GEMINI_MODELS
             
-            # Try each model until one works
+            # Also add any available models we found
+            for available in available_model_names:
+                if available not in models_to_try and 'gemini' in available.lower():
+                    models_to_try.append(available)
+            
+            # Try each model - don't test with a request (saves quota)
             for model_name in models_to_try:
                 if not model_name:
                     continue
                 try:
                     print(f"Trying Gemini model: {model_name}")
                     model = genai.GenerativeModel(model_name)
-                    # Test with a simple request to verify it works
-                    test_response = model.generate_content("Say 'OK' in one word")
-                    if test_response and test_response.text:
-                        self.gemini_model = model
-                        self.active_model_name = model_name
-                        print(f"✓ Gemini AI initialized with model: {model_name}")
-                        return
+                    # Just check if model object is created successfully
+                    # Skip test request to avoid rate limiting
+                    self.gemini_model = model
+                    self.active_model_name = model_name
+                    print(f"✓ Gemini AI initialized with model: {model_name}")
+                    self._init_error = None
+                    return
                 except Exception as e:
-                    error_str = str(e)
+                    error_str = str(e).lower()
                     # If API key is invalid, no point trying other models
-                    if 'API_KEY_INVALID' in error_str or 'API Key not found' in error_str:
-                        print(f"ERROR: Invalid GEMINI_API_KEY - please get a new key from https://aistudio.google.com/app/apikey")
+                    if 'api_key_invalid' in error_str or 'api key not found' in error_str or 'invalid api key' in error_str:
+                        print(f"ERROR: Invalid GEMINI_API_KEY - get a new key from https://aistudio.google.com/app/apikey")
                         self.gemini_model = None
-                        self._init_error = "Invalid API key - get a new one from https://aistudio.google.com/app/apikey"
+                        self._init_error = "Invalid API key"
                         return
                     print(f"✗ Model {model_name} failed: {str(e)[:100]}")
                     continue
             
+            # If we have available models but none worked from our list, try the first available one
+            if available_model_names:
+                for available in available_model_names:
+                    if 'gemini' in available.lower():
+                        try:
+                            print(f"Trying available model: {available}")
+                            model = genai.GenerativeModel(available)
+                            self.gemini_model = model
+                            self.active_model_name = available
+                            print(f"✓ Gemini AI initialized with model: {available}")
+                            self._init_error = None
+                            return
+                        except Exception as e:
+                            print(f"✗ Model {available} failed: {str(e)[:50]}")
+                            continue
+            
             print("ERROR: Could not initialize any Gemini model")
             self.gemini_model = None
-            self._init_error = "No compatible Gemini model found"
+            self._init_error = "No compatible Gemini model found - check API key"
             
         except Exception as e:
             print(f"Failed to initialize Gemini: {e}")
