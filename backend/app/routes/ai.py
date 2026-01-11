@@ -112,6 +112,24 @@ def vision_helper():
         return jsonify({'success': False, 'error': 'Image too large'}), 400
     
     attributes = ai_service.analyze_image(image_base64)
+    
+    # Add helpful highlights with price info
+    highlights = []
+    if attributes.get('make') and attributes.get('model'):
+        highlights.append(f"Detected: {attributes['make']} {attributes['model']}")
+    if attributes.get('year'):
+        highlights.append(f"Year: {attributes['year']}")
+    if attributes.get('bodyStyle'):
+        highlights.append(f"Body: {attributes['bodyStyle']}")
+    if attributes.get('estimatedPrice'):
+        currency = attributes.get('currency', 'JOD')
+        price = attributes['estimatedPrice']
+        highlights.append(f"Est. price: {price:,.0f} {currency}")
+    if attributes.get('conditionDescription'):
+        highlights.append(f"Condition: {attributes['conditionDescription'][:100]}")
+    
+    attributes['highlights'] = highlights
+    
     return jsonify({'success': True, 'attributes': attributes})
 
 @bp.route('/listing-assistant', methods=['POST'])

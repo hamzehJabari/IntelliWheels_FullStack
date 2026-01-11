@@ -14,13 +14,13 @@ except ImportError:
 class AIService:
     _instance = None
     
-    # Model names to try in order of preference (as of Jan 2026)
-    # Note: gemini-1.5-flash was retired, use gemini-2.x models
+    # Model names to try in order of preference
+    # Free tier works best with gemini-1.5-flash and gemini-pro
     GEMINI_MODELS = [
-        'gemini-2.5-flash',           # Latest and fastest
-        'gemini-2.0-flash',           # Fallback
-        'gemini-2.5-pro',             # Pro model (slower but better)
-        'gemini-pro',                 # Legacy fallback
+        'gemini-1.5-flash',           # Free tier - fast and efficient
+        'gemini-1.5-pro',             # Free tier - more capable
+        'gemini-pro',                 # Legacy free tier fallback
+        'gemini-2.0-flash-exp',       # Experimental (may not be available)
     ]
     
     def __init__(self):
@@ -195,7 +195,7 @@ class AIService:
 
         try:
             # Build conversation context
-            system_prompt = """You are IntelliWheels AI Assistant, an expert automotive consultant for a car marketplace in the Middle East (primarily Jordan/GCC region). 
+            system_prompt = """You are IntelliWheels AI Assistant, an expert automotive consultant for a car marketplace in Jordan. 
 You help users:
 - Find and compare cars
 - Estimate fair market prices
@@ -203,7 +203,14 @@ You help users:
 - Answer automotive questions
 - Analyze car images
 
-Be helpful, concise, and knowledgeable about cars. Prices are typically in JOD (Jordanian Dinar) or AED (UAE Dirham)."""
+IMPORTANT: All prices must be in JOD (Jordanian Dinar). This is a Jordanian marketplace.
+Price references for used cars in Jordan:
+- Economy (Toyota Yaris, Honda City): 5,000 - 12,000 JOD
+- Mid-range (Toyota Camry, Honda Accord): 8,000 - 20,000 JOD  
+- Premium (BMW 3-Series, Mercedes C-Class): 15,000 - 35,000 JOD
+- Luxury (BMW 7-Series, Mercedes S-Class): 30,000 - 80,000 JOD
+
+Be helpful, concise, and knowledgeable about cars."""
 
             # Build message content
             contents = []
@@ -269,7 +276,7 @@ Be helpful, concise, and knowledgeable about cars. Prices are typically in JOD (
             return "I apologize, but I encountered an issue processing your request. Please try again."
 
     def semantic_search(self, query, limit):
-        """Search cars using smart keyword matching on make, model, specs, and price."""
+        """Search cars using semantic scoring - always returns results ranked by relevance."""
         import sqlite3
         import re
         from flask import current_app
@@ -285,88 +292,146 @@ Be helpful, concise, and knowledgeable about cars. Prices are typically in JOD (
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             
-            # First check if there are any cars at all
-            cursor.execute("SELECT COUNT(*) as cnt FROM cars")
-            count = cursor.fetchone()['cnt']
-            print(f"[Semantic Search] Total cars in DB: {count}")
+            # Get ALL cars from database to score them
+            cursor.execute("SELECT id, make, model, year, price, currency, image_url, specs FROM cars")
+            all_cars = cursor.fetchall()
+            print(f"[Semantic Search] Total cars in DB: {len(all_cars)}")
+            conn.close()
+            
+            if not all_cars:
+                return []
+            
+            query_lower = query.lower()
             
             # Parse price constraints from query (e.g., "under 50k", "below 100000")
             max_price = None
             min_price = None
             price_pattern = r'(?:under|below|less than|max|<)\s*(\d+)\s*k?'
-            price_match = re.search(price_pattern, query.lower())
+            price_match = re.search(price_pattern, query_lower)
             if price_match:
                 price_val = int(price_match.group(1))
                 max_price = price_val * 1000 if price_val < 1000 else price_val
             
             min_price_pattern = r'(?:over|above|more than|min|>)\s*(\d+)\s*k?'
-            min_price_match = re.search(min_price_pattern, query.lower())
+            min_price_match = re.search(min_price_pattern, query_lower)
             if min_price_match:
                 price_val = int(min_price_match.group(1))
                 min_price = price_val * 1000 if price_val < 1000 else price_val
             
-            # Extract keywords, removing price-related terms
-            clean_query = re.sub(r'(?:under|below|less than|over|above|more than|max|min|<|>)\s*\d+\s*k?', '', query.lower())
-            keywords = [w.strip() for w in clean_query.split() if len(w.strip()) > 2]
+            # Extract keywords, removing price-related and stop words
+            clean_query = re.sub(r'(?:under|below|less than|over|above|more than|max|min|<|>)\s*\d+\s*k?', '', query_lower)
+            stop_words = {'car', 'cars', 'the', 'a', 'an', 'and', 'or', 'with', 'for', 'find', 'show', 'me', 'i', 'want', 'need', 'looking', 'search'}
+            keywords = [w.strip() for w in clean_query.split() if len(w.strip()) > 1 and w.strip() not in stop_words]
             
-            # Map common terms to makes/attributes
-            luxury_makes = ['mercedes', 'bmw', 'audi', 'lexus', 'porsche', 'bentley', 'rolls', 'maserati', 'jaguar', 'land rover', 'range rover']
-            fuel_types = {'petrol': 'petrol', 'gasoline': 'petrol', 'diesel': 'diesel', 'hybrid': 'hybrid', 'electric': 'electric', 'ev': 'electric'}
+            # Define category mappings
+            luxury_makes = {'mercedes', 'bmw', 'audi', 'lexus', 'porsche', 'bentley', 'rolls-royce', 'maserati', 'jaguar', 'land rover', 'range rover', 'infiniti', 'cadillac', 'lincoln'}
+            economy_makes = {'toyota', 'honda', 'nissan', 'hyundai', 'kia', 'mazda', 'suzuki', 'mitsubishi', 'subaru'}
+            fuel_keywords = {'petrol': ['petrol', 'gasoline', 'gas'], 'diesel': ['diesel'], 'hybrid': ['hybrid'], 'electric': ['electric', 'ev', 'battery']}
+            body_keywords = {'suv': ['suv', 'crossover', '4x4'], 'sedan': ['sedan', 'saloon'], 'coupe': ['coupe', 'sports'], 'hatchback': ['hatchback', 'hatch'], 'truck': ['truck', 'pickup'], 'van': ['van', 'minivan']}
             
-            # Build dynamic query
-            conditions = []
-            params = []
+            # Score each car
+            scored_cars = []
+            for row in all_cars:
+                score = 0.0
+                car_make = (row['make'] or '').lower()
+                car_model = (row['model'] or '').lower()
+                car_year = row['year'] or 0
+                car_price = row['price'] or 0
+                car_specs_raw = row['specs'] or ''
+                
+                # Parse specs JSON
+                try:
+                    car_specs = json.loads(car_specs_raw) if car_specs_raw else {}
+                except:
+                    car_specs = {}
+                car_specs_text = json.dumps(car_specs).lower() if car_specs else ''
+                
+                # Combined searchable text
+                searchable = f"{car_make} {car_model} {car_specs_text}"
+                
+                # Score direct keyword matches
+                for keyword in keywords:
+                    # Exact make match (highest score)
+                    if keyword == car_make:
+                        score += 50
+                    # Make contains keyword
+                    elif keyword in car_make:
+                        score += 30
+                    # Exact model match
+                    elif keyword == car_model:
+                        score += 45
+                    # Model contains keyword
+                    elif keyword in car_model:
+                        score += 25
+                    # Keyword in specs
+                    elif keyword in searchable:
+                        score += 10
+                    
+                    # Category matches
+                    if keyword == 'luxury' and car_make in luxury_makes:
+                        score += 40
+                    if keyword in ('economy', 'affordable', 'cheap', 'budget') and car_make in economy_makes:
+                        score += 35
+                    
+                    # Fuel type matches
+                    for fuel, terms in fuel_keywords.items():
+                        if keyword in terms and fuel in searchable:
+                            score += 20
+                    
+                    # Body type matches
+                    for body, terms in body_keywords.items():
+                        if keyword in terms and body in searchable:
+                            score += 20
+                
+                # Price range scoring (bonus for matching price constraints)
+                if max_price and car_price > 0:
+                    if car_price <= max_price:
+                        # Bonus for being under budget, more bonus for being closer to max
+                        ratio = car_price / max_price
+                        score += 15 * ratio  # Cars closer to budget get higher score
+                    else:
+                        score -= 20  # Penalty for over budget
+                
+                if min_price and car_price > 0:
+                    if car_price >= min_price:
+                        score += 10
+                    else:
+                        score -= 15  # Penalty for under minimum
+                
+                # If no keywords matched at all, give a small base score based on recency
+                if score == 0 and not keywords:
+                    # No specific search terms, rank by year (newer = better)
+                    score = min(car_year - 2000, 25) if car_year > 2000 else 5
+                
+                # Only include cars with positive scores, or all if no specific filters
+                if score > 0 or not keywords:
+                    scored_cars.append((score, row))
             
-            for keyword in keywords:
-                if keyword == 'luxury':
-                    luxury_conditions = ' OR '.join(['make LIKE ?' for _ in luxury_makes])
-                    conditions.append(f'({luxury_conditions})')
-                    params.extend([f'%{make}%' for make in luxury_makes])
-                elif keyword in fuel_types:
-                    conditions.append('(specs LIKE ? OR specs LIKE ?)')
-                    params.extend([f'%{keyword}%', f'%{fuel_types[keyword]}%'])
-                elif keyword not in ['car', 'cars', 'suv', 'sedan', 'the', 'and', 'with']:
-                    conditions.append('(make LIKE ? OR model LIKE ? OR specs LIKE ?)')
-                    params.extend([f'%{keyword}%', f'%{keyword}%', f'%{keyword}%'])
+            # Sort by score descending
+            scored_cars.sort(key=lambda x: x[0], reverse=True)
             
-            # Add price conditions
-            if max_price:
-                conditions.append('price <= ?')
-                params.append(max_price)
-            if min_price:
-                conditions.append('price >= ?')
-                params.append(min_price)
+            # If no cars matched well, return top cars by year
+            if not scored_cars:
+                scored_cars = [(10, row) for row in all_cars]
+                scored_cars.sort(key=lambda x: x[1]['year'] or 0, reverse=True)
             
-            # If no conditions, do a general search
-            if not conditions:
-                search_term = f'%{query}%'
-                conditions.append('(make LIKE ? OR model LIKE ? OR specs LIKE ?)')
-                params.extend([search_term, search_term, search_term])
+            # Take top results
+            top_results = scored_cars[:limit]
+            print(f"[Semantic Search] Returning {len(top_results)} results (top score: {top_results[0][0] if top_results else 0})")
             
-            where_clause = ' AND '.join(conditions) if conditions else '1=1'
-            
-            sql = f'''
-                SELECT id, make, model, year, price, currency, image_url, specs
-                FROM cars
-                WHERE {where_clause}
-                ORDER BY year DESC, price ASC
-                LIMIT ?
-            '''
-            params.append(limit)
-            
-            cursor.execute(sql, params)
-            rows = cursor.fetchall()
-            print(f"[Semantic Search] Query returned {len(rows)} rows")
-            conn.close()
-            
+            # Format results
             results = []
-            for i, row in enumerate(rows):
+            max_score = top_results[0][0] if top_results else 1
+            for score, row in top_results:
                 specs = {}
                 if row['specs']:
                     try:
                         specs = json.loads(row['specs'])
                     except:
                         pass
+                
+                # Normalize similarity score to 0-1 range
+                similarity = round(min(score / max(max_score, 1), 1.0), 2)
                 
                 results.append({
                     "car": {
@@ -379,9 +444,11 @@ Be helpful, concise, and knowledgeable about cars. Prices are typically in JOD (
                         "image": row['image_url'],
                         "description": specs.get('overview', f"{row['make']} {row['model']} {row['year']}")
                     },
-                    "similarity": round(0.95 - (i * 0.05), 2)
+                    "similarity": similarity,
+                    "score": score
                 })
             
+            print(f"[Semantic Search] Results: {[(r['car']['make'], r['car']['model'], r['score']) for r in results]}")
             return results
             
         except Exception as e:
@@ -423,9 +490,19 @@ Be helpful, concise, and knowledgeable about cars. Prices are typically in JOD (
     "model": "model name",
     "year": estimated year as number,
     "bodyStyle": "Sedan/SUV/Coupe/Hatchback/Truck/Van/Convertible",
-    "estimatedPrice": estimated price in AED as number,
+    "estimatedPrice": estimated price in JOD (Jordanian Dinar) as a NUMBER ONLY,
+    "currency": "JOD",
     "conditionDescription": "brief description of visible condition"
 }
+
+PRICE GUIDE for used cars in Jordan (JOD):
+- Toyota Yaris/Corolla: 5,000 - 12,000 JOD
+- Toyota Camry: 8,000 - 18,000 JOD
+- Honda Civic/Accord: 7,000 - 16,000 JOD
+- Hyundai/Kia compact: 4,000 - 10,000 JOD
+- BMW 3-Series: 12,000 - 30,000 JOD
+- Mercedes C-Class: 15,000 - 35,000 JOD
+- Land Cruiser/Patrol: 25,000 - 60,000 JOD
 
 Only respond with the JSON, no other text."""
 
@@ -488,7 +565,9 @@ Only respond with the JSON, no other text."""
             }
 
         try:
-            system_prompt = """You are a car listing assistant for IntelliWheels marketplace. Help users create car listings.
+            system_prompt = """You are a car listing assistant for IntelliWheels marketplace in Jordan. Help users create car listings.
+All prices must be in JOD (Jordanian Dinar).
+
 When you have enough information to create a listing, respond with JSON in this format:
 {
     "response": "your helpful message",
@@ -497,7 +576,8 @@ When you have enough information to create a listing, respond with JSON in this 
         "make": "...",
         "model": "...",
         "year": number,
-        "price": number,
+        "price": number in JOD,
+        "currency": "JOD",
         "description": "..."
     }
 }

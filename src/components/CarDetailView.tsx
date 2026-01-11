@@ -12,7 +12,7 @@ interface CarDetailViewProps {
 
 export function CarDetailView({ carId }: CarDetailViewProps) {
   const numericId = Number(carId);
-  const { token, user } = useAuth();
+  const { token, user, formatPrice } = useAuth();
   const router = useRouter();
   const [car, setCar] = useState<Car | null>(null);
   const [loading, setLoading] = useState(true);
@@ -337,7 +337,7 @@ export function CarDetailView({ carId }: CarDetailViewProps) {
                 </div>
                 <div className="rounded-2xl bg-slate-50 px-4 py-3 text-right">
                   <p className="text-xs uppercase text-slate-400">Price</p>
-                  <p className="text-3xl font-bold text-emerald-600">{formatCurrency(car.price, car.currency)}</p>
+                  <p className="text-3xl font-bold text-emerald-600">{formatPrice(car.price, car.currency || 'JOD')}</p>
                 </div>
               </div>
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -603,21 +603,6 @@ export function CarDetailView({ carId }: CarDetailViewProps) {
   );
 }
 
-function formatCurrency(value?: number, currency = 'AED') {
-  if (value === undefined || value === null) {
-    return 'TBD';
-  }
-  try {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency,
-      maximumFractionDigits: 0,
-    }).format(value);
-  } catch (err) {
-    return `${value.toLocaleString()} ${currency}`;
-  }
-}
-
 function camelToTitle(value: string) {
   return value
     .replace(/([A-Z])/g, ' $1')
@@ -645,8 +630,11 @@ function buildDescriptionCopy(car: Car | null) {
       segments.push(`Highlights include ${specLines.join(', ')}.`);
     }
   }
-  if (car.currency && car.price) {
-    segments.push(`Priced at ${formatCurrency(car.price, car.currency)}, it is ready for viewing.`);
+  if (car.price) {
+    // Use simple price format for description text
+    const priceStr = car.price.toLocaleString();
+    const currencyLabel = car.currency || 'JOD';
+    segments.push(`Priced at ${priceStr} ${currencyLabel}, it is ready for viewing.`);
   }
   return segments.join(' ');
 }

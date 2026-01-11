@@ -250,19 +250,6 @@ const LANGUAGE_OPTIONS = [
 
 const CURRENCY_OPTIONS: CurrencyCode[] = ['JOD', 'AED', 'USD', 'EUR', 'GBP', 'SAR', 'QAR', 'BHD', 'KWD', 'OMR'];
 
-const CURRENCY_RATES: Record<CurrencyCode, number> = {
-  JOD: 1,
-  AED: 0.19,
-  USD: 0.71,
-  EUR: 0.65,
-  GBP: 0.56,
-  SAR: 0.19,
-  QAR: 0.19,
-  BHD: 0.53,
-  KWD: 0.43,
-  OMR: 2.15,
-};
-
 const DEFAULT_FILTERS: CarFilters = {
   make: 'all',
   search: '',
@@ -298,7 +285,7 @@ interface VisionSuggestion extends VisionAttributes {
 }
 
 export function AppView() {
-  const { user, token, loading: authLoading, login, signup, logout, updateMyProfile, refreshProfile, error: authError, clearError } = useAuth();
+  const { user, token, loading: authLoading, login, signup, logout, updateMyProfile, refreshProfile, error: authError, clearError, currency, setCurrency, formatPrice, convertCurrency } = useAuth();
   const [mounted, setMounted] = useState(false);
   const [activePage, setActivePage] = useState<PageKey>('listings');
   const [serviceMode, setServiceMode] = useState<ServiceMode>('marketplace');
@@ -336,10 +323,9 @@ export function AppView() {
     videoUrl: '',
     description: '',
   });
-  const [currency, setCurrency] = useState<CurrencyCode>('JOD');
   const [language, setLanguage] = useState<'en' | 'ar'>('en');
   const [isDraggingImage, setIsDraggingImage] = useState(false);
-  const [priceEstimate, setPriceEstimate] = useState<{ value: number; currency: string; range?: { low: number; high: number } } | null>(null);
+  const [priceEstimate, setPriceEstimate] = useState<{ value: number; currency: CurrencyCode; range?: { low: number; high: number } } | null>(null);
   const [visionSuggestion, setVisionSuggestion] = useState<VisionSuggestion | null>(null);
   const [visionLoading, setVisionLoading] = useState(false);
   const [assistantMode, setAssistantMode] = useState<'general' | 'listing'>('general');
@@ -579,15 +565,6 @@ export function AppView() {
       return '/placeholder-car.svg';
     },
     [resolveImageUrl]
-  );
-
-  const formatPrice = useCallback(
-    (value?: number, sourceCurrency: CurrencyCode = 'JOD') => {
-      if (value === undefined || value === null) return 'TBD';
-      const converted = convertCurrency(value, sourceCurrency, currency);
-      return formatCurrency(converted ?? value, currency);
-    },
-    [currency]
   );
 
   const requireAuth = useCallback(() => {
@@ -973,7 +950,7 @@ export function AppView() {
         model: listingForm.model,
         year: listingForm.year ? Number(listingForm.year) : undefined,
         price: listingForm.price ? Number(listingForm.price) : undefined,
-        currency: listingForm.currency,
+        currency: listingForm.currency as CurrencyCode,
         odometerKm: listingForm.odometer ? Number(listingForm.odometer) : undefined,
         image: listingForm.image || normalizedGallery[0],
         galleryImages: normalizedGallery,
@@ -1285,7 +1262,7 @@ export function AppView() {
         <div className="text-right text-sm text-slate-500">
           <p>{copy.dealerMetaAverage}</p>
           <p className="text-base font-semibold text-emerald-600">
-            {dealer.average_price ? formatPrice(dealer.average_price, 'AED') : '—'}
+            {dealer.average_price ? formatPrice(dealer.average_price, 'JOD') : '—'}
           </p>
         </div>
       </div>
@@ -2345,49 +2322,6 @@ function StatCard({ label, value }: { label: string; value: string }) {
       <p className="mt-2 text-2xl font-semibold">{value}</p>
     </div>
   );
-}
-
-function convertCurrency(value?: number, fromCurrency: CurrencyCode = 'JOD', toCurrency: CurrencyCode = 'JOD') {
-  if (value === undefined || value === null) return null;
-  if (fromCurrency === toCurrency) return value;
-
-  // Convert from source to JOD (Base) first
-  // Rates are defined as "How many JOD is 1 Unit of Source" ? NO
-  // Let's assume rates in CURRENCY_RATES are "Value of 1 [Key] in JOD"
-  // Wait, previous rates were based on AED. 
-  // Old: USD: 3.6725 (1 USD = 3.67 AED).
-  // New Base: JOD.
-  // Rate logic: 1 JOD = X Currency? OR 1 Currency = X JOD?
-  // Let's stick to: 1 [Key] = [Value] Base Currency (JOD).
-  // So if Base is JOD:
-  // USD = 0.709 (1 USD is 0.709 JOD)
-  // AED = 0.19  (1 AED is 0.19 JOD)
-
-  const fromRate = CURRENCY_RATES[fromCurrency as keyof typeof CURRENCY_RATES] ?? 1; // Value of 1 FromUnit in JOD
-  const toRate = CURRENCY_RATES[toCurrency as keyof typeof CURRENCY_RATES] ?? 1;     // Value of 1 ToUnit in JOD
-
-  // Convert Source to Base (JOD)
-  // Value * Rate = Value in JOD
-  const valueInBase = value * fromRate;
-
-  // Convert Base to Target
-  // ValueInBase / ToRate = Value in Target
-  const converted = valueInBase / toRate;
-
-  return converted;
-}
-
-function formatCurrency(value?: number, currency = 'JOD') {
-  if (!value && value !== 0) return 'TBD';
-  try {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency,
-      maximumFractionDigits: 0,
-    }).format(value);
-  } catch (err) {
-    return `${value?.toLocaleString() ?? 'TBD'} ${currency}`;
-  }
 }
 
 function camelToTitle(value: string) {

@@ -78,6 +78,7 @@ def parse_int(value) -> Optional[int]:
 
 
 def parse_price_block(value: str, currency_hint: str = "JOD") -> Optional[float]:
+    """Parse price block and return raw value (no conversion)."""
     text = norm(value)
     if not text:
         return None
@@ -85,8 +86,8 @@ def parse_price_block(value: str, currency_hint: str = "JOD") -> Optional[float]
     if not numbers:
         return None
     avg = sum(numbers) / len(numbers)
-    multiplier = CURRENCY_RATES.get(currency_hint.upper(), 1.0)
-    return avg * multiplier
+    # Return raw value without conversion
+    return avg
 
 
 def extract_star_rating(value: str) -> Optional[float]:
@@ -114,7 +115,7 @@ def init_db() -> None:
             model TEXT NOT NULL,
             year INTEGER,
             price REAL,
-            currency TEXT DEFAULT 'AED',
+            currency TEXT DEFAULT 'JOD',
             image_url TEXT,
             image_urls TEXT,
             gallery_images TEXT,
@@ -261,18 +262,22 @@ def build_groups(records: Iterable[Dict[str, str]]) -> Dict[Tuple[str, str, int]
 
 
 def derive_price(rows: Sequence[EngineRow]) -> Tuple[Optional[float], str]:
+    """Derive price from rows and convert to JOD."""
     prices: List[float] = []
     for row in rows:
         price_aed = parse_price_block(row.payload.get("Price UAE", ""), "AED")
         if price_aed:
-            prices.append(price_aed)
+            # Convert AED to JOD (1 AED ≈ 0.19 JOD)
+            prices.append(price_aed * CURRENCY_RATES["AED"])
             continue
         price_sar = parse_price_block(row.payload.get("Price KSA", ""), "SAR")
         if price_sar:
-            prices.append(price_sar)
+            # Convert SAR to JOD (1 SAR ≈ 0.19 JOD)
+            prices.append(price_sar * CURRENCY_RATES["SAR"])
     if not prices:
-        return None, "AED"
-    return sum(prices) / len(prices), "AED"
+        return None, "JOD"
+    # Return average price in JOD
+    return round(sum(prices) / len(prices), 2), "JOD"
 
 
 def derive_rating(group: CarGroup) -> float:

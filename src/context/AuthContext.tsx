@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { STORAGE_KEYS } from '@/lib/config';
+import { STORAGE_KEYS, CurrencyCode, CURRENCY_RATES, convertCurrency as convertCurrencyUtil, formatCurrency as formatCurrencyUtil, formatPrice as formatPriceUtil } from '@/lib/config';
 import { getProfile, loginUser, logoutUser, signupUser, updateProfile, verifySession } from '@/lib/api';
 import { UserProfile } from '@/lib/types';
 
@@ -16,6 +16,11 @@ interface AuthContextValue {
   refreshProfile: () => Promise<UserProfile | null>;
   updateMyProfile: (payload: Partial<UserProfile> & { password?: string; current_password?: string }) => Promise<boolean>;
   clearError: () => void;
+  // Currency support
+  currency: CurrencyCode;
+  setCurrency: (currency: CurrencyCode) => void;
+  formatPrice: (value: number | undefined | null, sourceCurrency?: CurrencyCode) => string;
+  convertCurrency: (amount: number, from: CurrencyCode, to?: CurrencyCode) => number;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -25,6 +30,36 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [currency, setCurrencyState] = useState<CurrencyCode>('JOD');
+
+  // Load persisted currency preference
+  useEffect(() => {
+    const storedCurrency = typeof window !== 'undefined' ? localStorage.getItem(STORAGE_KEYS.currency) : null;
+    if (storedCurrency && Object.keys(CURRENCY_RATES).includes(storedCurrency)) {
+      setCurrencyState(storedCurrency as CurrencyCode);
+    }
+  }, []);
+
+  const setCurrency = useCallback((newCurrency: CurrencyCode) => {
+    setCurrencyState(newCurrency);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(STORAGE_KEYS.currency, newCurrency);
+    }
+  }, []);
+
+  const formatPrice = useCallback(
+    (value: number | undefined | null, sourceCurrency: CurrencyCode = 'JOD') => {
+      return formatPriceUtil(value, sourceCurrency, currency);
+    },
+    [currency]
+  );
+
+  const convertCurrency = useCallback(
+    (amount: number, from: CurrencyCode, to?: CurrencyCode) => {
+      return convertCurrencyUtil(amount, from, to ?? currency);
+    },
+    [currency]
+  );
 
   useEffect(() => {
     const storedToken = typeof window !== 'undefined' ? localStorage.getItem(STORAGE_KEYS.token) : null;
@@ -197,7 +232,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     refreshProfile,
     updateMyProfile,
     clearError: () => setError(null),
-  }), [user, token, loading, error, handleLogin, handleSignup, handleLogout, refreshProfile, updateMyProfile]);
+    // Currency support
+    currency,
+    setCurrency,
+    formatPrice,
+    convertCurrency,
+  }), [user, token, loading, error, handleLogin, handleSignup, handleLogout, refreshProfile, updateMyProfile, currency, setCurrency, formatPrice, convertCurrency]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

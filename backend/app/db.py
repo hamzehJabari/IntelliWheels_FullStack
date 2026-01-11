@@ -45,7 +45,7 @@ def init_db(app):
             )
         ''')
         
-        # Create Cars Table - matches ingest_excel_to_db.py schema
+        # Create Cars Table - matches import_sql_data.py schema
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS cars (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,

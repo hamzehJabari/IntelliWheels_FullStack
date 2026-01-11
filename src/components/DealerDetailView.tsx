@@ -12,7 +12,7 @@ interface DealerDetailViewProps {
 
 export function DealerDetailView({ dealerId }: DealerDetailViewProps) {
   const numericId = Number(dealerId);
-  const { token } = useAuth();
+  const { token, formatPrice } = useAuth();
   const router = useRouter();
   const [dealer, setDealer] = useState<DealerDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -100,7 +100,7 @@ export function DealerDetailView({ dealerId }: DealerDetailViewProps) {
               <p className="text-sm text-slate-500">Member since {dealer.member_since ? new Date(dealer.member_since).toLocaleDateString() : 'recently'}</p>
               <div className="mt-4 flex flex-wrap gap-4 text-sm text-slate-600">
                 <span>{dealer.total_listings} listings</span>
-                {dealer.average_price ? <span>Avg price {formatCurrency(dealer.average_price)}</span> : null}
+                {dealer.average_price ? <span>Avg price {formatPrice(dealer.average_price, 'JOD')}</span> : null}
                 {dealer.top_makes?.length ? <span>Top makes: {dealer.top_makes.slice(0, 3).map((entry) => entry.make).join(', ')}</span> : null}
               </div>
             </div>
@@ -131,7 +131,7 @@ export function DealerDetailView({ dealerId }: DealerDetailViewProps) {
                     <div className="flex-1">
                       <h3 className="text-lg font-semibold text-slate-900">{car.make} {car.model}</h3>
                       <p className="text-sm text-slate-500">{car.year || 'Year TBD'}</p>
-                      <p className="font-semibold text-emerald-600">{formatCurrency(car.price, car.currency)}</p>
+                      <p className="font-semibold text-emerald-600">{formatPrice(car.price, car.currency || 'JOD')}</p>
                       {car.odometerKm ? <p className="text-xs text-slate-500">{car.odometerKm.toLocaleString()} km</p> : null}
                     </div>
                   </div>
@@ -152,17 +152,4 @@ export function DealerDetailView({ dealerId }: DealerDetailViewProps) {
       </div>
     </div>
   );
-}
-
-function formatCurrency(value?: number | null, currency = 'AED') {
-  if (!value) return 'TBD';
-  try {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency,
-      maximumFractionDigits: 0,
-    }).format(value);
-  } catch (err) {
-    return `${value.toLocaleString()} ${currency}`;
-  }
 }

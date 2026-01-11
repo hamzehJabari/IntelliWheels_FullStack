@@ -1,4 +1,5 @@
-export type CurrencyCode = 'JOD' | 'AED' | 'USD' | 'EUR' | 'GBP' | 'SAR' | 'QAR' | 'BHD' | 'KWD' | 'OMR' | 'EGP' | 'MAD' | string;
+// Core currency codes supported by the app
+export type CurrencyCode = 'JOD' | 'AED' | 'USD' | 'EUR' | 'GBP' | 'SAR' | 'QAR' | 'BHD' | 'KWD' | 'OMR';
 
 export type SortOption = 'default' | 'price-asc' | 'price-desc' | 'rating-desc' | 'year-desc';
 
@@ -152,6 +153,7 @@ export interface VisionAttributes {
   color?: string;
   conditionDescription?: string;
   estimatedPrice?: number;
+  currency?: CurrencyCode;
   confidence?: number;
   highlights?: string[];
 }
