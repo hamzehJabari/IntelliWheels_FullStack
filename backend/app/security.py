@@ -230,3 +230,16 @@ def add_security_headers(response):
     # Referrer policy
     response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
     return response
+
+# ============================================
+# Authentication Helper
+# ============================================
+
+def require_auth():
+    """
+    Check if request is authenticated and return user dict.
+    Returns None if not authenticated.
+    """
+    from .routes.auth import get_user_from_token
+    token = request.headers.get('Authorization', '').replace('Bearer ', '')
+    return get_user_from_token(token)

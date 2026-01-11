@@ -1,14 +1,9 @@
 from flask import Blueprint, request, jsonify
 from ..services.ai_service import ai_service
-from ..security import rate_limit, sanitize_string, validate_text_field
-from .auth import get_user_from_token
+from ..security import rate_limit, sanitize_string, validate_text_field, require_auth
 
 bp = Blueprint('ai', __name__, url_prefix='/api')
 
-def require_auth():
-    """Check if request is authenticated."""
-    token = request.headers.get('Authorization', '').replace('Bearer ', '')
-    return get_user_from_token(token)
 
 @bp.route('/chatbot', methods=['POST'])
 @rate_limit(max_requests=20, window_seconds=60)  # 20 messages per minute
