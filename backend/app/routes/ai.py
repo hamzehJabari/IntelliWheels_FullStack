@@ -24,11 +24,17 @@ def chatbot():
         return jsonify({'success': False, 'error': 'Invalid JSON body'}), 400
     
     query = sanitize_string(data.get('query') or data.get('message') or '')
+    image_base64 = data.get('image_base64')
     
-    # Validate query length
-    valid, error = validate_text_field(query, 'Message', required=True, max_length=4000)
-    if not valid:
-        return jsonify({'success': False, 'error': error}), 400
+    # Require either a message or an image
+    if not query and not image_base64:
+        return jsonify({'success': False, 'error': 'Please provide a message or image'}), 400
+    
+    # Validate query length if provided
+    if query:
+        valid, error = validate_text_field(query, 'Message', required=False, max_length=4000)
+        if not valid:
+            return jsonify({'success': False, 'error': error}), 400
     
     history = data.get('history', [])
     # Limit history to prevent abuse
@@ -37,7 +43,6 @@ def chatbot():
     else:
         history = []
     
-    image_base64 = data.get('image_base64')
     # Basic validation for base64 image
     if image_base64 and len(image_base64) > 10 * 1024 * 1024:  # 10MB limit
         return jsonify({'success': False, 'error': 'Image too large'}), 400

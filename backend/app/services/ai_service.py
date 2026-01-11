@@ -25,15 +25,19 @@ class AIService:
             print("Warning: google-generativeai not installed")
             return
         api_key = os.environ.get('GEMINI_API_KEY')
-        if api_key:
+        if api_key and len(api_key) > 10:
             try:
                 genai.configure(api_key=api_key)
-                self.gemini_model = genai.GenerativeModel('gemini-1.5-flash')
-                print("Gemini AI initialized successfully")
+                # Try gemini-1.5-flash first, fallback to gemini-pro
+                model_name = os.environ.get('GEMINI_TEXT_MODEL', 'gemini-1.5-flash')
+                self.gemini_model = genai.GenerativeModel(model_name)
+                # Test the model with a simple request
+                print(f"Gemini AI initialized with model: {model_name}")
             except Exception as e:
                 print(f"Failed to initialize Gemini: {e}")
+                self.gemini_model = None
         else:
-            print("Warning: GEMINI_API_KEY not set")
+            print("Warning: GEMINI_API_KEY not set or invalid")
         
     @classmethod
     def get_instance(cls):

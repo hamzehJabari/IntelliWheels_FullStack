@@ -11,5 +11,9 @@ services:
         value: 3.11.9
       - key: GEMINI_API_KEY
         sync: false  # Set this in Render dashboard for security
+      - key: SECRET_KEY
+        sync: false  # Set this in Render dashboard for security
+      - key: FLASK_ENV
+        value: production
       - key: FRONTEND_ORIGIN
         value: https://intelli-wheels.vercel.app

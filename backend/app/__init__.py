@@ -13,12 +13,17 @@ def create_app(test_config=None):
     app = Flask(__name__, instance_relative_config=True)
     
     # Validate required environment variables
-    secret_key = os.environ.get('SECRET_KEY')
-    if not secret_key or secret_key == 'dev' or 'change' in secret_key.lower():
-        if os.environ.get('FLASK_ENV') == 'production':
-            raise ValueError("SECRET_KEY must be set to a secure value in production!")
+    secret_key = os.environ.get('SECRET_KEY', '')
+    is_production = os.environ.get('FLASK_ENV') == 'production'
+    
+    # Check if secret key is valid (not empty, not 'dev', and at least 32 chars)
+    is_valid_key = secret_key and secret_key != 'dev' and len(secret_key) >= 32
+    
+    if not is_valid_key:
+        if is_production:
+            raise ValueError("SECRET_KEY must be set to a secure value (32+ chars) in production!")
         print("⚠️  WARNING: Using insecure SECRET_KEY. Set a proper one for production!")
-        secret_key = 'dev-only-insecure-key'
+        secret_key = 'dev-only-insecure-key-for-local-testing'
     
     # Get allowed origins from environment
     frontend_origin = os.environ.get('FRONTEND_ORIGIN', 'http://localhost:3000')
