@@ -245,7 +245,7 @@ const LANGUAGE_OPTIONS = [
   { value: 'ar', label: 'العربية' },
 ] as const;
 
-const CURRENCY_OPTIONS: CurrencyCode[] = ['AED', 'USD', 'EUR', 'GBP', 'SAR', 'QAR', 'BHD', 'KWD', 'OMR', 'JOD'];
+const CURRENCY_OPTIONS: CurrencyCode[] = ['JOD', 'AED', 'USD', 'EUR', 'GBP', 'SAR', 'QAR', 'BHD', 'KWD', 'OMR'];
 
 const CURRENCY_RATES: Record<CurrencyCode, number> = {
   JOD: 1,
@@ -266,7 +266,7 @@ const DEFAULT_FILTERS: CarFilters = {
   sort: 'default',
 };
 
-const LISTINGS_PER_PAGE = 9;
+const LISTINGS_PER_PAGE = 1000; // Show all listings
 
 interface ToastState {
   type: 'success' | 'error' | 'info';
@@ -322,7 +322,7 @@ export function AppView() {
     model: '',
     year: '',
     price: '',
-    currency: 'AED',
+    currency: 'JOD',
     bodyStyle: '',
     horsepower: '',
     engine: '',
@@ -389,13 +389,13 @@ export function AppView() {
     ? 'bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-slate-100'
     : 'bg-gradient-to-br from-slate-50 via-white to-sky-50 text-slate-900';
   const headerSurfaceClass = resolvedTheme === 'dark'
-    ? 'bg-slate-900/90 border-b border-slate-800/60 text-slate-100'
-    : 'bg-white/80 border-b border-slate-200/60 text-slate-900';
+    ? 'bg-slate-950/95 border-b border-slate-800/60 text-slate-100'
+    : 'bg-slate-100/95 border-b border-slate-300/60 text-slate-900';
   const mainSurfaceClass = resolvedTheme === 'dark'
     ? 'border-slate-800 bg-slate-900/80 text-slate-100'
     : 'border-slate-100 bg-white/90 text-slate-900';
-  const headerMuted = resolvedTheme === 'dark' ? 'text-slate-300/80' : 'text-slate-200/80';
-  const headerSubtleText = resolvedTheme === 'dark' ? 'text-slate-200/90' : 'text-slate-100/80';
+  const headerMuted = resolvedTheme === 'dark' ? 'text-slate-400' : 'text-slate-500';
+  const headerSubtleText = resolvedTheme === 'dark' ? 'text-slate-300' : 'text-slate-600';
   const selectorClass = resolvedTheme === 'dark'
     ? 'rounded-2xl border border-slate-700 bg-slate-900/60 px-3 py-2 text-sm text-slate-100'
     : 'rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900';
@@ -560,7 +560,7 @@ export function AppView() {
   );
 
   const formatPrice = useCallback(
-    (value?: number, sourceCurrency: CurrencyCode = 'AED') => {
+    (value?: number, sourceCurrency: CurrencyCode = 'JOD') => {
       if (value === undefined || value === null) return 'TBD';
       const converted = convertCurrency(value, sourceCurrency, currency);
       return formatCurrency(converted ?? value, currency);
@@ -2246,32 +2246,32 @@ export function AppView() {
           {authLoading ? <p className="text-center text-slate-500">Loading account...</p> : renderContent()}
         </main>
       </div>
-      <footer className={`${headerSurfaceClass} border-t ${subtleBorderClass}`}>
+      <footer className={`${resolvedTheme === 'dark' ? 'bg-slate-950 text-slate-200' : 'bg-slate-800 text-slate-100'} border-t border-slate-700/50`}>
         <div className="mx-auto max-w-7xl px-4 py-8">
           <div className="flex flex-wrap items-start justify-between gap-6 text-sm">
             <div>
-              <p className="text-lg font-semibold">IntelliWheels</p>
-              <p className={`text-sm ${headerSubtleText}`}>{copy.tagline}</p>
+              <p className="text-lg font-semibold text-white">IntelliWheels</p>
+              <p className="text-sm text-slate-300">{copy.tagline}</p>
             </div>
             <div>
-              <p className="font-semibold">{copy.footerSupport}</p>
-              <p className={`text-sm ${headerSubtleText}`}>{copy.footerEmail}: support@intelliwheels.ai</p>
-              <p className={`text-sm ${headerSubtleText}`}>{copy.footerPhone}: +971 55 501 0101</p>
+              <p className="font-semibold text-white">{copy.footerSupport}</p>
+              <p className="text-sm text-slate-300">{copy.footerEmail}: support@intelliwheels.ai</p>
+              <p className="text-sm text-slate-300">{copy.footerPhone}: +962 79 501 0101</p>
             </div>
             <div>
-              <p className="font-semibold">{copy.footerContact}</p>
-              <p className={`text-sm ${headerSubtleText}`}>Suite 14, Dubai Design District</p>
-              <p className={`text-sm ${headerSubtleText}`}>hello@intelliwheels.ai</p>
+              <p className="font-semibold text-white">{copy.footerContact}</p>
+              <p className="text-sm text-slate-300">Amman, Jordan</p>
+              <p className="text-sm text-slate-300">hello@intelliwheels.ai</p>
             </div>
             <div>
-              <p className="font-semibold">{copy.footerSocial}</p>
-              <div className="flex flex-col gap-1 text-sky-600">
-                <a href="https://www.instagram.com/intelliwheels" target="_blank" rel="noreferrer">{copy.footerInstagram}</a>
-                <a href="https://x.com/IntelliWheels" target="_blank" rel="noreferrer">X / Twitter</a>
+              <p className="font-semibold text-white">{copy.footerSocial}</p>
+              <div className="flex flex-col gap-1 text-sky-400">
+                <a href="https://www.instagram.com/intelliwheels" target="_blank" rel="noreferrer" className="hover:text-sky-300">{copy.footerInstagram}</a>
+                <a href="https://x.com/IntelliWheels" target="_blank" rel="noreferrer" className="hover:text-sky-300">X / Twitter</a>
               </div>
             </div>
           </div>
-          <p className={`mt-6 text-xs ${headerMuted}`}>© {currentYear} IntelliWheels. {copy.footerRights}</p>
+          <p className="mt-6 text-xs text-slate-400">© {currentYear} IntelliWheels. {copy.footerRights}</p>
         </div>
       </footer>
     </div>
@@ -2287,7 +2287,7 @@ function StatCard({ label, value }: { label: string; value: string }) {
   );
 }
 
-function convertCurrency(value?: number, fromCurrency: CurrencyCode = 'AED', toCurrency: CurrencyCode = 'AED') {
+function convertCurrency(value?: number, fromCurrency: CurrencyCode = 'JOD', toCurrency: CurrencyCode = 'JOD') {
   if (value === undefined || value === null) return null;
   if (fromCurrency === toCurrency) return value;
 
@@ -2317,7 +2317,7 @@ function convertCurrency(value?: number, fromCurrency: CurrencyCode = 'AED', toC
   return converted;
 }
 
-function formatCurrency(value?: number, currency = 'AED') {
+function formatCurrency(value?: number, currency = 'JOD') {
   if (!value && value !== 0) return 'TBD';
   try {
     return new Intl.NumberFormat('en-US', {

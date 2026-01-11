@@ -44,7 +44,7 @@ def build_document(row: pd.Series) -> str:
     if row.get("rating"):
         parts.append(f"rating {row['rating']}")
     if row.get("price"):
-        parts.append(f"price {row['price']} {row.get('currency', 'AED')}")
+        parts.append(f"price {row['price']} {row.get('currency', 'JOD')}")
     return " | ".join(parts)
 
 

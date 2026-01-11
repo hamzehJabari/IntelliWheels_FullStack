@@ -54,7 +54,7 @@ def init_db(app):
                 model TEXT NOT NULL,
                 year INTEGER,
                 price REAL,
-                currency TEXT DEFAULT 'AED',
+                currency TEXT DEFAULT 'JOD',
                 image_url TEXT,
                 image_urls JSON,
                 gallery_images JSON,

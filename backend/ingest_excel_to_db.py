@@ -14,8 +14,9 @@ SQL_DUMP_PATH = BASE_DIR / "data" / "Middle-East-GCC-Car-Database-by-Teoalida-SA
 
 STAR_PATTERN = re.compile(r"star(\d+(?:\.\d+)?)", re.IGNORECASE)
 CURRENCY_RATES = {
-    "AED": 1.0,
-    "SAR": 0.98,  # approx AED value for Saudi Riyal
+    "JOD": 1.0,
+    "AED": 0.19,  # approx JOD value for UAE Dirham
+    "SAR": 0.19,  # approx JOD value for Saudi Riyal
 }
 
 @dataclass
@@ -76,7 +77,7 @@ def parse_int(value) -> Optional[int]:
     return int(result) if result is not None else None
 
 
-def parse_price_block(value: str, currency_hint: str = "AED") -> Optional[float]:
+def parse_price_block(value: str, currency_hint: str = "JOD") -> Optional[float]:
     text = norm(value)
     if not text:
         return None
