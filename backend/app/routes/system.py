@@ -16,10 +16,19 @@ def health_check():
     gemini_key = os.environ.get('GEMINI_API_KEY', '')
     ai_configured = bool(gemini_key and len(gemini_key) > 10)
     
+    # Check which model is actually active
+    from ..services.ai_service import ai_service
+    active_model = getattr(ai_service, 'active_model_name', None)
+    gemini_working = ai_service.gemini_model is not None
+    init_error = getattr(ai_service, '_init_error', None)
+    
     return jsonify({
         'status': 'healthy',
         'version': '2.0.0',
         'ai_enabled': ai_configured,
+        'ai_working': gemini_working,
+        'ai_model': active_model,
+        'ai_error': init_error if not gemini_working else None,
         'frontend_origin': os.environ.get('FRONTEND_ORIGIN', 'not set')
     })
 

@@ -14,10 +14,20 @@ except ImportError:
 class AIService:
     _instance = None
     
+    # Model names to try in order of preference (as of Jan 2026)
+    # Note: gemini-1.5-flash was retired, use gemini-2.x models
+    GEMINI_MODELS = [
+        'gemini-2.5-flash',           # Latest and fastest
+        'gemini-2.0-flash',           # Fallback
+        'gemini-2.5-pro',             # Pro model (slower but better)
+        'gemini-pro',                 # Legacy fallback
+    ]
+    
     def __init__(self):
         self.price_model = None
         self.embeddings = None
         self.gemini_model = None
+        self.active_model_name = None
         self._init_gemini()
         
     def _init_gemini(self):
@@ -25,19 +35,63 @@ class AIService:
             print("Warning: google-generativeai not installed")
             return
         api_key = os.environ.get('GEMINI_API_KEY')
-        if api_key and len(api_key) > 10:
-            try:
-                genai.configure(api_key=api_key)
-                # Try gemini-1.5-flash first, fallback to gemini-pro
-                model_name = os.environ.get('GEMINI_TEXT_MODEL', 'gemini-1.5-flash')
-                self.gemini_model = genai.GenerativeModel(model_name)
-                # Test the model with a simple request
-                print(f"Gemini AI initialized with model: {model_name}")
-            except Exception as e:
-                print(f"Failed to initialize Gemini: {e}")
-                self.gemini_model = None
-        else:
+        if not api_key or len(api_key) < 10:
             print("Warning: GEMINI_API_KEY not set or invalid")
+            return
+            
+        try:
+            genai.configure(api_key=api_key)
+            
+            # First, try to list available models to help debug
+            try:
+                available_models = []
+                for m in genai.list_models():
+                    methods = getattr(m, 'supported_generation_methods', [])
+                    if 'generateContent' in methods:
+                        available_models.append(m.name)
+                if available_models:
+                    print(f"Available Gemini models: {available_models[:5]}...")
+            except Exception as e:
+                print(f"Could not list models (non-critical): {e}")
+                available_models = []
+            
+            # Try to use a model from the environment variable first
+            env_model = os.environ.get('GEMINI_TEXT_MODEL')
+            models_to_try = [env_model] + self.GEMINI_MODELS if env_model else self.GEMINI_MODELS
+            
+            # Try each model until one works
+            for model_name in models_to_try:
+                if not model_name:
+                    continue
+                try:
+                    print(f"Trying Gemini model: {model_name}")
+                    model = genai.GenerativeModel(model_name)
+                    # Test with a simple request to verify it works
+                    test_response = model.generate_content("Say 'OK' in one word")
+                    if test_response and test_response.text:
+                        self.gemini_model = model
+                        self.active_model_name = model_name
+                        print(f"✓ Gemini AI initialized with model: {model_name}")
+                        return
+                except Exception as e:
+                    error_str = str(e)
+                    # If API key is invalid, no point trying other models
+                    if 'API_KEY_INVALID' in error_str or 'API Key not found' in error_str:
+                        print(f"ERROR: Invalid GEMINI_API_KEY - please get a new key from https://aistudio.google.com/app/apikey")
+                        self.gemini_model = None
+                        self._init_error = "Invalid API key - get a new one from https://aistudio.google.com/app/apikey"
+                        return
+                    print(f"✗ Model {model_name} failed: {str(e)[:100]}")
+                    continue
+            
+            print("ERROR: Could not initialize any Gemini model")
+            self.gemini_model = None
+            self._init_error = "No compatible Gemini model found"
+            
+        except Exception as e:
+            print(f"Failed to initialize Gemini: {e}")
+            self.gemini_model = None
+            self._init_error = str(e)
         
     @classmethod
     def get_instance(cls):
@@ -70,7 +124,10 @@ class AIService:
             self._init_gemini()
             
         if not self.gemini_model:
-            return "I am the IntelliWheels AI Assistant. The AI service is currently unavailable (GEMINI_API_KEY not configured). Please contact support."
+            error = getattr(self, '_init_error', 'Unknown error')
+            if 'Invalid API key' in error:
+                return f"AI service error: Your Gemini API key is invalid. Please update it in the Render dashboard with a valid key from https://aistudio.google.com/app/apikey"
+            return f"I am the IntelliWheels AI Assistant. The AI service is currently unavailable. Error: {error}"
 
         try:
             # Build conversation context
@@ -211,13 +268,14 @@ Be helpful, concise, and knowledgeable about cars. Prices are typically in JOD (
             self._init_gemini()
             
         if not self.gemini_model:
+            error = getattr(self, '_init_error', 'AI service unavailable')
             return {
                 "make": "",
                 "model": "",
                 "year": None,
                 "bodyStyle": "",
                 "estimatedPrice": None,
-                "conditionDescription": "AI service unavailable - GEMINI_API_KEY not configured",
+                "conditionDescription": f"AI Error: {error}",
                 "error": True
             }
 
