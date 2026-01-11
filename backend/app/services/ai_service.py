@@ -125,8 +125,16 @@ Be helpful, concise, and knowledgeable about cars. Prices are typically in JOD (
             return response.text
             
         except Exception as e:
-            print(f"Gemini API error: {e}")
-            return f"I apologize, but I encountered an issue processing your request. Please try again."
+            error_msg = str(e)
+            print(f"Gemini API error: {error_msg}")
+            # Provide more specific error messages
+            if 'API_KEY' in error_msg.upper() or 'authentication' in error_msg.lower():
+                return "AI service configuration error. Please contact support."
+            elif 'quota' in error_msg.lower() or 'limit' in error_msg.lower():
+                return "AI service is temporarily unavailable due to high demand. Please try again later."
+            elif 'blocked' in error_msg.lower() or 'safety' in error_msg.lower():
+                return "I cannot process that request. Please rephrase your question."
+            return "I apologize, but I encountered an issue processing your request. Please try again."
 
     def semantic_search(self, query, limit):
         # Mock implementation

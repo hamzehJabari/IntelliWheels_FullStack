@@ -12,7 +12,16 @@ def allowed_file(filename):
 
 @bp.route('/health')
 def health_check():
-    return jsonify({'status': 'healthy', 'version': '2.0.0'})
+    # Check if GEMINI_API_KEY is configured
+    gemini_key = os.environ.get('GEMINI_API_KEY', '')
+    ai_configured = bool(gemini_key and len(gemini_key) > 10)
+    
+    return jsonify({
+        'status': 'healthy',
+        'version': '2.0.0',
+        'ai_enabled': ai_configured,
+        'frontend_origin': os.environ.get('FRONTEND_ORIGIN', 'not set')
+    })
 
 @bp.route('/uploads/images/<path:filename>')
 def serve_uploaded_image(filename):
