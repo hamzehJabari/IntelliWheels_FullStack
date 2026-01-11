@@ -101,22 +101,8 @@ def init_db(app):
         
         db.commit()
         
-        # Seed sample dealers if table is empty (cars are loaded from SQL dump via ingest script)
-        dealer_count = cursor.execute('SELECT COUNT(*) FROM dealers').fetchone()[0]
-        if dealer_count == 0:
-            sample_dealers = [
-                ('AutoHouse Jordan', 'Amman, Jordan', 4.8, 156, 'contact@autohouse.jo', '+962-6-555-1234'),
-                ('Elite Motors', 'Dubai, UAE', 4.9, 243, 'sales@elitemotors.ae', '+971-4-555-5678'),
-                ('Premium Auto Gallery', 'Riyadh, Saudi Arabia', 4.7, 198, 'info@premiumauto.sa', '+966-11-555-9012'),
-                ('Luxury Wheels', 'Kuwait City, Kuwait', 4.6, 87, 'sales@luxurywheels.kw', '+965-2-555-3456'),
-            ]
-            
-            cursor.executemany(
-                'INSERT INTO dealers (name, location, rating, reviews_count, contact_email, contact_phone) VALUES (?, ?, ?, ?, ?, ?)',
-                sample_dealers
-            )
-            db.commit()
-            print("Dealers seeded")
+        # REMOVED: sample_dealers seeding - no synthetic data
+        # Dealers table will be populated via API or admin interface only
 
 def init_app(app):
     app.teardown_appcontext(close_db)

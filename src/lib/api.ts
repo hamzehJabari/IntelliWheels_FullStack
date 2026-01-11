@@ -1,6 +1,6 @@
 import { API_BASE_URL } from './config';
-import { MOCK_CARS } from './mockData';
 import {
+// REMOVED: import { MOCK_CARS } from './mockData' - no synthetic data fallbacks
   AnalyticsInsights,
   Car,
   CarFilters,
@@ -96,71 +96,29 @@ export async function fetchCars(filters: CarFilters, signal?: AbortSignal, token
   if (filters.search) params.append('search', filters.search);
   if (filters.sort && filters.sort !== 'default') params.append('sort', filters.sort);
 
+  // No fallback - frontend depends on backend API for real car data only
   return apiRequest<{ success: boolean; cars: Car[] }>(`/cars${params.size ? `?${params.toString()}` : ''}`, {
     signal,
     token,
-    fallback: async () => ({ success: true, cars: filterLocalCars(filters) }),
   });
 }
 
 export async function fetchCarById(carId: number, token?: string | null) {
+  // No fallback - frontend depends on backend API for real car data only
   return apiRequest<{ success: boolean; car: Car }>(`/cars/${carId}`, {
     token,
-    fallback: () => {
-      const local = getLocalCarById(carId);
-      if (!local) {
-        throw new Error('Car not found');
-      }
-      return { success: true, car: local };
-    },
   });
 }
 
 export async function fetchMakes(token?: string | null) {
-  if (!token) {
-    return { success: true, makes: getLocalMakes() };
-  }
+  // No fallback - frontend depends on backend API for real makes data only
   return apiRequest<{ success: boolean; makes: string[] }>(`/makes`, {
     token,
-    fallback: () => ({ success: true, makes: getLocalMakes() }),
   });
 }
 
-function filterLocalCars(filters: CarFilters) {
-  let results = [...MOCK_CARS];
-  if (filters.make && filters.make !== 'all') {
-    results = results.filter((car) => car.make.toLowerCase() === filters.make.toLowerCase());
-  }
-  if (filters.search) {
-    const needle = filters.search.toLowerCase();
-    results = results.filter((car) => `${car.make} ${car.model} ${car.year}`.toLowerCase().includes(needle));
-  }
-  switch (filters.sort) {
-    case 'price-asc':
-      results = results.sort((a, b) => (a.price || 0) - (b.price || 0));
-      break;
-    case 'price-desc':
-      results = results.sort((a, b) => (b.price || 0) - (a.price || 0));
-      break;
-    case 'rating-desc':
-      results = results.sort((a, b) => (b.rating || 0) - (a.rating || 0));
-      break;
-    case 'year-desc':
-      results = results.sort((a, b) => (b.year || 0) - (a.year || 0));
-      break;
-    default:
-      break;
-  }
-  return results;
-}
-
-function getLocalCarById(carId: number) {
-  return MOCK_CARS.find((car) => car.id === carId);
-}
-
-function getLocalMakes() {
-  return Array.from(new Set(MOCK_CARS.map((car) => car.make)));
-}
+// REMOVED: filterLocalCars, getLocalCarById, getLocalMakes functions
+// No synthetic data fallbacks - frontend relies on backend API only
 
 export async function createListing(payload: Partial<Car>, token: string | null) {
   return apiRequest(`/cars`, {

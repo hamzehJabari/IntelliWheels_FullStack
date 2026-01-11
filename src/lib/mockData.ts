@@ -1,18 +1,7 @@
-import rawCars from '@/data/cars.json';
+// REMOVED: Synthetic data import - all car data now comes from backend API only
+// The backend loads real car data from the DriveArabia SQL dump via ingest_excel_to_db.py
 import { Car } from './types';
 
-type RawCar = Partial<Car> & { id?: number };
-
-export const MOCK_CARS: Car[] = (rawCars as RawCar[]).map((car, index) => ({
-  id: car.id ?? index + 1,
-  make: car.make ?? 'Unknown',
-  model: car.model ?? 'Model',
-  year: car.year,
-  price: car.price,
-  currency: car.currency ?? 'AED',
-  rating: car.rating,
-  reviews: car.reviews,
-  description: car.description,
-  image: car.image,
-  specs: car.specs,
-}));
+// Empty array - no synthetic/mock data fallback
+// Frontend must rely on backend API for all car data
+export const MOCK_CARS: Car[] = [];
