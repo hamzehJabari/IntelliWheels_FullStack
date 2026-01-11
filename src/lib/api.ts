@@ -117,6 +117,21 @@ export async function fetchMakes(token?: string | null) {
   });
 }
 
+export async function fetchModels(make: string, token?: string | null) {
+  // Fetch models for a specific make from backend
+  return apiRequest<{ success: boolean; models: string[] }>(`/models?make=${encodeURIComponent(make)}`, {
+    token,
+  });
+}
+
+export async function fetchEngines(make: string, model: string, token?: string | null) {
+  // Fetch engines for a specific make/model from backend
+  return apiRequest<{ success: boolean; engines: string[] }>(
+    `/engines?make=${encodeURIComponent(make)}&model=${encodeURIComponent(model)}`,
+    { token }
+  );
+}
+
 // REMOVED: filterLocalCars, getLocalCarById, getLocalMakes functions
 // No synthetic data fallbacks - frontend relies on backend API only
 

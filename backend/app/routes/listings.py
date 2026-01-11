@@ -14,6 +14,53 @@ def get_makes():
     makes = [row['make'] for row in cursor.fetchall()]
     return jsonify({'success': True, 'makes': makes})
 
+@bp.route('/models', methods=['GET'])
+def get_models():
+    """Get models for a specific make, or all make-model pairs."""
+    db = get_db()
+    make = request.args.get('make')
+    
+    if make:
+        cursor = db.execute(
+            'SELECT DISTINCT model FROM cars WHERE LOWER(make) = LOWER(?) ORDER BY model ASC',
+            (make,)
+        )
+        models = [row['model'] for row in cursor.fetchall()]
+        return jsonify({'success': True, 'models': models})
+    else:
+        # Return all make-model pairs grouped
+        cursor = db.execute(
+            'SELECT DISTINCT make, model FROM cars ORDER BY make ASC, model ASC'
+        )
+        result = {}
+        for row in cursor.fetchall():
+            make_name = row['make']
+            if make_name not in result:
+                result[make_name] = []
+            result[make_name].append(row['model'])
+        return jsonify({'success': True, 'models_by_make': result})
+
+@bp.route('/engines', methods=['GET'])
+def get_engines():
+    """Get engines for a specific make/model."""
+    db = get_db()
+    make = request.args.get('make')
+    model = request.args.get('model')
+    
+    if not make or not model:
+        return jsonify({'success': False, 'error': 'make and model required'}), 400
+    
+    cursor = db.execute(
+        '''SELECT DISTINCT json_extract(specs, '$.engine') as engine 
+           FROM cars 
+           WHERE LOWER(make) = LOWER(?) AND LOWER(model) = LOWER(?)
+           AND json_extract(specs, '$.engine') IS NOT NULL
+           ORDER BY engine ASC''',
+        (make, model)
+    )
+    engines = [row['engine'] for row in cursor.fetchall() if row['engine']]
+    return jsonify({'success': True, 'engines': engines})
+
 @bp.route('/my-listings', methods=['GET'])
 def get_my_listings():
     token = request.headers.get('Authorization', '').replace('Bearer ', '')
