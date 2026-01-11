@@ -60,9 +60,16 @@ async function apiRequest<T = any>(path: string, options: RequestOptions<T> = {}
           : undefined,
     });
   } catch (error) {
+    // Silently handle aborted requests (e.g., component unmount)
+    const isAbort = error instanceof DOMException && error.name === 'AbortError';
     if (fallback) {
-      console.warn(`[api] Falling back for ${path}:`, error);
+      if (!isAbort) {
+        console.warn(`[api] Falling back for ${path}:`, error);
+      }
       return await fallback();
+    }
+    if (isAbort) {
+      throw error; // Re-throw abort without wrapping
     }
     throw error instanceof Error ? error : new Error('Network request failed');
   }
@@ -309,7 +316,7 @@ export interface ChatbotPayload {
   imageMimeType?: string;
 }
 
-export async function handleChatbotMessage(payload: ChatbotPayload, token?: string | null) {
+export async function handleChatbotMessage(payload: ChatbotPayload, token?: string | null, signal?: AbortSignal) {
   const finalPayload = {
     query: payload.query,
     history: payload.history ?? [],
@@ -321,12 +328,14 @@ export async function handleChatbotMessage(payload: ChatbotPayload, token?: stri
     method: 'POST',
     token,
     body: finalPayload,
+    signal,
   });
 }
 
 export async function handleListingAssistantMessage(
   payload: Omit<ChatbotPayload, 'imageBase64' | 'imageMimeType'>,
-  token?: string | null
+  token?: string | null,
+  signal?: AbortSignal
 ) {
   const finalPayload = {
     query: payload.query,
@@ -339,6 +348,7 @@ export async function handleListingAssistantMessage(
       method: 'POST',
       token,
       body: finalPayload,
+      signal,
     }
   );
 }

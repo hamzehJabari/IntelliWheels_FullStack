@@ -344,6 +344,7 @@ export function AppView() {
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [chatInput, setChatInput] = useState('');
   const [chatBusy, setChatBusy] = useState(false);
+  const [chatAbortController, setChatAbortController] = useState<AbortController | null>(null);
   const [chatAttachment, setChatAttachment] = useState<{ preview: string; base64: string; mime: string } | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [pendingGalleryUrl, setPendingGalleryUrl] = useState('');
@@ -1035,8 +1036,12 @@ export function AppView() {
     const updatedMessages = [...chatMessages, userMessage].slice(-CHAT_HISTORY_LIMIT);
     persistChatSession(sessionId, updatedMessages);
     setChatInput('');
+    const attachmentData = chatAttachment;
     setChatAttachment(null);
     setChatBusy(true);
+
+    const controller = new AbortController();
+    setChatAbortController(controller);
 
     try {
       const historyPayload: Array<{ role: 'user' | 'bot'; text: string }> = updatedMessages
@@ -1045,15 +1050,16 @@ export function AppView() {
 
       const response =
         assistantMode === 'listing'
-          ? await handleListingAssistantMessage({ query: message, history: historyPayload }, token)
+          ? await handleListingAssistantMessage({ query: message, history: historyPayload }, token, controller.signal)
           : await handleChatbotMessage(
             {
               query: message,
               history: historyPayload,
-              imageBase64: chatAttachment?.base64,
-              imageMimeType: chatAttachment?.mime,
+              imageBase64: attachmentData?.base64,
+              imageMimeType: attachmentData?.mime,
             },
-            token
+            token,
+            controller.signal
           );
 
       const assistantMessage: ChatMessage = {
@@ -1068,8 +1074,21 @@ export function AppView() {
 
       persistChatSession(sessionId, [...updatedMessages, assistantMessage]);
     } catch (err: any) {
-      showToast(err.message || 'Assistant failed to respond', 'error');
+      if (err.name === 'AbortError') {
+        showToast('Response stopped', 'info');
+      } else {
+        showToast(err.message || 'Assistant failed to respond', 'error');
+      }
     } finally {
+      setChatBusy(false);
+      setChatAbortController(null);
+    }
+  };
+
+  const handleChatStop = () => {
+    if (chatAbortController) {
+      chatAbortController.abort();
+      setChatAbortController(null);
       setChatBusy(false);
     }
   };
@@ -1353,104 +1372,251 @@ export function AppView() {
   };
 
   const renderChatbot = () => (
-    <div className="grid gap-6 lg:grid-cols-[280px,1fr]">
-      <div className="rounded-3xl border border-slate-100 bg-white p-4 shadow-sm">
-        <button className="w-full rounded-2xl bg-slate-900/5 px-3 py-2 text-sm font-semibold text-slate-900" onClick={() => startNewChat()}>
-          + New Chat
-        </button>
-        <div className="mt-4 space-y-2">
-          {chatSessions.map((session) => (
-            <button
-              key={session.id}
-              onClick={() => setActiveSessionId(session.id)}
-              className={`w-full rounded-2xl px-3 py-2 text-left text-sm ${session.id === activeSessionId ? 'bg-sky-50 text-slate-900' : 'bg-slate-50 text-slate-500'
-                }`}
-            >
-              <span className="block font-semibold">{session.title}</span>
-              <span className="text-xs">{new Date(session.updatedAt).toLocaleString()}</span>
-            </button>
-          ))}
+    <div className="flex h-[calc(100vh-180px)] gap-4">
+      {/* Sidebar */}
+      <div className="hidden w-72 flex-shrink-0 flex-col rounded-2xl border border-slate-200 bg-white lg:flex">
+        <div className="border-b border-slate-100 p-4">
+          <button
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:from-blue-600 hover:to-indigo-700"
+            onClick={() => startNewChat()}
+          >
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            New Chat
+          </button>
         </div>
-        <div className="mt-6 space-y-3">
-          <label className="text-xs uppercase text-slate-500">Assistant Mode</label>
+        <div className="flex-1 overflow-y-auto p-3">
+          <p className="mb-2 px-2 text-xs font-medium uppercase tracking-wide text-slate-400">Recent</p>
+          <div className="space-y-1">
+            {chatSessions.map((session) => (
+              <button
+                key={session.id}
+                onClick={() => setActiveSessionId(session.id)}
+                className={`group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition ${
+                  session.id === activeSessionId
+                    ? 'bg-blue-50 text-blue-700'
+                    : 'text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                <svg className="h-4 w-4 flex-shrink-0 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                </svg>
+                <div className="min-w-0 flex-1">
+                  <span className="block truncate font-medium">{session.title}</span>
+                  <span className="block truncate text-xs text-slate-400">{new Date(session.updatedAt).toLocaleDateString()}</span>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="border-t border-slate-100 p-4">
+          <label className="mb-2 block text-xs font-medium uppercase tracking-wide text-slate-400">Mode</label>
           <select
             name="assistant-mode"
             id="assistant-mode"
             value={assistantMode}
             onChange={(event) => setAssistantMode(event.target.value as 'general' | 'listing')}
-            className={`w-full ${inputFieldClass}`}
+            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
           >
-            <option value="general">General Q&A</option>
-            <option value="listing">Listing Assistant</option>
+            <option value="general">💬 General Q&A</option>
+            <option value="listing">📝 Listing Assistant</option>
           </select>
         </div>
       </div>
-      <div className="flex flex-col rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
-        <div className="flex-1 space-y-4 overflow-y-auto pr-2">
-          {chatMessages.length === 0 && (
-            <p className="text-center text-slate-500">Start the conversation with IntelliWheels AI Assistant.</p>
-          )}
-          {chatMessages.map((msg) => (
-            <div
-              key={msg.id}
-              className={`max-w-3xl rounded-2xl p-4 ${msg.role === 'user' ? 'ml-auto bg-sky-100 text-slate-900' : 'bg-slate-50 text-slate-600'}`}
-            >
-              <p className="text-xs uppercase text-slate-400">{msg.role === 'user' ? 'You' : 'Assistant'}</p>
-              <p className="mt-1 whitespace-pre-line text-sm">{msg.text}</p>
-              {msg.listingData && (
-                <div className="mt-3 rounded-xl bg-white p-3 text-xs text-slate-500">
-                  <p className="font-semibold text-slate-900">Proposed Listing</p>
-                  {Object.entries(msg.listingData).map(([key, value]) =>
-                    value ? <p key={key}>{camelToTitle(key)}: {String(value)}</p> : null
-                  )}
-                </div>
-              )}
+
+      {/* Main Chat Area */}
+      <div className="flex flex-1 flex-col rounded-2xl border border-slate-200 bg-white">
+        {/* Chat Header */}
+        <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-indigo-600">
+              <svg className="h-5 w-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+              </svg>
             </div>
-          ))}
+            <div>
+              <h2 className="font-semibold text-slate-900">IntelliWheels AI</h2>
+              <p className="text-xs text-slate-500">{assistantMode === 'listing' ? 'Listing Assistant' : 'General Assistant'}</p>
+            </div>
+          </div>
+          {chatBusy && (
+            <div className="flex items-center gap-2 text-sm text-slate-500">
+              <div className="flex gap-1">
+                <span className="h-2 w-2 animate-bounce rounded-full bg-blue-500" style={{ animationDelay: '0ms' }} />
+                <span className="h-2 w-2 animate-bounce rounded-full bg-blue-500" style={{ animationDelay: '150ms' }} />
+                <span className="h-2 w-2 animate-bounce rounded-full bg-blue-500" style={{ animationDelay: '300ms' }} />
+              </div>
+              <span>Thinking...</span>
+            </div>
+          )}
         </div>
-        <div className="mt-4 space-y-3">
-          {chatAttachment && (
-            <div className="flex items-center justify-between rounded-2xl bg-slate-50 p-3 text-sm text-slate-600">
-              <span>Attached image</span>
-              <button onClick={() => setChatAttachment(null)} className="text-xs text-rose-500">Remove</button>
+
+        {/* Messages Area */}
+        <div className="flex-1 overflow-y-auto px-6 py-4">
+          {chatMessages.length === 0 ? (
+            <div className="flex h-full flex-col items-center justify-center text-center">
+              <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-blue-100 to-indigo-100">
+                <svg className="h-10 w-10 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                </svg>
+              </div>
+              <h3 className="mb-2 text-xl font-semibold text-slate-900">How can I help you today?</h3>
+              <p className="max-w-md text-slate-500">Ask me about car pricing, specifications, comparisons, or let me help you create a listing.</p>
+              <div className="mt-6 flex flex-wrap justify-center gap-2">
+                {['Compare Toyota vs Honda', 'Price a 2022 BMW X5', 'Help me list my car'].map((suggestion) => (
+                  <button
+                    key={suggestion}
+                    onClick={() => setChatInput(suggestion)}
+                    className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm text-slate-600 transition hover:border-blue-300 hover:bg-blue-50"
+                  >
+                    {suggestion}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="mx-auto max-w-3xl space-y-6">
+              {chatMessages.map((msg) => (
+                <div
+                  key={msg.id}
+                  className={`flex gap-4 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}
+                >
+                  <div className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full ${
+                    msg.role === 'user' ? 'bg-slate-700' : 'bg-gradient-to-br from-blue-500 to-indigo-600'
+                  }`}>
+                    {msg.role === 'user' ? (
+                      <svg className="h-4 w-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                      </svg>
+                    ) : (
+                      <svg className="h-4 w-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                      </svg>
+                    )}
+                  </div>
+                  <div className={`max-w-[80%] ${msg.role === 'user' ? 'text-right' : ''}`}>
+                    <div
+                      className={`inline-block rounded-2xl px-4 py-3 ${
+                        msg.role === 'user'
+                          ? 'bg-slate-700 text-white'
+                          : 'bg-slate-100 text-slate-800'
+                      }`}
+                    >
+                      <p className="whitespace-pre-line text-sm leading-relaxed">{msg.text}</p>
+                    </div>
+                    {msg.listingData && (
+                      <div className="mt-2 rounded-xl border border-slate-200 bg-white p-4 text-left text-sm shadow-sm">
+                        <p className="mb-2 font-semibold text-slate-900">📋 Proposed Listing</p>
+                        <div className="space-y-1 text-slate-600">
+                          {Object.entries(msg.listingData).map(([key, value]) =>
+                            value ? (
+                              <p key={key}>
+                                <span className="font-medium">{camelToTitle(key)}:</span> {String(value)}
+                              </p>
+                            ) : null
+                          )}
+                        </div>
+                      </div>
+                    )}
+                    <p className="mt-1 text-xs text-slate-400">
+                      {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
-          <textarea
-            name="chat-input"
-            id="chat-input"
-            value={chatInput}
-            onChange={(event) => setChatInput(event.target.value)}
-            placeholder="Ask about pricing, specs, or request a listing draft..."
-            className="min-h-[120px] w-full rounded-3xl border border-slate-200 bg-slate-50 p-4 text-slate-900 placeholder-slate-500"
-          />
-          <div className="flex flex-wrap items-center gap-3">
-            <label className="cursor-pointer rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-900">
-              Attach Image
-              <input
-                name="chat-attachment"
-                id="chat-attachment"
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={async (event) => {
-                  const file = event.target.files?.[0];
-                  if (!file) return;
-                  const base64 = await fileToDataUrl(file);
-                  setChatAttachment({
-                    preview: URL.createObjectURL(file),
-                    base64,
-                    mime: file.type,
-                  });
+        </div>
+
+        {/* Input Area */}
+        <div className="border-t border-slate-100 p-4">
+          <div className="mx-auto max-w-3xl">
+            {chatAttachment && (
+              <div className="mb-3 flex items-center justify-between rounded-xl bg-slate-50 p-3">
+                <div className="flex items-center gap-3">
+                  <div className="h-12 w-12 overflow-hidden rounded-lg bg-slate-200">
+                    <img src={chatAttachment.preview} alt="Attachment" className="h-full w-full object-cover" />
+                  </div>
+                  <span className="text-sm text-slate-600">Image attached</span>
+                </div>
+                <button onClick={() => setChatAttachment(null)} className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-red-500">
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            )}
+            <div className="relative flex items-end gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 focus-within:border-blue-400 focus-within:ring-1 focus-within:ring-blue-400">
+              <label className="flex cursor-pointer items-center justify-center rounded-xl p-2 text-slate-400 transition hover:bg-slate-200 hover:text-slate-600">
+                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                <input
+                  name="chat-attachment"
+                  id="chat-attachment"
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={async (event) => {
+                    const file = event.target.files?.[0];
+                    if (!file) return;
+                    const base64 = await fileToDataUrl(file);
+                    setChatAttachment({
+                      preview: URL.createObjectURL(file),
+                      base64,
+                      mime: file.type,
+                    });
+                  }}
+                />
+              </label>
+              <textarea
+                name="chat-input"
+                id="chat-input"
+                value={chatInput}
+                onChange={(event) => setChatInput(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' && !event.shiftKey) {
+                    event.preventDefault();
+                    if (!chatBusy) handleChatSubmit();
+                  }
+                }}
+                placeholder="Ask about cars, pricing, or type / for commands..."
+                rows={1}
+                className="max-h-32 min-h-[44px] flex-1 resize-none bg-transparent py-2 text-sm text-slate-900 placeholder-slate-400 focus:outline-none"
+                style={{ height: 'auto', overflow: 'hidden' }}
+                onInput={(e) => {
+                  const target = e.target as HTMLTextAreaElement;
+                  target.style.height = 'auto';
+                  target.style.height = Math.min(target.scrollHeight, 128) + 'px';
                 }}
               />
-            </label>
-            <button
-              className="flex-1 rounded-2xl bg-sky-600 py-3 text-center font-semibold text-white disabled:bg-sky-300"
-              onClick={handleChatSubmit}
-              disabled={chatBusy}
-            >
-              {chatBusy ? 'Thinking...' : 'Send'}
-            </button>
+              {chatBusy ? (
+                <button
+                  onClick={handleChatStop}
+                  className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-500 text-white shadow-sm transition hover:bg-red-600"
+                  title="Stop generating"
+                >
+                  <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
+                    <rect x="6" y="6" width="12" height="12" rx="1" />
+                  </svg>
+                </button>
+              ) : (
+                <button
+                  onClick={handleChatSubmit}
+                  disabled={!chatInput.trim() && !chatAttachment}
+                  className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+                  title="Send message"
+                >
+                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                  </svg>
+                </button>
+              )}
+            </div>
+            <p className="mt-2 text-center text-xs text-slate-400">
+              Press Enter to send, Shift+Enter for new line
+            </p>
           </div>
         </div>
       </div>

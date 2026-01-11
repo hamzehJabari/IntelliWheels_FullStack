@@ -146,15 +146,25 @@ def init_db() -> None:
     )
     cursor.execute("PRAGMA table_info(cars)")
     columns = {column[1] for column in cursor.fetchall()}
+    
+    # SECURITY NOTE: This function uses string formatting for ALTER TABLE
+    # because SQLite doesn't support parameterized column names.
+    # It's safe here because the column names are hardcoded below,
+    # NOT from user input. Never call this with user-supplied data.
+    ALLOWED_COLUMNS = {'user_id', 'gallery_images', 'media_gallery', 'video_url', 'odometer_km', 'description'}
+    
     def ensure_column(name: str, definition: str) -> None:
+        # Whitelist check to prevent any accidental injection
+        if name not in ALLOWED_COLUMNS:
+            raise ValueError(f"Column '{name}' not in allowed list")
         if name not in columns:
             cursor.execute(f"ALTER TABLE cars ADD COLUMN {definition}")
             columns.add(name)
 
-    ensure_column('user_id', 'INTEGER')
-    ensure_column('gallery_images', 'TEXT')
-    ensure_column('media_gallery', 'TEXT')
-    ensure_column('video_url', 'TEXT')
+    ensure_column('user_id', 'user_id INTEGER')
+    ensure_column('gallery_images', 'gallery_images TEXT')
+    ensure_column('media_gallery', 'media_gallery TEXT')
+    ensure_column('video_url', 'video_url TEXT')
 
     conn.commit()
     conn.close()

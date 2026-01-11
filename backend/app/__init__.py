@@ -1,18 +1,39 @@
 import os
 from flask import Flask
 from flask_cors import CORS
+from dotenv import load_dotenv
 from .db import init_app as init_db
+from .security import add_security_headers
+
+# Load environment variables from .env file
+load_dotenv()
 
 def create_app(test_config=None):
     # Create and configure the app
     app = Flask(__name__, instance_relative_config=True)
     
+    # Validate required environment variables
+    secret_key = os.environ.get('SECRET_KEY')
+    if not secret_key or secret_key == 'dev' or 'change' in secret_key.lower():
+        if os.environ.get('FLASK_ENV') == 'production':
+            raise ValueError("SECRET_KEY must be set to a secure value in production!")
+        print("⚠️  WARNING: Using insecure SECRET_KEY. Set a proper one for production!")
+        secret_key = 'dev-only-insecure-key'
+    
+    # Get allowed origins from environment
+    frontend_origin = os.environ.get('FRONTEND_ORIGIN', 'http://localhost:3000')
+    allowed_origins = [origin.strip() for origin in frontend_origin.split(',')]
+    
     # Configuration
     app.config.from_mapping(
-        SECRET_KEY=os.environ.get('SECRET_KEY', 'dev'),
-        DATABASE=os.path.join(app.root_path, '..', 'intelliwheels.db'),
+        SECRET_KEY=secret_key,
+        DATABASE=os.environ.get('DATABASE_PATH', os.path.join(app.root_path, '..', 'intelliwheels.db')),
         UPLOAD_FOLDER=os.path.join(app.root_path, '..', 'uploads'),
         MAX_CONTENT_LENGTH=16 * 1024 * 1024,  # 16MB max upload
+        # Security settings
+        SESSION_COOKIE_SECURE=os.environ.get('FLASK_ENV') == 'production',
+        SESSION_COOKIE_HTTPONLY=True,
+        SESSION_COOKIE_SAMESITE='Lax',
     )
 
     if test_config is None:
@@ -34,14 +55,17 @@ def create_app(test_config=None):
     except OSError:
         pass
 
-    # Initialize CORS - allow all origins for API routes
+    # Initialize CORS with proper origin restrictions
     CORS(app, 
          resources={r"/api/*": {
-             "origins": ["*"],
+             "origins": allowed_origins if os.environ.get('FLASK_ENV') == 'production' else "*",
              "methods": ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
              "allow_headers": ["Content-Type", "Authorization", "X-Requested-With", "Accept"],
              "supports_credentials": False
          }})
+    
+    # Add security headers to all responses
+    app.after_request(add_security_headers)
     
     init_db(app)
 
