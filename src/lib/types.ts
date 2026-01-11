@@ -157,7 +157,8 @@ export interface VisionAttributes {
 }
 
 export interface SemanticSearchResult {
-  score: number;
+  score?: number;
+  similarity?: number;
   car: Car;
 }
 

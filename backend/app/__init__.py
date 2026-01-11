@@ -29,10 +29,15 @@ def create_app(test_config=None):
     frontend_origin = os.environ.get('FRONTEND_ORIGIN', 'http://localhost:3000')
     allowed_origins = [origin.strip() for origin in frontend_origin.split(',')]
     
+    # Determine database path
+    db_path = os.environ.get('DATABASE_PATH', os.path.join(app.root_path, '..', 'intelliwheels.db'))
+    print(f"[App Init] Database path: {db_path}")
+    print(f"[App Init] Database exists: {os.path.exists(db_path)}")
+    
     # Configuration
     app.config.from_mapping(
         SECRET_KEY=secret_key,
-        DATABASE=os.environ.get('DATABASE_PATH', os.path.join(app.root_path, '..', 'intelliwheels.db')),
+        DATABASE=db_path,
         UPLOAD_FOLDER=os.path.join(app.root_path, '..', 'uploads'),
         MAX_CONTENT_LENGTH=16 * 1024 * 1024,  # 16MB max upload
         # Security settings

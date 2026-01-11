@@ -275,10 +275,20 @@ Be helpful, concise, and knowledgeable about cars. Prices are typically in JOD (
         from flask import current_app
         
         try:
-            db_path = current_app.config.get('DATABASE', 'intelliwheels.db')
+            db_path = current_app.config.get('DATABASE')
+            if not db_path:
+                print("[Semantic Search] ERROR: No DATABASE config found")
+                return []
+            
+            print(f"[Semantic Search] Connecting to DB: {db_path}")
             conn = sqlite3.connect(db_path)
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
+            
+            # First check if there are any cars at all
+            cursor.execute("SELECT COUNT(*) as cnt FROM cars")
+            count = cursor.fetchone()['cnt']
+            print(f"[Semantic Search] Total cars in DB: {count}")
             
             # Parse price constraints from query (e.g., "under 50k", "below 100000")
             max_price = None
@@ -346,6 +356,7 @@ Be helpful, concise, and knowledgeable about cars. Prices are typically in JOD (
             
             cursor.execute(sql, params)
             rows = cursor.fetchall()
+            print(f"[Semantic Search] Query returned {len(rows)} rows")
             conn.close()
             
             results = []
@@ -374,7 +385,9 @@ Be helpful, concise, and knowledgeable about cars. Prices are typically in JOD (
             return results
             
         except Exception as e:
-            print(f"Semantic search error: {e}")
+            import traceback
+            print(f"[Semantic Search] ERROR: {e}")
+            traceback.print_exc()
             return []
 
     def analyze_image(self, image_base64):

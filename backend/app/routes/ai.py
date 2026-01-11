@@ -87,7 +87,9 @@ def semantic_search():
     except ValueError:
         limit = 6
     
+    print(f"[Semantic Search] Query: {query}, Limit: {limit}")
     results = ai_service.semantic_search(query, limit)
+    print(f"[Semantic Search] Found {len(results)} results")
     return jsonify({'success': True, 'results': results})
 
 @bp.route('/vision-helper', methods=['POST'])

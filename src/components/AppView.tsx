@@ -613,7 +613,9 @@ export function AppView() {
           setCars(response.cars || []);
         }
       } catch (err: any) {
-        console.error('Failed to load cars', err);
+        // Ignore abort errors (expected when component unmounts or re-renders)
+        if (err?.name === 'AbortError') return;
+        console.warn('Failed to load cars', err);
         // Only redirect if explicitly rejected and not already on a vital public page
         if (typeof err?.message === 'string' && err.message.toLowerCase().includes('auth') && activePage !== 'listings' && activePage !== 'dealers') {
           // Don't auto-redirect, just let the user see the restricted content message or handle it locally
@@ -1040,11 +1042,20 @@ export function AppView() {
     setSemanticLoading(true);
     try {
       const response = await semanticSearch(semanticQuery.trim(), 6, token);
+      console.log('Semantic search response:', response);
       if (response.success) {
-        setSemanticResults(response.results?.map((entry) => entry.car) || []);
+        const results = response.results?.map((entry) => entry.car) || [];
+        console.log('Parsed results:', results);
+        setSemanticResults(results);
+        if (results.length === 0) {
+          showToast('No matching cars found', 'info');
+        }
+      } else {
+        showToast('Search returned no results', 'info');
       }
-    } catch (err) {
-      showToast('Semantic search failed', 'error');
+    } catch (err: any) {
+      console.error('Semantic search error:', err);
+      showToast(err?.message || 'Semantic search failed', 'error');
     } finally {
       setSemanticLoading(false);
     }
