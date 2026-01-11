@@ -2259,19 +2259,18 @@ export function AppView() {
             </div>
             <div>
               <p className="font-semibold text-white">{copy.footerSupport}</p>
-              <p className="text-sm text-slate-300">{copy.footerEmail}: support@intelliwheels.ai</p>
-              <p className="text-sm text-slate-300">{copy.footerPhone}: +962 79 501 0101</p>
+              <p className="text-sm text-slate-300">{copy.footerEmail}: intelliwheels03@gmail.com</p>
+              <p className="text-sm text-slate-300">{copy.footerPhone}: +962 77 738 1408</p>
             </div>
             <div>
               <p className="font-semibold text-white">{copy.footerContact}</p>
               <p className="text-sm text-slate-300">Amman, Jordan</p>
-              <p className="text-sm text-slate-300">hello@intelliwheels.ai</p>
+              <p className="text-sm text-slate-300">intelliwheels03@gmail.com</p>
             </div>
             <div>
               <p className="font-semibold text-white">{copy.footerSocial}</p>
               <div className="flex flex-col gap-1 text-sky-400">
-                <a href="https://www.instagram.com/intelliwheels" target="_blank" rel="noreferrer" className="hover:text-sky-300">{copy.footerInstagram}</a>
-                <a href="https://x.com/IntelliWheels" target="_blank" rel="noreferrer" className="hover:text-sky-300">X / Twitter</a>
+                <a href="https://www.instagram.com/intelli_wheels1/" target="_blank" rel="noreferrer" className="hover:text-sky-300">{copy.footerInstagram}</a>
               </div>
             </div>
           </div>
