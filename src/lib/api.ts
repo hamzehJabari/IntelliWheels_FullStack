@@ -9,6 +9,8 @@ import {
   ListingDraft,
   PriceEstimatePayload,
   PriceEstimateResponse,
+  Review,
+  ReviewStats,
   SemanticSearchResult,
   UserProfile,
   VisionAttributes,
@@ -329,4 +331,30 @@ export async function handleListingAssistantMessage(
 
 export async function healthCheck() {
   return apiRequest<{ success: boolean; status: string; timestamp: string }>(`/health`);
+}
+
+// Reviews API
+export async function fetchCarReviews(carId: number) {
+  return apiRequest<{ success: boolean; reviews: Review[]; stats: ReviewStats }>(`/reviews/car/${carId}`);
+}
+
+export async function submitReview(carId: number, rating: number, comment: string, token: string | null) {
+  return apiRequest<{ success: boolean; message: string; review_id: number }>(`/reviews/car/${carId}`, {
+    method: 'POST',
+    token,
+    body: { rating, comment },
+  });
+}
+
+export async function deleteReview(reviewId: number, token: string | null) {
+  return apiRequest<{ success: boolean; message: string }>(`/reviews/${reviewId}`, {
+    method: 'DELETE',
+    token,
+  });
+}
+
+export async function fetchMyReviews(token: string | null) {
+  return apiRequest<{ success: boolean; reviews: Array<Review & { car: { make: string; model: string; year?: number; image?: string } }> }>(`/reviews/user/me`, {
+    token,
+  });
 }

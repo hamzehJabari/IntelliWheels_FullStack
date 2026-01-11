@@ -64,12 +64,21 @@ def price_estimate():
     model = sanitize_string(data.get('model', ''))[:100]
     year = data.get('year')
     specs = data.get('specs', {})
+    currency = sanitize_string(data.get('currency', 'JOD'))[:10]
     
     if not make or not model:
         return jsonify({'success': False, 'error': 'Make and model are required'}), 400
     
-    price = ai_service.estimate_price(make, model, year, specs)
-    return jsonify({'success': True, 'estimate': price})
+    result = ai_service.estimate_price(make, model, year, specs, currency)
+    return jsonify({
+        'success': True,
+        'estimate': result['value'],
+        'currency': result['currency'],
+        'range': {
+            'low': result['low'],
+            'high': result['high']
+        }
+    })
 
 @bp.route('/semantic-search', methods=['GET'])
 @rate_limit(max_requests=30, window_seconds=60)

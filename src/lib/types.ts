@@ -161,6 +161,22 @@ export interface SemanticSearchResult {
   car: Car;
 }
 
+export interface Review {
+  id: number;
+  car_id: number;
+  user_id: number;
+  user_name: string;
+  rating: number;
+  comment?: string;
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface ReviewStats {
+  average_rating: number;
+  total_reviews: number;
+}
+
 export interface DealerSummary {
   id: number;
   name: string;

@@ -1,8 +1,8 @@
 'use client';
 
 import { useAuth } from '@/context/AuthContext';
-import { fetchCarById } from '@/lib/api';
-import { Car } from '@/lib/types';
+import { fetchCarById, fetchCarReviews, submitReview, deleteReview } from '@/lib/api';
+import { Car, Review, ReviewStats } from '@/lib/types';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
@@ -12,11 +12,21 @@ interface CarDetailViewProps {
 
 export function CarDetailView({ carId }: CarDetailViewProps) {
   const numericId = Number(carId);
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const router = useRouter();
   const [car, setCar] = useState<Car | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // Reviews state
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [reviewStats, setReviewStats] = useState<ReviewStats>({ average_rating: 0, total_reviews: 0 });
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewComment, setReviewComment] = useState('');
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
+  const [reviewError, setReviewError] = useState<string | null>(null);
+  const [showReviewForm, setShowReviewForm] = useState(false);
+  
   const apiHost = useMemo(() => {
     const base = process.env.NEXT_PUBLIC_API_BASE_URL ?? '';
     return base.replace(/\/api$/, '');
@@ -72,6 +82,74 @@ export function CarDetailView({ carId }: CarDetailViewProps) {
       cancelled = true;
     };
   }, [numericId, token]);
+
+  // Fetch reviews for the car
+  useEffect(() => {
+    if (!Number.isFinite(numericId)) return;
+    async function loadReviews() {
+      try {
+        const response = await fetchCarReviews(numericId);
+        if (response.success) {
+          setReviews(response.reviews || []);
+          setReviewStats(response.stats || { average_rating: 0, total_reviews: 0 });
+        }
+      } catch (err) {
+        console.warn('Failed to load reviews:', err);
+      }
+    }
+    loadReviews();
+  }, [numericId]);
+
+  const handleSubmitReview = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!token) {
+      setReviewError('Please sign in to submit a review');
+      return;
+    }
+    setReviewSubmitting(true);
+    setReviewError(null);
+    try {
+      const response = await submitReview(numericId, reviewRating, reviewComment, token);
+      if (response.success) {
+        // Refresh reviews
+        const refreshed = await fetchCarReviews(numericId);
+        if (refreshed.success) {
+          setReviews(refreshed.reviews || []);
+          setReviewStats(refreshed.stats || { average_rating: 0, total_reviews: 0 });
+        }
+        setReviewComment('');
+        setReviewRating(5);
+        setShowReviewForm(false);
+      } else {
+        setReviewError('Failed to submit review');
+      }
+    } catch (err) {
+      setReviewError(err instanceof Error ? err.message : 'Failed to submit review');
+    } finally {
+      setReviewSubmitting(false);
+    }
+  };
+
+  const handleDeleteReview = async (reviewId: number) => {
+    if (!token) return;
+    try {
+      const response = await deleteReview(reviewId, token);
+      if (response.success) {
+        const refreshed = await fetchCarReviews(numericId);
+        if (refreshed.success) {
+          setReviews(refreshed.reviews || []);
+          setReviewStats(refreshed.stats || { average_rating: 0, total_reviews: 0 });
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to delete review:', err);
+    }
+  };
+
+  const userHasReview = useMemo(() => {
+    if (!user) return false;
+    return reviews.some((r) => r.user_id === user.id);
+  }, [reviews, user]);
 
   const heroImage = car ? resolveImageUrl(car.image) : '/placeholder-car.svg';
 
@@ -303,6 +381,143 @@ export function CarDetailView({ carId }: CarDetailViewProps) {
                   </div>
                 </div>
               )}
+              
+              {/* Reviews Section */}
+              <div className="rounded-2xl border border-slate-100 bg-white p-5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">Reviews & Ratings</p>
+                    <div className="mt-1 flex items-center gap-2">
+                      <div className="flex items-center">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <svg
+                            key={star}
+                            className={`h-5 w-5 ${star <= Math.round(reviewStats.average_rating) ? 'text-yellow-400' : 'text-slate-200'}`}
+                            fill="currentColor"
+                            viewBox="0 0 20 20"
+                          >
+                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                          </svg>
+                        ))}
+                      </div>
+                      <span className="text-sm font-semibold text-slate-900">{reviewStats.average_rating.toFixed(1)}</span>
+                      <span className="text-sm text-slate-500">({reviewStats.total_reviews} reviews)</span>
+                    </div>
+                  </div>
+                  {token && !userHasReview && (
+                    <button
+                      onClick={() => setShowReviewForm(!showReviewForm)}
+                      className="rounded-xl bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700"
+                    >
+                      Write a Review
+                    </button>
+                  )}
+                </div>
+
+                {/* Review Form */}
+                {showReviewForm && (
+                  <form onSubmit={handleSubmitReview} className="mt-4 rounded-xl border border-slate-100 bg-slate-50 p-4">
+                    <p className="text-sm font-semibold text-slate-900">Your Review</p>
+                    <div className="mt-3">
+                      <label className="block text-xs text-slate-500">Rating</label>
+                      <div className="mt-1 flex gap-1">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <button
+                            key={star}
+                            type="button"
+                            onClick={() => setReviewRating(star)}
+                            className="focus:outline-none"
+                          >
+                            <svg
+                              className={`h-8 w-8 transition ${star <= reviewRating ? 'text-yellow-400' : 'text-slate-300 hover:text-yellow-300'}`}
+                              fill="currentColor"
+                              viewBox="0 0 20 20"
+                            >
+                              <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                            </svg>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="mt-3">
+                      <label className="block text-xs text-slate-500">Comment (optional)</label>
+                      <textarea
+                        value={reviewComment}
+                        onChange={(e) => setReviewComment(e.target.value)}
+                        placeholder="Share your thoughts about this car..."
+                        className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                        rows={3}
+                        maxLength={1000}
+                      />
+                    </div>
+                    {reviewError && <p className="mt-2 text-sm text-red-600">{reviewError}</p>}
+                    <div className="mt-3 flex gap-2">
+                      <button
+                        type="submit"
+                        disabled={reviewSubmitting}
+                        className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+                      >
+                        {reviewSubmitting ? 'Submitting...' : 'Submit Review'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowReviewForm(false)}
+                        className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </form>
+                )}
+
+                {/* Reviews List */}
+                {reviews.length > 0 ? (
+                  <div className="mt-4 space-y-3">
+                    {reviews.map((review) => (
+                      <div key={review.id} className="rounded-xl border border-slate-100 bg-slate-50/50 p-4">
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-semibold text-slate-900">{review.user_name}</span>
+                              <div className="flex">
+                                {[1, 2, 3, 4, 5].map((star) => (
+                                  <svg
+                                    key={star}
+                                    className={`h-4 w-4 ${star <= review.rating ? 'text-yellow-400' : 'text-slate-200'}`}
+                                    fill="currentColor"
+                                    viewBox="0 0 20 20"
+                                  >
+                                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                                  </svg>
+                                ))}
+                              </div>
+                            </div>
+                            <p className="mt-1 text-xs text-slate-400">
+                              {new Date(review.created_at).toLocaleDateString()}
+                            </p>
+                          </div>
+                          {user && user.id === review.user_id && (
+                            <button
+                              onClick={() => handleDeleteReview(review.id)}
+                              className="rounded-lg p-1 text-slate-400 hover:bg-red-50 hover:text-red-600"
+                              title="Delete review"
+                            >
+                              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </button>
+                          )}
+                        </div>
+                        {review.comment && (
+                          <p className="mt-2 text-sm text-slate-600">{review.comment}</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-4 text-sm text-slate-500">No reviews yet. Be the first to review this car!</p>
+                )}
+              </div>
             </div>
           </div>
           <div className="flex flex-col gap-4">

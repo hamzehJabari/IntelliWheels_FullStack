@@ -1,0 +1,201 @@
+from flask import Blueprint, request, jsonify
+from ..db import get_db
+from ..security import sanitize_string, validate_text_field, require_auth
+import json
+
+bp = Blueprint('reviews', __name__, url_prefix='/api/reviews')
+
+
+@bp.route('/car/<int:car_id>', methods=['GET'])
+def get_car_reviews(car_id):
+    """Get all reviews for a specific car."""
+    if car_id < 1:
+        return jsonify({'success': False, 'error': 'Invalid car ID'}), 400
+    
+    db = get_db()
+    
+    # Get reviews with user info
+    cursor = db.execute('''
+        SELECT r.id, r.car_id, r.user_id, r.rating, r.comment, r.created_at, r.updated_at,
+               u.name as user_name
+        FROM reviews r
+        JOIN users u ON r.user_id = u.id
+        WHERE r.car_id = ?
+        ORDER BY r.created_at DESC
+    ''', (car_id,))
+    
+    reviews = []
+    for row in cursor.fetchall():
+        reviews.append({
+            'id': row['id'],
+            'car_id': row['car_id'],
+            'user_id': row['user_id'],
+            'user_name': row['user_name'],
+            'rating': row['rating'],
+            'comment': row['comment'],
+            'created_at': row['created_at'],
+            'updated_at': row['updated_at']
+        })
+    
+    # Calculate average rating
+    avg_cursor = db.execute('''
+        SELECT AVG(rating) as avg_rating, COUNT(*) as count
+        FROM reviews WHERE car_id = ?
+    ''', (car_id,))
+    stats = avg_cursor.fetchone()
+    
+    return jsonify({
+        'success': True,
+        'reviews': reviews,
+        'stats': {
+            'average_rating': round(stats['avg_rating'], 1) if stats['avg_rating'] else 0,
+            'total_reviews': stats['count']
+        }
+    })
+
+
+@bp.route('/car/<int:car_id>', methods=['POST'])
+def add_review(car_id):
+    """Add a review for a car (authenticated users only)."""
+    user = require_auth()
+    if not user:
+        return jsonify({'success': False, 'error': 'Authentication required'}), 401
+    
+    if car_id < 1:
+        return jsonify({'success': False, 'error': 'Invalid car ID'}), 400
+    
+    if not request.is_json:
+        return jsonify({'success': False, 'error': 'Content-Type must be application/json'}), 400
+    
+    data = request.get_json(silent=True)
+    if not data:
+        return jsonify({'success': False, 'error': 'Invalid JSON body'}), 400
+    
+    # Validate rating
+    rating = data.get('rating')
+    if rating is None or not isinstance(rating, (int, float)) or rating < 1 or rating > 5:
+        return jsonify({'success': False, 'error': 'Rating must be between 1 and 5'}), 400
+    rating = int(rating)
+    
+    # Sanitize comment
+    comment = sanitize_string(data.get('comment', ''))[:1000]
+    
+    db = get_db()
+    
+    # Check if car exists
+    car = db.execute('SELECT id FROM cars WHERE id = ?', (car_id,)).fetchone()
+    if not car:
+        return jsonify({'success': False, 'error': 'Car not found'}), 404
+    
+    try:
+        # Insert or update review (one review per user per car)
+        cursor = db.execute('''
+            INSERT INTO reviews (car_id, user_id, rating, comment)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(car_id, user_id) DO UPDATE SET
+                rating = excluded.rating,
+                comment = excluded.comment,
+                updated_at = CURRENT_TIMESTAMP
+        ''', (car_id, user['id'], rating, comment))
+        db.commit()
+        
+        # Update car's average rating
+        update_car_rating(db, car_id)
+        
+        return jsonify({
+            'success': True,
+            'message': 'Review submitted successfully',
+            'review_id': cursor.lastrowid
+        }), 201
+    except Exception as e:
+        print(f"Add review error: {e}")
+        return jsonify({'success': False, 'error': 'Failed to submit review'}), 500
+
+
+@bp.route('/<int:review_id>', methods=['DELETE'])
+def delete_review(review_id):
+    """Delete a review (only by the review author)."""
+    user = require_auth()
+    if not user:
+        return jsonify({'success': False, 'error': 'Authentication required'}), 401
+    
+    if review_id < 1:
+        return jsonify({'success': False, 'error': 'Invalid review ID'}), 400
+    
+    db = get_db()
+    
+    # Get review and check ownership
+    review = db.execute('SELECT * FROM reviews WHERE id = ?', (review_id,)).fetchone()
+    if not review:
+        return jsonify({'success': False, 'error': 'Review not found'}), 404
+    
+    if review['user_id'] != user['id']:
+        return jsonify({'success': False, 'error': 'Not authorized to delete this review'}), 403
+    
+    car_id = review['car_id']
+    
+    try:
+        db.execute('DELETE FROM reviews WHERE id = ?', (review_id,))
+        db.commit()
+        
+        # Update car's average rating
+        update_car_rating(db, car_id)
+        
+        return jsonify({'success': True, 'message': 'Review deleted'})
+    except Exception as e:
+        print(f"Delete review error: {e}")
+        return jsonify({'success': False, 'error': 'Failed to delete review'}), 500
+
+
+@bp.route('/user/me', methods=['GET'])
+def get_my_reviews():
+    """Get all reviews by the current user."""
+    user = require_auth()
+    if not user:
+        return jsonify({'success': False, 'error': 'Authentication required'}), 401
+    
+    db = get_db()
+    cursor = db.execute('''
+        SELECT r.id, r.car_id, r.rating, r.comment, r.created_at,
+               c.make, c.model, c.year, c.image_url
+        FROM reviews r
+        JOIN cars c ON r.car_id = c.id
+        WHERE r.user_id = ?
+        ORDER BY r.created_at DESC
+    ''', (user['id'],))
+    
+    reviews = []
+    for row in cursor.fetchall():
+        reviews.append({
+            'id': row['id'],
+            'car_id': row['car_id'],
+            'rating': row['rating'],
+            'comment': row['comment'],
+            'created_at': row['created_at'],
+            'car': {
+                'make': row['make'],
+                'model': row['model'],
+                'year': row['year'],
+                'image': row['image_url']
+            }
+        })
+    
+    return jsonify({'success': True, 'reviews': reviews})
+
+
+def update_car_rating(db, car_id):
+    """Update the car's rating and review count based on all reviews."""
+    cursor = db.execute('''
+        SELECT AVG(rating) as avg_rating, COUNT(*) as count
+        FROM reviews WHERE car_id = ?
+    ''', (car_id,))
+    stats = cursor.fetchone()
+    
+    avg_rating = round(stats['avg_rating'], 1) if stats['avg_rating'] else None
+    review_count = stats['count']
+    
+    db.execute('''
+        UPDATE cars SET rating = ?, reviews = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+    ''', (avg_rating, review_count, car_id))
+    db.commit()

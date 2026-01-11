@@ -114,9 +114,73 @@ class AIService:
             except Exception as e:
                 print(f"Failed to load price model: {e}")
 
-    def estimate_price(self, make, model, year, specs):
+    def estimate_price(self, make, model, year, specs, currency='JOD'):
+        """Estimate car price based on make, model, year and specs."""
         self.load_models()
-        return 50000  # Mock return for structure demonstration
+        
+        # Base prices by make category (in JOD)
+        luxury_makes = ['mercedes', 'bmw', 'audi', 'lexus', 'porsche', 'bentley', 'rolls-royce', 'maserati', 'jaguar', 'land rover', 'range rover']
+        premium_makes = ['volvo', 'infiniti', 'acura', 'lincoln', 'cadillac', 'genesis', 'alfa romeo']
+        standard_makes = ['toyota', 'honda', 'nissan', 'mazda', 'hyundai', 'kia', 'ford', 'chevrolet', 'volkswagen', 'subaru']
+        budget_makes = ['suzuki', 'mitsubishi', 'renault', 'peugeot', 'citroen', 'fiat', 'dacia']
+        
+        make_lower = (make or '').lower()
+        
+        # Determine base price range
+        if any(m in make_lower for m in luxury_makes):
+            base_price = 45000
+            variance = 0.35
+        elif any(m in make_lower for m in premium_makes):
+            base_price = 30000
+            variance = 0.30
+        elif any(m in make_lower for m in standard_makes):
+            base_price = 18000
+            variance = 0.25
+        elif any(m in make_lower for m in budget_makes):
+            base_price = 12000
+            variance = 0.20
+        else:
+            base_price = 20000
+            variance = 0.25
+        
+        # Adjust for year (depreciation)
+        current_year = 2026
+        if year:
+            age = current_year - int(year)
+            if age <= 0:
+                base_price *= 1.1  # New car premium
+            elif age <= 3:
+                base_price *= (1 - age * 0.08)  # 8% per year for first 3 years
+            elif age <= 7:
+                base_price *= (0.76 - (age - 3) * 0.05)  # 5% per year for years 4-7
+            else:
+                base_price *= max(0.3, 0.56 - (age - 7) * 0.03)  # 3% per year after, min 30%
+        
+        # Adjust for specs
+        if specs:
+            if specs.get('horsepower'):
+                hp = int(specs.get('horsepower', 0))
+                if hp > 300:
+                    base_price *= 1.15
+                elif hp > 200:
+                    base_price *= 1.05
+            
+            body_style = (specs.get('bodyStyle') or '').lower()
+            if body_style in ['suv', 'crossover']:
+                base_price *= 1.10
+            elif body_style in ['coupe', 'convertible']:
+                base_price *= 1.08
+        
+        # Calculate range
+        low_price = base_price * (1 - variance)
+        high_price = base_price * (1 + variance)
+        
+        return {
+            'value': round(base_price),
+            'low': round(low_price),
+            'high': round(high_price),
+            'currency': 'JOD'
+        }
 
     def chat(self, message, history, image_base64=None):
         if not self.gemini_model:
