@@ -59,12 +59,18 @@ def upload_image():
     filepath = os.path.join(upload_dir, safe_filename)
     file.save(filepath)
     
-    # Return URL path
-    url = f"/api/uploads/images/{safe_filename}"
+    # Return full backend URL (not relative path) so frontend can load images from backend
+    # On Render, the backend URL is intelliwheels.onrender.com
+    backend_url = os.environ.get('BACKEND_URL', '')
+    if backend_url:
+        url = f"{backend_url}/api/uploads/images/{safe_filename}"
+    else:
+        # Fallback to relative path for local development
+        url = f"/api/uploads/images/{safe_filename}"
     
     return jsonify({
         'success': True,
         'url': url,
-        'path': url,
+        'path': f"/api/uploads/images/{safe_filename}",
         'filename': safe_filename
     })

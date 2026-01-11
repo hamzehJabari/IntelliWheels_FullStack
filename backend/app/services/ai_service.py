@@ -70,7 +70,7 @@ class AIService:
             self._init_gemini()
             
         if not self.gemini_model:
-            return "I am the IntelliWheels AI Assistant. The AI service is currently unavailable. Please try again later."
+            return "I am the IntelliWheels AI Assistant. The AI service is currently unavailable (GEMINI_API_KEY not configured). Please contact support."
 
         try:
             # Build conversation context
@@ -89,11 +89,12 @@ Be helpful, concise, and knowledgeable about cars. Prices are typically in JOD (
             
             # Add history context
             if history:
-                history_text = "\n".join([f"{'User' if h.get('role') == 'user' else 'Assistant'}: {h.get('text', '')}" for h in history[-5:]])
-                contents.append(f"Previous conversation:\n{history_text}\n\n")
+                history_text = "\\n".join([f"{'User' if h.get('role') == 'user' else 'Assistant'}: {h.get('text', '')}" for h in history[-5:]])
+                contents.append(f"Previous conversation:\\n{history_text}\\n\\n")
             
             # Add current message
-            contents.append(f"User: {message}")
+            if message:
+                contents.append(f"User: {message}")
             
             # Handle image if provided
             if image_base64:
@@ -108,22 +109,28 @@ Be helpful, concise, and knowledgeable about cars. Prices are typically in JOD (
                         'data': image_data
                     }
                     
-                    response = self.gemini_model.generate_content([
-                        system_prompt,
-                        "\n".join(contents),
-                        "Please analyze this car image and provide details about the vehicle:",
-                        image_part
-                    ])
+                    prompt_parts = [system_prompt]
+                    if contents:
+                        prompt_parts.append("\\n".join(contents))
+                    if not message:
+                        prompt_parts.append("Please analyze this car image and provide details about the vehicle:")
+                    prompt_parts.append(image_part)
+                    
+                    response = self.gemini_model.generate_content(prompt_parts)
                 except Exception as e:
                     print(f"Image processing error: {e}")
-                    response = self.gemini_model.generate_content([
-                        system_prompt,
-                        "\n".join(contents)
-                    ])
+                    # Fall back to text-only if image fails
+                    if message:
+                        response = self.gemini_model.generate_content([
+                            system_prompt,
+                            "\\n".join(contents)
+                        ])
+                    else:
+                        return f"I couldn't process that image. Error: {str(e)[:100]}"
             else:
                 response = self.gemini_model.generate_content([
                     system_prompt,
-                    "\n".join(contents)
+                    "\\n".join(contents)
                 ])
             
             return response.text
@@ -141,35 +148,63 @@ Be helpful, concise, and knowledgeable about cars. Prices are typically in JOD (
             return "I apologize, but I encountered an issue processing your request. Please try again."
 
     def semantic_search(self, query, limit):
-        # Mock implementation
-        return [
-            {
-                "car": {
-                    "id": 101,
-                    "make": "Toyota",
-                    "model": "Camry",
-                    "year": 2023,
-                    "price": 85000,
-                    "currency": "AED",
-                    "image": None,
-                    "description": "A great car matching your search for " + query
-                },
-                "similarity": 0.95
-            },
-            {
-                "car": {
-                    "id": 102,
-                    "make": "Honda",
-                    "model": "Accord",
-                    "year": 2022,
-                    "price": 78000,
-                    "currency": "AED",
-                    "image": None,
-                    "description": "Another option for " + query
-                },
-                "similarity": 0.92
-            }
-        ]
+        """Search cars using keyword matching on make, model, and description."""
+        import sqlite3
+        from flask import current_app
+        
+        try:
+            db_path = current_app.config.get('DATABASE', 'intelliwheels.db')
+            conn = sqlite3.connect(db_path)
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            
+            # Search by make, model, or specs (simple keyword search)
+            search_term = f"%{query}%"
+            cursor.execute('''
+                SELECT id, make, model, year, price, currency, image_url, specs
+                FROM cars
+                WHERE make LIKE ? OR model LIKE ? OR specs LIKE ?
+                ORDER BY 
+                    CASE 
+                        WHEN make LIKE ? THEN 1
+                        WHEN model LIKE ? THEN 2
+                        ELSE 3
+                    END,
+                    year DESC
+                LIMIT ?
+            ''', (search_term, search_term, search_term, search_term, search_term, limit))
+            
+            rows = cursor.fetchall()
+            conn.close()
+            
+            results = []
+            for i, row in enumerate(rows):
+                specs = {}
+                if row['specs']:
+                    try:
+                        specs = json.loads(row['specs'])
+                    except:
+                        pass
+                
+                results.append({
+                    "car": {
+                        "id": row['id'],
+                        "make": row['make'],
+                        "model": row['model'],
+                        "year": row['year'],
+                        "price": row['price'],
+                        "currency": row['currency'] or 'AED',
+                        "image": row['image_url'],
+                        "description": specs.get('overview', f"{row['make']} {row['model']} {row['year']}")
+                    },
+                    "similarity": round(0.95 - (i * 0.05), 2)  # Decreasing similarity score
+                })
+            
+            return results
+            
+        except Exception as e:
+            print(f"Semantic search error: {e}")
+            return []
 
     def analyze_image(self, image_base64):
         if not self.gemini_model:
@@ -177,12 +212,13 @@ Be helpful, concise, and knowledgeable about cars. Prices are typically in JOD (
             
         if not self.gemini_model:
             return {
-                "make": "Unknown",
-                "model": "Unknown",
-                "year": 2023,
-                "bodyStyle": "Unknown",
-                "estimatedPrice": 0,
-                "conditionDescription": "AI service unavailable"
+                "make": "",
+                "model": "",
+                "year": None,
+                "bodyStyle": "",
+                "estimatedPrice": None,
+                "conditionDescription": "AI service unavailable - GEMINI_API_KEY not configured",
+                "error": True
             }
 
         try:
@@ -219,17 +255,39 @@ Only respond with the JSON, no other text."""
                     response_text = response_text[4:]
             response_text = response_text.strip()
             
-            return json.loads(response_text)
+            result = json.loads(response_text)
+            result['error'] = False
+            return result
             
+        except json.JSONDecodeError as e:
+            print(f"Vision JSON parse error: {e}, response was: {response_text[:200] if 'response_text' in dir() else 'N/A'}")
+            return {
+                "make": "",
+                "model": "",
+                "year": None,
+                "bodyStyle": "",
+                "estimatedPrice": None,
+                "conditionDescription": "Could not parse AI response. Please try a clearer image.",
+                "error": True
+            }
         except Exception as e:
             print(f"Image analysis error: {e}")
+            error_msg = str(e)
+            if 'blocked' in error_msg.lower() or 'safety' in error_msg.lower():
+                desc = "Image was blocked by safety filters. Please use a different image."
+            elif 'quota' in error_msg.lower() or 'limit' in error_msg.lower():
+                desc = "AI service quota exceeded. Please try again later."
+            else:
+                desc = f"Analysis failed: {error_msg[:100]}"
+            
             return {
-                "make": "Toyota",
-                "model": "Camry",
-                "year": 2022,
-                "bodyStyle": "Sedan",
-                "estimatedPrice": 82000,
-                "conditionDescription": "Unable to analyze image. Default values provided."
+                "make": "",
+                "model": "",
+                "year": None,
+                "bodyStyle": "",
+                "estimatedPrice": None,
+                "conditionDescription": desc,
+                "error": True
             }
 
     def listing_assistant(self, query, history):
