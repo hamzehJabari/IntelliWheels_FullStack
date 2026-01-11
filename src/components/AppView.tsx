@@ -11,8 +11,6 @@ import {
   fetchFavorites,
   fetchDealers,
   fetchMakes,
-  fetchModels,
-  fetchEngines,
   fetchMyListings,
   getAnalytics,
   getPriceEstimate,
@@ -36,8 +34,10 @@ import {
   VisionAttributes,
 } from '@/lib/types';
 import { CHAT_HISTORY_LIMIT, STORAGE_KEYS } from '@/lib/config';
+import { getAllMakes, getModelsForMake } from '@/lib/vehicleDatabase';
 
-// Make/model/engine options now fetched from API instead of static catalog
+// Make/model options for Add Listing come from comprehensive vehicle database
+// Filter makes come from actual database listings
 
 const NAV_CONFIG = [
   { key: 'listings', labelKey: 'navCatalog', descriptionKey: 'navCatalogDesc' },
@@ -364,84 +364,30 @@ export function AppView() {
     return base.replace(/\/api$/, '');
   }, []);
   
-  // State for dynamic make/model/engine options fetched from API
-  const [makeOptions, setMakeOptions] = useState<string[]>([]);
-  const [modelOptions, setModelOptions] = useState<string[]>([]);
-  const [engineOptions, setEngineOptions] = useState<string[]>([]);
+  // Comprehensive vehicle database for Add Listing form (all production vehicles)
+  const allVehicleMakes = useMemo(() => getAllMakes(), []);
+  const listingModelOptions = useMemo(
+    () => listingForm.make ? getModelsForMake(listingForm.make) : [],
+    [listingForm.make]
+  );
   
-  // Fetch makes from API on mount
-  useEffect(() => {
-    async function loadMakeOptions() {
-      try {
-        const response = await fetchMakes(token);
-        if (response.success && response.makes) {
-          setMakeOptions(response.makes);
-        }
-      } catch (err) {
-        console.warn('Failed to load make options', err);
-      }
-    }
-    loadMakeOptions();
-  }, [token]);
-  
-  // Fetch models when make changes
-  useEffect(() => {
-    if (!listingForm.make) {
-      setModelOptions([]);
-      return;
-    }
-    async function loadModelOptions() {
-      try {
-        const response = await fetchModels(listingForm.make, token);
-        if (response.success && response.models) {
-          setModelOptions(response.models);
-        }
-      } catch (err) {
-        console.warn('Failed to load model options', err);
-        setModelOptions([]);
-      }
-    }
-    loadModelOptions();
-  }, [listingForm.make, token]);
-  
-  // Fetch engines when make and model change
-  useEffect(() => {
-    if (!listingForm.make || !listingForm.model) {
-      setEngineOptions([]);
-      return;
-    }
-    async function loadEngineOptions() {
-      try {
-        const response = await fetchEngines(listingForm.make, listingForm.model, token);
-        if (response.success && response.engines) {
-          setEngineOptions(response.engines);
-        }
-      } catch (err) {
-        console.warn('Failed to load engine options', err);
-        setEngineOptions([]);
-      }
-    }
-    loadEngineOptions();
-  }, [listingForm.make, listingForm.model, token]);
-  
+  // Allow custom make/model if not in database
   const availableMakeOptions = useMemo(() => {
-    if (!listingForm.make || makeOptions.includes(listingForm.make)) {
-      return makeOptions;
+    if (!listingForm.make || allVehicleMakes.includes(listingForm.make)) {
+      return allVehicleMakes;
     }
-    return [...makeOptions, listingForm.make];
-  }, [listingForm.make, makeOptions]);
+    return [...allVehicleMakes, listingForm.make].sort((a, b) => a.localeCompare(b));
+  }, [listingForm.make, allVehicleMakes]);
+  
   const availableModelOptions = useMemo(() => {
-    if (!listingForm.model || modelOptions.includes(listingForm.model)) {
-      return modelOptions;
+    if (!listingForm.model || listingModelOptions.includes(listingForm.model)) {
+      return listingModelOptions;
     }
-    return [...modelOptions, listingForm.model];
-  }, [listingForm.model, modelOptions]);
-  const availableEngineOptions = useMemo(() => {
-    if (!listingForm.engine || engineOptions.includes(listingForm.engine)) {
-      return engineOptions;
-    }
-    return [...engineOptions, listingForm.engine];
-  }, [engineOptions, listingForm.engine]);
+    return [...listingModelOptions, listingForm.model].sort((a, b) => a.localeCompare(b));
+  }, [listingForm.model, listingModelOptions]);
+  
+  // Engine is free text input since it varies too much
+  const availableEngineOptions: string[] = [];
   const direction = language === 'ar' ? 'rtl' : 'ltr';
   const backgroundClass = resolvedTheme === 'dark'
     ? 'bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-slate-100'

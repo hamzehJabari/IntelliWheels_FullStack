@@ -25,14 +25,14 @@ def get_cars():
     db = get_db()
     args = request.args
     
-    query = "SELECT * FROM cars WHERE 1=1"
+    base_query = "FROM cars WHERE 1=1"
     params = []
 
     # Sanitize and validate make filter
     make = args.get('make')
     if make and make != 'all':
         make = sanitize_string(make)[:50]  # Limit length
-        query += " AND make = ?"
+        base_query += " AND make = ?"
         params.append(make)
     
     # Sanitize search query
@@ -40,24 +40,28 @@ def get_cars():
     if search:
         search = sanitize_search_query(search)[:100]  # Limit length
         search_pattern = f"%{search}%"
-        query += " AND (make LIKE ? ESCAPE '\\' OR model LIKE ? ESCAPE '\\')"
+        base_query += " AND (make LIKE ? ESCAPE '\\' OR model LIKE ? ESCAPE '\\')"
         params.extend([search_pattern, search_pattern])
 
-    # Validate pagination parameters
+    # Get total count first
+    count_cursor = db.execute(f"SELECT COUNT(*) as total {base_query}", params)
+    total = count_cursor.fetchone()['total']
+
+    # Validate pagination parameters - default to 1000 (effectively all) if not specified
     try:
-        limit = min(int(args.get('limit', 20)), 100)  # Max 100 per request
+        limit = min(int(args.get('limit', 1000)), 1000)  # Max 1000 per request
         offset = max(int(args.get('offset', 0)), 0)
     except ValueError:
-        limit = 20
+        limit = 1000
         offset = 0
     
-    query += " ORDER BY created_at DESC LIMIT ? OFFSET ?"
+    query = f"SELECT * {base_query} ORDER BY created_at DESC LIMIT ? OFFSET ?"
     params.extend([limit, offset])
 
     cursor = db.execute(query, params)
     cars = [car_row_to_dict(row) for row in cursor.fetchall()]
     
-    return jsonify({'success': True, 'cars': cars})
+    return jsonify({'success': True, 'cars': cars, 'total': total})
 
 @bp.route('/<int:id>', methods=['GET'])
 def get_car(id):
