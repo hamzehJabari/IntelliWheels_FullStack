@@ -564,10 +564,11 @@ export function AppView() {
   const backgroundClass = resolvedTheme === 'dark'
     ? 'bg-slate-950 text-slate-100'
     : 'bg-slate-50 text-slate-900';
-  // Background image for car handover scene - add car-handover-bg.jpg to public folder
-  // Image should show an Arabic seller handing car keys to a happy customer
+  // Background with elegant gradient - provides professional look without external image dependency
   const backgroundImageStyle = {
-    backgroundImage: 'linear-gradient(135deg, rgba(15, 23, 42, 0.1) 0%, rgba(30, 58, 138, 0.15) 50%, rgba(14, 165, 233, 0.1) 100%), url(/car-handover-bg.jpg)',
+    backgroundImage: resolvedTheme === 'dark'
+      ? 'linear-gradient(135deg, rgba(15, 23, 42, 1) 0%, rgba(30, 41, 59, 1) 25%, rgba(51, 65, 85, 0.9) 50%, rgba(30, 58, 138, 0.8) 75%, rgba(14, 165, 233, 0.6) 100%)'
+      : 'linear-gradient(135deg, rgba(248, 250, 252, 1) 0%, rgba(241, 245, 249, 1) 25%, rgba(226, 232, 240, 0.95) 50%, rgba(186, 230, 253, 0.8) 75%, rgba(56, 189, 248, 0.4) 100%)',
     backgroundSize: 'cover',
     backgroundPosition: 'center',
     backgroundAttachment: 'fixed',
@@ -2303,16 +2304,16 @@ export function AppView() {
                 <button type="button" className="rounded-2xl bg-sky-600 px-4 py-2 text-sm font-semibold text-white" onClick={handlePriceAssist}>
                   {copy.priceAssistLabel}
                 </button>
-                <label className="cursor-pointer rounded-2xl border border-dashed border-slate-300 px-4 py-2 text-sm font-semibold text-slate-900">
+                <label htmlFor="upload-photo-input" className="cursor-pointer rounded-2xl border border-dashed border-slate-300 px-4 py-2 text-sm font-semibold text-slate-900">
                   {copy.uploadPhotoLabel}
-                  <input type="file" accept="image/*" className="hidden" onChange={(event) => {
+                  <input type="file" name="upload-photo" id="upload-photo-input" accept="image/*" className="hidden" onChange={(event) => {
                     const file = event.target.files?.[0];
                     if (file) handleUploadImage(file);
                   }} />
                 </label>
-                <label className="cursor-pointer rounded-2xl border border-dashed border-slate-300 px-4 py-2 text-sm font-semibold text-slate-900">
+                <label htmlFor="vision-helper-input" className="cursor-pointer rounded-2xl border border-dashed border-slate-300 px-4 py-2 text-sm font-semibold text-slate-900">
                   {copy.visionHelperLabel}
-                  <input type="file" accept="image/*" className="hidden" onChange={(event) => {
+                  <input type="file" name="vision-helper" id="vision-helper-input" accept="image/*" className="hidden" onChange={(event) => {
                     const file = event.target.files?.[0];
                     if (file) handleVisionAnalyze(file);
                   }} />
@@ -2338,7 +2339,10 @@ export function AppView() {
                   </label>
                 </div>
                 <div className="flex flex-wrap gap-2">
+                  <label htmlFor="pending-gallery-url" className="sr-only">Gallery image URL</label>
                   <input
+                    name="pending-gallery-url"
+                    id="pending-gallery-url"
                     value={pendingGalleryUrl}
                     onChange={(event) => setPendingGalleryUrl(event.target.value)}
                     placeholder="Paste image URL"
@@ -2354,8 +2358,6 @@ export function AppView() {
                   )}
                   {listingForm.galleryImages.map((url, index) => (
                     <div key={`${url}-${index}`} className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white">
-                      name="video-url"
-                      id="video-url"
                       <img src={url} alt={`Gallery ${index + 1}`} className="h-32 w-full object-cover" />
                       <button type="button" className="absolute right-2 top-2 rounded-full bg-white/90 px-2 py-1 text-xs font-semibold text-rose-500" onClick={() => handleRemoveGalleryImage(index)}>
                         {copy.galleryRemove}
@@ -2364,8 +2366,10 @@ export function AppView() {
                   ))}
                 </div>
                 <div>
-                  <label className="text-xs uppercase tracking-wide text-slate-500">{copy.videoLabel}</label>
+                  <label htmlFor="listing-video-url" className="text-xs uppercase tracking-wide text-slate-500">{copy.videoLabel}</label>
                   <input
+                    name="listing-video-url"
+                    id="listing-video-url"
                     value={listingForm.videoUrl}
                     onChange={(event) => handleListingInput('videoUrl', event.target.value)}
                     placeholder="https://www.youtube.com/watch?v=..."

@@ -12,11 +12,8 @@ This repository contains the full stack application for IntelliWheels - an intel
 ### Logo
 The website logo is located at `public/intelliwheels_logo_exact_m4.png`. Replace this file to update the logo.
 
-### Background Image
-To add a custom background image showing an Arabic car seller handing keys to a customer:
-1. Add an image file named `car-handover-bg.jpg` to the `public/` folder
-2. Recommended: Use a high-quality image (1920x1080 or higher) showing a car sale/handover scene
-3. The image will automatically be applied with a subtle overlay for readability
+### Theme & Colors
+The application uses an elegant gradient background that adapts to light/dark theme. The gradients are defined in `src/components/AppView.tsx` in the `backgroundImageStyle` constant.
 
 ### Languages
 The application supports:
@@ -24,6 +21,11 @@ The application supports:
 - **Arabic (ar)** - Full RTL support with comprehensive translations
 
 Switch languages via the settings menu in the header.
+
+### AI Features
+The AI features (chatbot, vision helper, listing assistant) require a valid **Gemini API key**:
+1. Get a free API key from https://aistudio.google.com/app/apikey
+2. Set `GEMINI_API_KEY` in your environment (locally in `backend/.env`, on Render in Environment Variables)
 
 ## Deployment
 

@@ -14,15 +14,14 @@ except ImportError:
 class AIService:
     _instance = None
     
-    # Model names for FREE tier (as of late 2024/2025)
-    # gemini-1.5 is NO LONGER free - use gemini-2.0-flash or gemini-pro
+    # Model names for FREE tier - gemini-2.5-flash is the latest free model
     GEMINI_MODELS = [
-        'gemini-2.0-flash',               # Current free tier model
-        'gemini-2.0-flash-exp',           # Experimental version
+        'gemini-2.5-flash',               # Latest free tier model (2025)
+        'gemini-2.5-pro',                 # Pro version
+        'gemini-2.0-flash-lite',          # Lite version
+        'gemini-2.0-flash',               # Previous free tier
+        'models/gemini-2.5-flash',        # With prefix
         'models/gemini-2.0-flash',        # With prefix
-        'models/gemini-2.0-flash-exp',    # With prefix
-        'gemini-pro',                     # Legacy free model
-        'models/gemini-pro',              # With prefix
     ]
     
     def __init__(self):
@@ -325,16 +324,15 @@ Be helpful, concise, and knowledgeable about cars."""
         except Exception as e:
             error_msg = str(e)
             print(f"Gemini API error: {error_msg}")
-            # Provide more specific error messages
-            if 'API_KEY' in error_msg.upper() or 'API Key not found' in error_msg or 'api_key_invalid' in error_msg.lower() or 'authentication' in error_msg.lower():
-                return "AI service configuration error: Invalid API key. Please contact support to update the Gemini API key."
-            elif 'quota' in error_msg.lower() or 'rate' in error_msg.lower():
-                return "AI service is temporarily unavailable due to high demand. Please try again later."
-            elif 'limit' in error_msg.lower() and 'quota' not in error_msg.lower():
-                return "AI service rate limit reached. Please wait a moment and try again."
-            elif 'blocked' in error_msg.lower() or 'safety' in error_msg.lower():
+            # Provide clear error messages - prioritize API key errors
+            error_lower = error_msg.lower()
+            if any(x in error_lower for x in ['api_key', 'api key', 'invalid', 'authentication', '400', '401', '403']):
+                return "AI service error: The API key needs to be updated. Please contact support or update GEMINI_API_KEY in your environment."
+            elif 'blocked' in error_lower or 'safety' in error_lower:
                 return "I cannot process that request. Please rephrase your question."
-            return f"I apologize, but I encountered an issue processing your request. Error: {error_msg[:100]}"
+            elif 'quota' in error_lower or 'resource' in error_lower:
+                return "AI service temporarily unavailable. Please try again in a few minutes."
+            return f"I encountered an issue: {error_msg[:150]}"
 
     def semantic_search(self, query, limit):
         """Search cars using semantic scoring - always returns results ranked by relevance."""
@@ -596,10 +594,13 @@ Only respond with the JSON, no other text."""
         except Exception as e:
             print(f"Image analysis error: {e}")
             error_msg = str(e)
-            if 'blocked' in error_msg.lower() or 'safety' in error_msg.lower():
+            error_lower = error_msg.lower()
+            if 'blocked' in error_lower or 'safety' in error_lower:
                 desc = "Image was blocked by safety filters. Please use a different image."
-            elif 'quota' in error_msg.lower() or 'limit' in error_msg.lower():
-                desc = "AI service quota exceeded. Please try again later."
+            elif any(x in error_lower for x in ['api_key', 'api key', 'invalid', 'authentication', '400', '401', '403']):
+                desc = "AI service error: API key needs to be updated. Please contact support."
+            elif 'quota' in error_lower or 'resource' in error_lower:
+                desc = "AI service temporarily unavailable. Please try again later."
             else:
                 desc = f"Analysis failed: {error_msg[:100]}"
             
@@ -716,9 +717,17 @@ If you need more information, just respond normally without the listing_data."""
                 
         except Exception as e:
             print(f"Listing assistant error: {e}")
+            error_msg = str(e)
+            error_lower = error_msg.lower()
+            if any(x in error_lower for x in ['api_key', 'api key', 'invalid', 'authentication', '400', '401', '403']):
+                response_text = "AI service error: API key needs to be updated. Please contact support."
+            elif 'blocked' in error_lower or 'safety' in error_lower:
+                response_text = "I cannot process that request. Please try a different question."
+            else:
+                response_text = f"I encountered an issue: {error_msg[:100]}"
             return {
                 "success": True,
-                "response": "I encountered an issue. Please try again.",
+                "response": response_text,
                 "action_type": None,
                 "listing_data": None
             }
