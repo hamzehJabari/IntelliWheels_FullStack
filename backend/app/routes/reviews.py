@@ -114,23 +114,17 @@ def add_review(car_id):
     
     db = get_db()
     
-    # Ensure reviews table exists (for production deployments)
+    # Ensure reviews table exists with proper schema
     try:
+        # First try to add the unique index if it doesn't exist
         db.execute('''
-            CREATE TABLE IF NOT EXISTS reviews (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                car_id INTEGER NOT NULL,
-                user_id INTEGER NOT NULL,
-                rating INTEGER NOT NULL CHECK(rating >= 1 AND rating <= 5),
-                comment TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                UNIQUE(car_id, user_id)
-            )
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_reviews_car_user 
+            ON reviews(car_id, user_id)
         ''')
         db.commit()
-    except Exception as table_err:
-        print(f"Reviews table check error: {table_err}")
+    except Exception as idx_err:
+        # Index might already exist or table structure differs
+        print(f"Reviews index note: {idx_err}")
     
     # Check if car exists
     car = db.execute('SELECT id FROM cars WHERE id = ?', (car_id,)).fetchone()
@@ -138,25 +132,39 @@ def add_review(car_id):
         return jsonify({'success': False, 'error': 'Car not found'}), 404
     
     try:
-        # Insert or update review (one review per user per car)
-        cursor = db.execute('''
-            INSERT INTO reviews (car_id, user_id, rating, comment)
-            VALUES (?, ?, ?, ?)
-            ON CONFLICT(car_id, user_id) DO UPDATE SET
-                rating = excluded.rating,
-                comment = excluded.comment,
-                updated_at = CURRENT_TIMESTAMP
-        ''', (car_id, user['id'], rating, comment))
-        db.commit()
+        # Check if user already has a review for this car
+        existing = db.execute(
+            'SELECT id FROM reviews WHERE car_id = ? AND user_id = ?',
+            (car_id, user['id'])
+        ).fetchone()
         
-        # Update car's average rating
-        update_car_rating(db, car_id)
-        
-        return jsonify({
-            'success': True,
-            'message': 'Review submitted successfully',
-            'review_id': cursor.lastrowid
-        }), 201
+        if existing:
+            # Update existing review
+            db.execute('''
+                UPDATE reviews 
+                SET rating = ?, comment = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            ''', (rating, comment, existing['id']))
+            db.commit()
+            update_car_rating(db, car_id)
+            return jsonify({
+                'success': True,
+                'message': 'Review updated successfully',
+                'review_id': existing['id']
+            }), 200
+        else:
+            # Insert new review
+            cursor = db.execute('''
+                INSERT INTO reviews (car_id, user_id, rating, comment)
+                VALUES (?, ?, ?, ?)
+            ''', (car_id, user['id'], rating, comment))
+            db.commit()
+            update_car_rating(db, car_id)
+            return jsonify({
+                'success': True,
+                'message': 'Review submitted successfully',
+                'review_id': cursor.lastrowid
+            }), 201
     except Exception as e:
         import traceback
         print(f"Add review error: {e}")

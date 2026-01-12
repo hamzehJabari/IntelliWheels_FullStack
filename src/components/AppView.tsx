@@ -480,6 +480,7 @@ export function AppView() {
   const [dealers, setDealers] = useState<DealerSummary[]>([]);
   const [dealersLoading, setDealersLoading] = useState(false);
   const [favorites, setFavorites] = useState<number[]>([]);
+  const [favoriteCars, setFavoriteCars] = useState<Car[]>([]);
   const [myListings, setMyListings] = useState<Car[]>([]);
   const [myListingsAnalytics, setMyListingsAnalytics] = useState<MyListingsAnalytics | null>(null);
   const [myListingsAnalyticsLoading, setMyListingsAnalyticsLoading] = useState(false);
@@ -523,9 +524,12 @@ export function AppView() {
   const [chatAttachment, setChatAttachment] = useState<{ preview: string; base64: string; mime: string } | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [pendingGalleryUrl, setPendingGalleryUrl] = useState('');
+  const [headerSearchOpen, setHeaderSearchOpen] = useState(false);
+  const [headerSearchQuery, setHeaderSearchQuery] = useState('');
   const serviceMenuRef = useRef<HTMLDivElement | null>(null);
   const navMenuRef = useRef<HTMLDivElement | null>(null);
   const settingsMenuRef = useRef<HTMLDivElement | null>(null);
+  const headerSearchRef = useRef<HTMLInputElement | null>(null);
   const resolvedTheme = theme === 'system' ? 'light' : theme;
   const currentService = SERVICE_CONFIG.find((service) => service.key === serviceMode) ?? SERVICE_CONFIG[0];
   const router = useRouter();
@@ -715,10 +719,13 @@ export function AppView() {
       if (settingsOpen && settingsMenuRef.current && !settingsMenuRef.current.contains(target)) {
         setSettingsOpen(false);
       }
+      if (headerSearchOpen && headerSearchRef.current && !headerSearchRef.current.contains(target)) {
+        setHeaderSearchOpen(false);
+      }
     }
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
-  }, [serviceMenuOpen, navMenuOpen, settingsOpen]);
+  }, [serviceMenuOpen, navMenuOpen, settingsOpen, headerSearchOpen]);
 
   useEffect(() => {
     function handleKey(event: KeyboardEvent) {
@@ -726,6 +733,7 @@ export function AppView() {
         setServiceMenuOpen(false);
         setNavMenuOpen(false);
         setSettingsOpen(false);
+        setHeaderSearchOpen(false);
       }
     }
     window.addEventListener('keydown', handleKey);
@@ -820,6 +828,7 @@ export function AppView() {
   useEffect(() => {
     if (!token) {
       setFavorites([]);
+      setFavoriteCars([]);
       setMyListings([]);
       setMyListingsAnalytics(null);
       return;
@@ -832,7 +841,9 @@ export function AppView() {
           fetchMyListings(token),
         ]);
         if (favoritesResponse.success) {
-          setFavorites((favoritesResponse.cars || []).map((car) => car.id));
+          const favCars = favoritesResponse.cars || [];
+          setFavoriteCars(favCars);
+          setFavorites(favCars.map((car) => car.id));
         }
         if (listingsResponse.success) {
           setMyListings(listingsResponse.cars || []);
@@ -970,8 +981,12 @@ export function AppView() {
     async (car: Car) => {
       if (!requireAuth()) return;
       const isFavorited = favorites.includes(car.id);
+      // Optimistically update both favorites IDs and favoriteCars array
       setFavorites((prev) =>
         isFavorited ? prev.filter((id) => id !== car.id) : [...prev, car.id]
+      );
+      setFavoriteCars((prev) =>
+        isFavorited ? prev.filter((c) => c.id !== car.id) : [...prev, car]
       );
       try {
         if (isFavorited) {
@@ -983,8 +998,12 @@ export function AppView() {
         }
       } catch (err) {
         showToast('Unable to update favorites', 'error');
+        // Revert on error
         setFavorites((prev) =>
           isFavorited ? [...prev, car.id] : prev.filter((id) => id !== car.id)
+        );
+        setFavoriteCars((prev) =>
+          isFavorited ? [...prev, car] : prev.filter((c) => c.id !== car.id)
         );
       }
     },
@@ -2063,8 +2082,8 @@ export function AppView() {
       case 'favorites':
         return (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {cars.filter((car) => favorites.includes(car.id)).map((car) => renderCarCard(car))}
-            {favorites.length === 0 && <p className="text-slate-500">No favorites yet.</p>}
+            {favoriteCars.map((car) => renderCarCard(car))}
+            {favoriteCars.length === 0 && <p className="text-slate-500">{copy.noFavorites}</p>}
           </div>
         );
       case 'dealers':
@@ -2448,6 +2467,7 @@ export function AppView() {
               {[
                 { key: 'listings', label: copy.navCatalog },
                 { key: 'dealers', label: copy.navDealers },
+                { key: 'favorites', label: copy.navFavorites },
                 { key: 'addListing', label: copy.navAddListing },
                 { key: 'chatbot', label: copy.navChatbot },
                 { key: 'myListings', label: copy.navMyListings },
@@ -2471,12 +2491,48 @@ export function AppView() {
             <div className={`hidden h-8 w-px md:block ${resolvedTheme === 'dark' ? 'bg-slate-800' : 'bg-slate-200'}`} />
 
             <div className="flex items-center gap-2">
-              {/* Search Trigger (Visual Only for now) */}
-              <button className={`hidden rounded-full p-2 text-slate-500 transition hover:bg-slate-100 dark:hover:bg-slate-800 sm:block`}>
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
-                </svg>
-              </button>
+              {/* Search Trigger */}
+              <div className="relative hidden sm:block" ref={headerSearchRef as any}>
+                {headerSearchOpen ? (
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      if (headerSearchQuery.trim()) {
+                        setFilters((prev) => ({ ...prev, search: headerSearchQuery.trim() }));
+                        setActivePage('listings');
+                        setHeaderSearchOpen(false);
+                      }
+                    }}
+                    className="flex items-center gap-2"
+                  >
+                    <input
+                      type="text"
+                      value={headerSearchQuery}
+                      onChange={(e) => setHeaderSearchQuery(e.target.value)}
+                      placeholder={copy.searchPlaceholder || 'Search cars...'}
+                      autoFocus
+                      className={`w-48 rounded-full border px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 ${resolvedTheme === 'dark' ? 'border-slate-700 bg-slate-800 text-white' : 'border-slate-200 bg-white text-slate-900'}`}
+                    />
+                    <button type="submit" className="rounded-full bg-indigo-500 p-2 text-white hover:bg-indigo-600">
+                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+                      </svg>
+                    </button>
+                    <button type="button" onClick={() => { setHeaderSearchOpen(false); setHeaderSearchQuery(''); }} className="rounded-full p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800">
+                      ✕
+                    </button>
+                  </form>
+                ) : (
+                  <button
+                    onClick={() => setHeaderSearchOpen(true)}
+                    className={`rounded-full p-2 text-slate-500 transition hover:bg-slate-100 dark:hover:bg-slate-800`}
+                  >
+                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+                    </svg>
+                  </button>
+                )}
+              </div>
 
               {/* Settings Toggle */}
               <div className="relative" ref={settingsMenuRef}>
@@ -2596,6 +2652,7 @@ export function AppView() {
               {[
                 { key: 'listings', label: copy.navCatalog },
                 { key: 'dealers', label: copy.navDealers },
+                { key: 'favorites', label: copy.navFavorites },
                 { key: 'chatbot', label: copy.navChatbot },
                 { key: 'myListings', label: copy.navMyListings },
                 { key: 'profile', label: copy.navProfile },
