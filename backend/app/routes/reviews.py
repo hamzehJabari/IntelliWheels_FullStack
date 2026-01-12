@@ -94,6 +94,24 @@ def add_review(car_id):
     
     db = get_db()
     
+    # Ensure reviews table exists (for production deployments)
+    try:
+        db.execute('''
+            CREATE TABLE IF NOT EXISTS reviews (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                car_id INTEGER NOT NULL,
+                user_id INTEGER NOT NULL,
+                rating INTEGER NOT NULL CHECK(rating >= 1 AND rating <= 5),
+                comment TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(car_id, user_id)
+            )
+        ''')
+        db.commit()
+    except Exception as table_err:
+        print(f"Reviews table check error: {table_err}")
+    
     # Check if car exists
     car = db.execute('SELECT id FROM cars WHERE id = ?', (car_id,)).fetchone()
     if not car:
@@ -120,8 +138,10 @@ def add_review(car_id):
             'review_id': cursor.lastrowid
         }), 201
     except Exception as e:
+        import traceback
         print(f"Add review error: {e}")
-        return jsonify({'success': False, 'error': 'Failed to submit review'}), 500
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': f'Failed to submit review: {str(e)[:100]}'}), 500
 
 
 @bp.route('/<int:review_id>', methods=['DELETE'])

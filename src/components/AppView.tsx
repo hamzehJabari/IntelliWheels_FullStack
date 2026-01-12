@@ -159,6 +159,97 @@ const TRANSLATIONS = {
     footerEmail: 'Email us',
     footerPhone: 'Call support',
     footerInstagram: 'Instagram',
+    // Chat & AI Assistant
+    chatNewChat: 'New Chat',
+    chatRecent: 'Recent',
+    chatMode: 'Mode',
+    chatModeGeneral: '💬 General Q&A',
+    chatModeListing: '📝 Listing Assistant',
+    chatAssistantName: 'IntelliWheels AI',
+    chatGeneralAssistant: 'General Assistant',
+    chatListingAssistant: 'Listing Assistant',
+    chatThinking: 'Thinking...',
+    chatWelcome: 'How can I help you today?',
+    chatWelcomeDesc: 'Ask me about car pricing, specifications, comparisons, or let me help you create a listing.',
+    chatSuggestion1: 'Compare Toyota vs Honda',
+    chatSuggestion2: 'Price a 2022 BMW X5',
+    chatSuggestion3: 'Help me list my car',
+    chatPlaceholder: 'Ask about cars, pricing, or type / for commands...',
+    chatSendHint: 'Press Enter to send, Shift+Enter for new line',
+    chatImageAttached: 'Image attached',
+    chatProposedListing: '📋 Proposed Listing',
+    chatDeleteChat: 'Delete chat',
+    chatStopGenerating: 'Stop generating',
+    chatSendMessage: 'Send message',
+    // Auth & Profile
+    authSignIn: 'Sign In',
+    authSignUp: 'Sign Up',
+    authSignOut: 'Sign Out',
+    authUsername: 'Username',
+    authEmail: 'Email',
+    authPassword: 'Password',
+    authCurrentPassword: 'Current password',
+    authNewPassword: 'New password',
+    authCreateAccount: 'Create Account',
+    authWelcomeBack: 'Welcome back',
+    authManageAccount: 'Manage account',
+    profileTitle: 'Profile',
+    profileUpdate: 'Update Profile',
+    profileRefresh: 'Refresh Profile',
+    profileSaveChanges: 'Save Changes',
+    profileSignInPrompt: 'Sign in to manage your account and unlock favorites, listings, and analytics.',
+    // Listings & Cars
+    listingViewDetails: 'View Details',
+    listingFavorite: 'Favorite',
+    listingFavorited: 'Favorited',
+    listingPublish: 'Publish Listing',
+    listingPublishing: 'Publishing...',
+    listingReviews: 'reviews',
+    listingPhotos: 'photos',
+    listingVideo: 'Video',
+    listingYear: 'Year',
+    listingPrice: 'Price',
+    listingBodyStyle: 'Body Style',
+    listingHorsepower: 'Horsepower',
+    listingFuelEconomy: 'Fuel Economy',
+    // Filters & Search
+    filterAllMakes: 'All Makes',
+    filterRecommended: 'Recommended',
+    filterPriceLowHigh: 'Price: Low → High',
+    filterPriceHighLow: 'Price: High → Low',
+    filterNewerFirst: 'Newer first',
+    filterTopRated: 'Top rated',
+    searchAiSemantic: 'AI Semantic Search',
+    searchSearching: 'Searching...',
+    searchSearch: 'Search',
+    searchNoResults: 'No matching cars found',
+    searchInspect: 'Inspect',
+    // Analytics
+    analyticsAll: 'All',
+    analyticsMy: 'My',
+    analyticsFavorites: 'Favorites',
+    analyticsAvgPrice: 'Average Price',
+    analyticsCheapest: 'Cheapest',
+    analyticsMostExpensive: 'Most Expensive',
+    analyticsTopMakes: 'Top Makes',
+    analyticsListings: 'listings',
+    analyticsNoData: 'No analytics available yet. Create listings or favorites to unlock insights.',
+    // Pagination
+    paginationShowing: 'Showing',
+    paginationOf: 'of',
+    paginationListings: 'listings',
+    paginationPrev: 'Prev',
+    paginationNext: 'Next',
+    // Vision Helper
+    visionTipsTitle: 'Vision Helper Tips',
+    visionTipsDesc: 'Upload clear daylight shots. The AI will detect make, model, color, and condition to pre-fill your listing.',
+    visionAnalyzing: 'Analyzing image...',
+    // General
+    loading: 'Loading...',
+    loadingAccount: 'Loading account...',
+    loadingDealers: 'Loading dealers...',
+    noListings: 'No listings match your filters yet.',
+    noFavorites: 'No favorites yet.',
   },
   ar: {
     tagline: 'منصة سيارات ذكية',
@@ -223,7 +314,7 @@ const TRANSLATIONS = {
     odometerLabel: 'قراءة العداد (كم)',
     descriptionHeading: 'الوصف',
     dealersHeading: 'شبكة الوكلاء المميزين',
-    dealersSubheading: 'استكشف صالات العرض المختارة من شركاء IntelliWheels.',
+    dealersSubheading: 'استكشف صالات العرض المختارة من شركاء إنتلي ويلز.',
     dealersEmpty: 'لا يوجد وكلاء نشطون حالياً.',
     dealersVisit: 'عرض الصالة',
     dealerMetaListings: 'العروض',
@@ -242,6 +333,97 @@ const TRANSLATIONS = {
     footerEmail: 'راسلنا',
     footerPhone: 'اتصل بالدعم',
     footerInstagram: 'إنستغرام',
+    // Chat & AI Assistant - المساعد الذكي والدردشة
+    chatNewChat: 'محادثة جديدة',
+    chatRecent: 'الأخيرة',
+    chatMode: 'الوضع',
+    chatModeGeneral: '💬 أسئلة عامة',
+    chatModeListing: '📝 مساعد الإعلانات',
+    chatAssistantName: 'مساعد إنتلي ويلز الذكي',
+    chatGeneralAssistant: 'المساعد العام',
+    chatListingAssistant: 'مساعد الإعلانات',
+    chatThinking: 'جاري التفكير...',
+    chatWelcome: 'كيف يمكنني مساعدتك اليوم؟',
+    chatWelcomeDesc: 'اسألني عن أسعار السيارات، المواصفات، المقارنات، أو دعني أساعدك في إنشاء إعلان.',
+    chatSuggestion1: 'قارن بين تويوتا وهوندا',
+    chatSuggestion2: 'سعر BMW X5 موديل 2022',
+    chatSuggestion3: 'ساعدني في بيع سيارتي',
+    chatPlaceholder: 'اسأل عن السيارات، الأسعار، أو اكتب / للأوامر...',
+    chatSendHint: 'اضغط Enter للإرسال، Shift+Enter لسطر جديد',
+    chatImageAttached: 'تم إرفاق صورة',
+    chatProposedListing: '📋 الإعلان المقترح',
+    chatDeleteChat: 'حذف المحادثة',
+    chatStopGenerating: 'إيقاف التوليد',
+    chatSendMessage: 'إرسال الرسالة',
+    // Auth & Profile - المصادقة والملف الشخصي
+    authSignIn: 'تسجيل الدخول',
+    authSignUp: 'إنشاء حساب',
+    authSignOut: 'تسجيل الخروج',
+    authUsername: 'اسم المستخدم',
+    authEmail: 'البريد الإلكتروني',
+    authPassword: 'كلمة المرور',
+    authCurrentPassword: 'كلمة المرور الحالية',
+    authNewPassword: 'كلمة المرور الجديدة',
+    authCreateAccount: 'إنشاء حساب جديد',
+    authWelcomeBack: 'مرحباً بعودتك',
+    authManageAccount: 'إدارة الحساب',
+    profileTitle: 'الملف الشخصي',
+    profileUpdate: 'تحديث الملف الشخصي',
+    profileRefresh: 'تحديث البيانات',
+    profileSaveChanges: 'حفظ التغييرات',
+    profileSignInPrompt: 'سجل الدخول لإدارة حسابك وفتح المفضلة والإعلانات والتحليلات.',
+    // Listings & Cars - الإعلانات والسيارات
+    listingViewDetails: 'عرض التفاصيل',
+    listingFavorite: 'إضافة للمفضلة',
+    listingFavorited: 'في المفضلة',
+    listingPublish: 'نشر الإعلان',
+    listingPublishing: 'جاري النشر...',
+    listingReviews: 'تقييمات',
+    listingPhotos: 'صور',
+    listingVideo: 'فيديو',
+    listingYear: 'السنة',
+    listingPrice: 'السعر',
+    listingBodyStyle: 'نوع الهيكل',
+    listingHorsepower: 'قوة المحرك',
+    listingFuelEconomy: 'استهلاك الوقود',
+    // Filters & Search - الفلاتر والبحث
+    filterAllMakes: 'جميع الشركات',
+    filterRecommended: 'موصى به',
+    filterPriceLowHigh: 'السعر: من الأقل للأعلى',
+    filterPriceHighLow: 'السعر: من الأعلى للأقل',
+    filterNewerFirst: 'الأحدث أولاً',
+    filterTopRated: 'الأعلى تقييماً',
+    searchAiSemantic: 'البحث الذكي بالذكاء الاصطناعي',
+    searchSearching: 'جاري البحث...',
+    searchSearch: 'بحث',
+    searchNoResults: 'لم يتم العثور على سيارات مطابقة',
+    searchInspect: 'فحص',
+    // Analytics - التحليلات
+    analyticsAll: 'الكل',
+    analyticsMy: 'إعلاناتي',
+    analyticsFavorites: 'المفضلة',
+    analyticsAvgPrice: 'متوسط السعر',
+    analyticsCheapest: 'الأرخص',
+    analyticsMostExpensive: 'الأغلى',
+    analyticsTopMakes: 'أشهر الشركات',
+    analyticsListings: 'إعلانات',
+    analyticsNoData: 'لا توجد تحليلات بعد. أنشئ إعلانات أو أضف للمفضلة لفتح الرؤى.',
+    // Pagination - التصفح
+    paginationShowing: 'عرض',
+    paginationOf: 'من',
+    paginationListings: 'إعلانات',
+    paginationPrev: 'السابق',
+    paginationNext: 'التالي',
+    // Vision Helper - مساعد الرؤية
+    visionTipsTitle: 'نصائح مساعد الرؤية',
+    visionTipsDesc: 'ارفع صوراً واضحة في ضوء النهار. سيقوم الذكاء الاصطناعي بتحديد الشركة، الموديل، اللون، والحالة لملء إعلانك تلقائياً.',
+    visionAnalyzing: 'جاري تحليل الصورة...',
+    // General - عام
+    loading: 'جاري التحميل...',
+    loadingAccount: 'جاري تحميل الحساب...',
+    loadingDealers: 'جاري تحميل الوكلاء...',
+    noListings: 'لا توجد إعلانات تطابق الفلاتر المحددة.',
+    noFavorites: 'لا توجد مفضلات بعد.',
   },
 } as const;
 
@@ -380,8 +562,17 @@ export function AppView() {
   const availableEngineOptions: string[] = [];
   const direction = language === 'ar' ? 'rtl' : 'ltr';
   const backgroundClass = resolvedTheme === 'dark'
-    ? 'bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-slate-100'
-    : 'bg-gradient-to-br from-slate-50 via-white to-sky-50 text-slate-900';
+    ? 'bg-slate-950 text-slate-100'
+    : 'bg-slate-50 text-slate-900';
+  // Background image for car handover scene - add car-handover-bg.jpg to public folder
+  // Image should show an Arabic seller handing car keys to a happy customer
+  const backgroundImageStyle = {
+    backgroundImage: 'linear-gradient(135deg, rgba(15, 23, 42, 0.1) 0%, rgba(30, 58, 138, 0.15) 50%, rgba(14, 165, 233, 0.1) 100%), url(/car-handover-bg.jpg)',
+    backgroundSize: 'cover',
+    backgroundPosition: 'center',
+    backgroundAttachment: 'fixed',
+    backgroundRepeat: 'no-repeat',
+  };
   const headerSurfaceClass = resolvedTheme === 'dark'
     ? 'bg-slate-950/95 border-b border-slate-800/60 text-slate-100'
     : 'bg-slate-100/95 border-b border-slate-300/60 text-slate-900';
@@ -1237,7 +1428,7 @@ export function AppView() {
           className={`absolute right-3 top-3 rounded-full px-3 py-1 text-xs font-semibold ${favorites.includes(car.id) ? 'bg-rose-500 text-white' : 'bg-white/90 text-slate-900'
             }`}
         >
-          {favorites.includes(car.id) ? 'Favorited' : 'Favorite'}
+          {favorites.includes(car.id) ? copy.listingFavorited : copy.listingFavorite}
         </button>
       </div>
       <div className="mt-4 flex items-start justify-between gap-3">
@@ -1266,7 +1457,7 @@ export function AppView() {
         className="mt-4 w-full rounded-xl bg-sky-600 py-2 text-sm font-semibold text-white hover:bg-sky-700"
         onClick={() => handleOpenCarDetails(car.id)}
       >
-        View Details
+        {copy.listingViewDetails}
       </button>
     </div>
   );
@@ -1311,7 +1502,7 @@ export function AppView() {
   const renderAuthPanel = () => (
     <div className="grid gap-6 md:grid-cols-2">
       <div className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
-        <h3 className="text-xl font-semibold text-slate-900">Sign In</h3>
+        <h3 className="text-xl font-semibold text-slate-900">{copy.authSignIn}</h3>
         {authError && (
           <p className="mt-3 rounded-2xl bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-600">{authError}</p>
         )}
@@ -1325,19 +1516,19 @@ export function AppView() {
             clearError();
             const success = await login(username, password);
             if (success) {
-              showToast(`Welcome back, ${username}!`);
+              showToast(`${copy.authWelcomeBack}, ${username}!`);
             } else {
               showToast('Unable to sign in. Please check your details.', 'error');
             }
           }}
         >
-          <input name="login-username" placeholder="Username" className={`w-full ${inputFieldClass}`} required />
-          <input name="login-password" type="password" placeholder="Password" className={`w-full ${inputFieldClass}`} required />
-          <button className="w-full rounded-2xl bg-sky-600 py-3 font-semibold text-white">Sign In</button>
+          <input name="login-username" placeholder={copy.authUsername} className={`w-full ${inputFieldClass}`} required />
+          <input name="login-password" type="password" placeholder={copy.authPassword} className={`w-full ${inputFieldClass}`} required />
+          <button className="w-full rounded-2xl bg-sky-600 py-3 font-semibold text-white">{copy.authSignIn}</button>
         </form>
       </div>
       <div className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
-        <h3 className="text-xl font-semibold text-slate-900">Create Account</h3>
+        <h3 className="text-xl font-semibold text-slate-900">{copy.authCreateAccount}</h3>
         <form
           className="mt-4 space-y-4"
           onSubmit={async (event: React.FormEvent<HTMLFormElement>) => {
@@ -1357,10 +1548,10 @@ export function AppView() {
             }
           }}
         >
-          <input name="signup-username" placeholder="Username" className={`w-full ${inputFieldClass}`} required />
-          <input name="signup-email" type="email" placeholder="Email" className={`w-full ${inputFieldClass}`} required />
-          <input name="signup-password" type="password" placeholder="Password" className={`w-full ${inputFieldClass}`} required />
-          <button className="w-full rounded-2xl bg-emerald-500 py-3 font-semibold text-white">Sign Up</button>
+          <input name="signup-username" placeholder={copy.authUsername} className={`w-full ${inputFieldClass}`} required />
+          <input name="signup-email" type="email" placeholder={copy.authEmail} className={`w-full ${inputFieldClass}`} required />
+          <input name="signup-password" type="password" placeholder={copy.authPassword} className={`w-full ${inputFieldClass}`} required />
+          <button className="w-full rounded-2xl bg-emerald-500 py-3 font-semibold text-white">{copy.authSignUp}</button>
         </form>
       </div>
     </div>
@@ -1370,7 +1561,7 @@ export function AppView() {
     if (!user) {
       return (
         <div className="space-y-6">
-          <p className="text-slate-600">Sign in to manage your account and unlock favorites, listings, and analytics.</p>
+          <p className="text-slate-600">{copy.profileSignInPrompt}</p>
           {renderAuthPanel()}
         </div>
       );
@@ -1378,15 +1569,15 @@ export function AppView() {
     return (
       <div className="grid gap-6 md:grid-cols-2">
         <div className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
-          <h3 className="text-xl font-semibold text-slate-900">Profile</h3>
-          <p className="text-slate-600">Username: {user.username}</p>
-          <p className="text-slate-600">Email: {user.email}</p>
+          <h3 className="text-xl font-semibold text-slate-900">{copy.profileTitle}</h3>
+          <p className="text-slate-600">{copy.authUsername}: {user.username}</p>
+          <p className="text-slate-600">{copy.authEmail}: {user.email}</p>
           <button className="mt-4 rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-900" onClick={() => refreshProfile()}>
-            Refresh Profile
+            {copy.profileRefresh}
           </button>
         </div>
         <div className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
-          <h3 className="text-xl font-semibold text-slate-900">Update Profile</h3>
+          <h3 className="text-xl font-semibold text-slate-900">{copy.profileUpdate}</h3>
           <form
             className="mt-4 space-y-3"
             onSubmit={async (event: React.FormEvent<HTMLFormElement>) => {
@@ -1404,14 +1595,14 @@ export function AppView() {
               }
             }}
           >
-            <input name="profile-username" placeholder="Username" defaultValue={user.username} className={`w-full ${inputFieldClass}`} />
-            <input name="profile-email" type="email" placeholder="Email" defaultValue={user.email} className={`w-full ${inputFieldClass}`} />
-            <input name="profile-current-password" type="password" placeholder="Current password" className={`w-full ${inputFieldClass}`} />
-            <input name="profile-password" type="password" placeholder="New password" className={`w-full ${inputFieldClass}`} />
-            <button className="w-full rounded-2xl bg-emerald-500 py-3 font-semibold text-white">Save Changes</button>
+            <input name="profile-username" placeholder={copy.authUsername} defaultValue={user.username} className={`w-full ${inputFieldClass}`} />
+            <input name="profile-email" type="email" placeholder={copy.authEmail} defaultValue={user.email} className={`w-full ${inputFieldClass}`} />
+            <input name="profile-current-password" type="password" placeholder={copy.authCurrentPassword} className={`w-full ${inputFieldClass}`} />
+            <input name="profile-password" type="password" placeholder={copy.authNewPassword} className={`w-full ${inputFieldClass}`} />
+            <button className="w-full rounded-2xl bg-emerald-500 py-3 font-semibold text-white">{copy.profileSaveChanges}</button>
           </form>
           <button className="mt-4 w-full rounded-2xl border border-slate-200 py-2 font-semibold text-slate-900" onClick={() => logout()}>
-            Sign Out
+            {copy.authSignOut}
           </button>
         </div>
       </div>
@@ -1430,11 +1621,11 @@ export function AppView() {
             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
             </svg>
-            New Chat
+            {copy.chatNewChat}
           </button>
         </div>
         <div className="flex-1 overflow-y-auto p-3">
-          <p className="mb-2 px-2 text-xs font-medium uppercase tracking-wide text-slate-400">Recent</p>
+          <p className="mb-2 px-2 text-xs font-medium uppercase tracking-wide text-slate-400">{copy.chatRecent}</p>
           <div className="space-y-1">
             {chatSessions.map((session) => (
               <div
@@ -1474,7 +1665,7 @@ export function AppView() {
           </div>
         </div>
         <div className="border-t border-slate-100 p-4">
-          <label className="mb-2 block text-xs font-medium uppercase tracking-wide text-slate-400">Mode</label>
+          <label className="mb-2 block text-xs font-medium uppercase tracking-wide text-slate-400">{copy.chatMode}</label>
           <select
             name="assistant-mode"
             id="assistant-mode"
@@ -1482,8 +1673,8 @@ export function AppView() {
             onChange={(event) => setAssistantMode(event.target.value as 'general' | 'listing')}
             className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
           >
-            <option value="general">💬 General Q&A</option>
-            <option value="listing">📝 Listing Assistant</option>
+            <option value="general">{copy.chatModeGeneral}</option>
+            <option value="listing">{copy.chatModeListing}</option>
           </select>
         </div>
       </div>
@@ -1499,8 +1690,8 @@ export function AppView() {
               </svg>
             </div>
             <div>
-              <h2 className="font-semibold text-slate-900">IntelliWheels AI</h2>
-              <p className="text-xs text-slate-500">{assistantMode === 'listing' ? 'Listing Assistant' : 'General Assistant'}</p>
+              <h2 className="font-semibold text-slate-900">{copy.chatAssistantName}</h2>
+              <p className="text-xs text-slate-500">{assistantMode === 'listing' ? copy.chatListingAssistant : copy.chatGeneralAssistant}</p>
             </div>
           </div>
           {chatBusy && (
@@ -1510,7 +1701,7 @@ export function AppView() {
                 <span className="h-2 w-2 animate-bounce rounded-full bg-blue-500" style={{ animationDelay: '150ms' }} />
                 <span className="h-2 w-2 animate-bounce rounded-full bg-blue-500" style={{ animationDelay: '300ms' }} />
               </div>
-              <span>Thinking...</span>
+              <span>{copy.chatThinking}</span>
             </div>
           )}
         </div>
@@ -1524,10 +1715,10 @@ export function AppView() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
                 </svg>
               </div>
-              <h3 className="mb-2 text-xl font-semibold text-slate-900">How can I help you today?</h3>
-              <p className="max-w-md text-slate-500">Ask me about car pricing, specifications, comparisons, or let me help you create a listing.</p>
+              <h3 className="mb-2 text-xl font-semibold text-slate-900">{copy.chatWelcome}</h3>
+              <p className="max-w-md text-slate-500">{copy.chatWelcomeDesc}</p>
               <div className="mt-6 flex flex-wrap justify-center gap-2">
-                {['Compare Toyota vs Honda', 'Price a 2022 BMW X5', 'Help me list my car'].map((suggestion) => (
+                {[copy.chatSuggestion1, copy.chatSuggestion2, copy.chatSuggestion3].map((suggestion) => (
                   <button
                     key={suggestion}
                     onClick={() => setChatInput(suggestion)}
@@ -1570,7 +1761,7 @@ export function AppView() {
                     </div>
                     {msg.listingData && (
                       <div className="mt-2 rounded-xl border border-slate-200 bg-white p-4 text-left text-sm shadow-sm">
-                        <p className="mb-2 font-semibold text-slate-900">📋 Proposed Listing</p>
+                        <p className="mb-2 font-semibold text-slate-900">{copy.chatProposedListing}</p>
                         <div className="space-y-1 text-slate-600">
                           {Object.entries(msg.listingData).map(([key, value]) =>
                             value ? (
@@ -1601,7 +1792,7 @@ export function AppView() {
                   <div className="h-12 w-12 overflow-hidden rounded-lg bg-slate-200">
                     <img src={chatAttachment.preview} alt="Attachment" className="h-full w-full object-cover" />
                   </div>
-                  <span className="text-sm text-slate-600">Image attached</span>
+                  <span className="text-sm text-slate-600">{copy.chatImageAttached}</span>
                 </div>
                 <button onClick={() => setChatAttachment(null)} className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-red-500">
                   <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1644,7 +1835,7 @@ export function AppView() {
                     if (!chatBusy) handleChatSubmit();
                   }
                 }}
-                placeholder="Ask about cars, pricing, or type / for commands..."
+                placeholder={copy.chatPlaceholder}
                 rows={1}
                 className="max-h-32 min-h-[44px] flex-1 resize-none bg-transparent py-2 text-sm text-slate-900 placeholder-slate-400 focus:outline-none"
                 style={{ height: 'auto', overflow: 'hidden' }}
@@ -1678,7 +1869,7 @@ export function AppView() {
               )}
             </div>
             <p className="mt-2 text-center text-xs text-slate-400">
-              Press Enter to send, Shift+Enter for new line
+              {copy.chatSendHint}
             </p>
           </div>
         </div>
@@ -1689,7 +1880,7 @@ export function AppView() {
   const renderAnalytics = () => {
     if (!requireAuth()) return null;
     if (!analyticsData) {
-      return <p className="text-slate-500">No analytics available yet. Create listings or favorites to unlock insights.</p>;
+      return <p className="text-slate-500">{copy.analyticsNoData}</p>;
     }
     return (
       <div className="space-y-6">
@@ -1707,9 +1898,9 @@ export function AppView() {
         </div>
         {analyticsData.summary && (
           <div className="grid gap-4 md:grid-cols-3">
-            <StatCard label="Average Price" value={formatPrice(analyticsData.summary.average_price, analyticsData.summary.currency)} />
-            <StatCard label="Cheapest" value={formatPrice(analyticsData.summary.min_price, analyticsData.summary.currency)} />
-            <StatCard label="Most Expensive" value={formatPrice(analyticsData.summary.max_price, analyticsData.summary.currency)} />
+            <StatCard label={copy.analyticsAvgPrice} value={formatPrice(analyticsData.summary.average_price, analyticsData.summary.currency)} />
+            <StatCard label={copy.analyticsCheapest} value={formatPrice(analyticsData.summary.min_price, analyticsData.summary.currency)} />
+            <StatCard label={copy.analyticsMostExpensive} value={formatPrice(analyticsData.summary.max_price, analyticsData.summary.currency)} />
           </div>
         )}
         {analyticsData.market_top_makes && (
@@ -2228,7 +2419,10 @@ export function AppView() {
   const currentYear = new Date().getFullYear();
 
   return (
-    <div className={`${backgroundClass} min-h-screen`} dir={direction}>
+    <div className={`${backgroundClass} min-h-screen relative`} dir={direction} style={backgroundImageStyle}>
+      {/* Overlay for readability */}
+      <div className={`absolute inset-0 ${resolvedTheme === 'dark' ? 'bg-slate-950/85' : 'bg-white/80'}`} />
+      <div className="relative z-10">
       {renderToast()}
       <header className={`sticky top-0 z-50 border-b backdrop-blur-md transition-colors duration-300 ${headerSurfaceClass} ${subtleBorderClass}`}>
         <div className="mx-auto flex h-28 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
@@ -2239,7 +2433,7 @@ export function AppView() {
               onClick={() => setActivePage('listings')}
             >
               <img
-                src="/intellliwheels_logo_concept_dynamic_NO_BG.png"
+                src="/intelliwheels_logo_exact_m4.png"
                 alt="IntelliWheels"
                 className="h-24 w-auto object-contain transition-transform group-hover:scale-105"
               />
@@ -2252,7 +2446,7 @@ export function AppView() {
                 { key: 'dealers', label: copy.navDealers },
                 { key: 'addListing', label: copy.navAddListing },
                 { key: 'chatbot', label: copy.navChatbot },
-                { key: 'analytics', label: copy.navAnalytics },
+                { key: 'myListings', label: copy.navMyListings },
               ].map((item) => (
                 <button
                   key={item.key}
@@ -2399,7 +2593,7 @@ export function AppView() {
                 { key: 'listings', label: copy.navCatalog },
                 { key: 'dealers', label: copy.navDealers },
                 { key: 'chatbot', label: copy.navChatbot },
-                { key: 'analytics', label: copy.navAnalytics },
+                { key: 'myListings', label: copy.navMyListings },
                 { key: 'profile', label: copy.navProfile },
               ].map((item) => (
                 <button
@@ -2447,6 +2641,7 @@ export function AppView() {
           <p className="mt-6 text-xs text-slate-400">© {currentYear} IntelliWheels. {copy.footerRights}</p>
         </div>
       </footer>
+      </div>
     </div>
   );
 }

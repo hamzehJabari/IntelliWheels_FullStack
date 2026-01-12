@@ -219,8 +219,42 @@ class AIService:
             return f"I am the IntelliWheels AI Assistant. The AI service is currently unavailable. Error: {error}"
 
         try:
+            # Detect if message is in Arabic
+            def is_arabic(text):
+                if not text:
+                    return False
+                arabic_chars = sum(1 for c in text if '\u0600' <= c <= '\u06FF' or '\u0750' <= c <= '\u077F')
+                return arabic_chars > len(text) * 0.3
+            
+            use_arabic = is_arabic(message) if message else False
+            
+            # Check history for Arabic as well
+            if not use_arabic and history:
+                for h in history[-3:]:
+                    if is_arabic(h.get('text', '')):
+                        use_arabic = True
+                        break
+            
             # Build conversation context
-            system_prompt = """You are IntelliWheels AI Assistant, an expert automotive consultant for a car marketplace in Jordan. 
+            if use_arabic:
+                system_prompt = """أنت مساعد إنتلي ويلز الذكي، مستشار سيارات خبير لسوق السيارات في الأردن.
+تساعد المستخدمين في:
+- البحث عن السيارات ومقارنتها
+- تقدير أسعار السوق العادلة
+- إنشاء إعلانات السيارات
+- الإجابة على أسئلة السيارات
+- تحليل صور السيارات
+
+مهم: جميع الأسعار بالدينار الأردني. هذا سوق أردني.
+مرجع أسعار السيارات المستعملة في الأردن:
+- اقتصادية (تويوتا ياريس، هوندا سيتي): 5,000 - 12,000 دينار
+- متوسطة (تويوتا كامري، هوندا أكورد): 8,000 - 20,000 دينار
+- فاخرة (BMW 3، مرسيدس C-Class): 15,000 - 35,000 دينار
+- فخمة (BMW 7، مرسيدس S-Class): 30,000 - 80,000 دينار
+
+كن مفيداً وموجزاً وعلى دراية بالسيارات. أجب دائماً باللغة العربية."""
+            else:
+                system_prompt = """You are IntelliWheels AI Assistant, an expert automotive consultant for a car marketplace in Jordan. 
 You help users:
 - Find and compare cars
 - Estimate fair market prices
@@ -292,13 +326,15 @@ Be helpful, concise, and knowledgeable about cars."""
             error_msg = str(e)
             print(f"Gemini API error: {error_msg}")
             # Provide more specific error messages
-            if 'API_KEY' in error_msg.upper() or 'authentication' in error_msg.lower():
-                return "AI service configuration error. Please contact support."
-            elif 'quota' in error_msg.lower() or 'limit' in error_msg.lower():
+            if 'API_KEY' in error_msg.upper() or 'API Key not found' in error_msg or 'api_key_invalid' in error_msg.lower() or 'authentication' in error_msg.lower():
+                return "AI service configuration error: Invalid API key. Please contact support to update the Gemini API key."
+            elif 'quota' in error_msg.lower() or 'rate' in error_msg.lower():
                 return "AI service is temporarily unavailable due to high demand. Please try again later."
+            elif 'limit' in error_msg.lower() and 'quota' not in error_msg.lower():
+                return "AI service rate limit reached. Please wait a moment and try again."
             elif 'blocked' in error_msg.lower() or 'safety' in error_msg.lower():
                 return "I cannot process that request. Please rephrase your question."
-            return "I apologize, but I encountered an issue processing your request. Please try again."
+            return f"I apologize, but I encountered an issue processing your request. Error: {error_msg[:100]}"
 
     def semantic_search(self, query, limit):
         """Search cars using semantic scoring - always returns results ranked by relevance."""
@@ -590,7 +626,43 @@ Only respond with the JSON, no other text."""
             }
 
         try:
-            system_prompt = """You are a car listing assistant for IntelliWheels marketplace in Jordan. Help users create car listings.
+            # Detect if query is in Arabic
+            def is_arabic(text):
+                if not text:
+                    return False
+                arabic_chars = sum(1 for c in text if '\u0600' <= c <= '\u06FF' or '\u0750' <= c <= '\u077F')
+                return arabic_chars > len(text) * 0.3
+            
+            use_arabic = is_arabic(query) if query else False
+            
+            # Check history for Arabic as well
+            if not use_arabic and history:
+                for h in history[-3:]:
+                    if is_arabic(h.get('text', '')):
+                        use_arabic = True
+                        break
+            
+            if use_arabic:
+                system_prompt = """أنت مساعد إعلانات السيارات لسوق إنتلي ويلز في الأردن. ساعد المستخدمين في إنشاء إعلانات السيارات.
+جميع الأسعار بالدينار الأردني.
+
+عندما يكون لديك معلومات كافية لإنشاء إعلان، أجب بصيغة JSON:
+{
+    "response": "رسالتك المفيدة باللغة العربية",
+    "action_type": "draft",
+    "listing_data": {
+        "make": "...",
+        "model": "...",
+        "year": رقم,
+        "price": رقم بالدينار,
+        "currency": "JOD",
+        "description": "الوصف بالعربية..."
+    }
+}
+
+إذا كنت تحتاج مزيداً من المعلومات، أجب بشكل طبيعي بالعربية بدون listing_data."""
+            else:
+                system_prompt = """You are a car listing assistant for IntelliWheels marketplace in Jordan. Help users create car listings.
 All prices must be in JOD (Jordanian Dinar).
 
 When you have enough information to create a listing, respond with JSON in this format:
