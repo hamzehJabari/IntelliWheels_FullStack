@@ -1,0 +1,878 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "IntelliWheels API",
+    "description": "API for the IntelliWheels car marketplace platform. Features include car listings, AI-powered search, price estimation, dealer management, and user authentication.",
+    "version": "2.0.0",
+    "contact": {
+      "name": "IntelliWheels Support"
+    }
+  },
+  "servers": [
+    {
+      "url": "/api",
+      "description": "API Server"
+    }
+  ],
+  "tags": [
+    {"name": "System", "description": "Health checks and uploads"},
+    {"name": "Auth", "description": "User authentication"},
+    {"name": "Cars", "description": "Car listings CRUD"},
+    {"name": "AI", "description": "AI-powered features"},
+    {"name": "Dealers", "description": "Dealer management"},
+    {"name": "Favorites", "description": "User favorites"},
+    {"name": "Listings", "description": "Listing utilities"},
+    {"name": "Reviews", "description": "Car reviews"}
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": ["System"],
+        "summary": "Health check",
+        "description": "Check API health status and AI configuration",
+        "responses": {
+          "200": {
+            "description": "Health status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {"type": "string", "example": "healthy"},
+                    "version": {"type": "string", "example": "2.0.0"},
+                    "ai_enabled": {"type": "boolean"},
+                    "ai_working": {"type": "boolean"},
+                    "ai_model": {"type": "string", "nullable": true}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/uploads/images": {
+      "post": {
+        "tags": ["System"],
+        "summary": "Upload an image",
+        "description": "Upload an image file (PNG, JPG, JPEG, GIF, WebP)",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Upload successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {"type": "boolean"},
+                    "url": {"type": "string"}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/signup": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Register a new user",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["username", "email", "password"],
+                "properties": {
+                  "username": {"type": "string", "minLength": 3, "maxLength": 30},
+                  "email": {"type": "string", "format": "email"},
+                  "password": {"type": "string", "minLength": 8}
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "User created successfully",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/AuthResponse"}
+              }
+            }
+          },
+          "400": {"description": "Validation error"},
+          "409": {"description": "Username or email already exists"}
+        }
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Login user",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["password"],
+                "properties": {
+                  "username": {"type": "string", "description": "Username or email"},
+                  "email": {"type": "string"},
+                  "password": {"type": "string"}
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Login successful",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/AuthResponse"}
+              }
+            }
+          },
+          "401": {"description": "Invalid credentials"}
+        }
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Logout user",
+        "security": [{"BearerAuth": []}],
+        "responses": {
+          "200": {"description": "Logged out successfully"}
+        }
+      }
+    },
+    "/auth/me": {
+      "get": {
+        "tags": ["Auth"],
+        "summary": "Get current user info",
+        "security": [{"BearerAuth": []}],
+        "responses": {
+          "200": {
+            "description": "User info",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {"type": "boolean"},
+                    "user": {"$ref": "#/components/schemas/User"}
+                  }
+                }
+              }
+            }
+          },
+          "401": {"description": "Not authenticated"}
+        }
+      }
+    },
+    "/cars": {
+      "get": {
+        "tags": ["Cars"],
+        "summary": "List cars",
+        "parameters": [
+          {"name": "make", "in": "query", "schema": {"type": "string"}, "description": "Filter by make"},
+          {"name": "search", "in": "query", "schema": {"type": "string"}, "description": "Search make/model"},
+          {"name": "limit", "in": "query", "schema": {"type": "integer", "default": 1000, "maximum": 1000}},
+          {"name": "offset", "in": "query", "schema": {"type": "integer", "default": 0}}
+        ],
+        "responses": {
+          "200": {
+            "description": "List of cars",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {"type": "boolean"},
+                    "cars": {"type": "array", "items": {"$ref": "#/components/schemas/Car"}},
+                    "total": {"type": "integer"}
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Cars"],
+        "summary": "Create a car listing",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {"$ref": "#/components/schemas/CarInput"}
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Car created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {"type": "boolean"},
+                    "id": {"type": "integer"}
+                  }
+                }
+              }
+            }
+          },
+          "400": {"description": "Validation error"}
+        }
+      }
+    },
+    "/cars/{id}": {
+      "get": {
+        "tags": ["Cars"],
+        "summary": "Get car by ID",
+        "parameters": [
+          {"name": "id", "in": "path", "required": true, "schema": {"type": "integer"}}
+        ],
+        "responses": {
+          "200": {
+            "description": "Car details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {"type": "boolean"},
+                    "car": {"$ref": "#/components/schemas/Car"}
+                  }
+                }
+              }
+            }
+          },
+          "404": {"description": "Car not found"}
+        }
+      }
+    },
+    "/chatbot": {
+      "post": {
+        "tags": ["AI"],
+        "summary": "Chat with AI assistant",
+        "description": "Send messages to the AI chatbot. Supports text and optional image input.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "query": {"type": "string", "description": "User message", "maxLength": 4000},
+                  "message": {"type": "string", "description": "Alternative to query"},
+                  "history": {"type": "array", "items": {"type": "object"}, "description": "Chat history"},
+                  "image_base64": {"type": "string", "description": "Base64 encoded image"}
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "AI response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {"type": "boolean"},
+                    "response": {"type": "string"}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/price-estimate": {
+      "post": {
+        "tags": ["AI"],
+        "summary": "Get AI price estimate",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["make", "model"],
+                "properties": {
+                  "make": {"type": "string"},
+                  "model": {"type": "string"},
+                  "year": {"type": "integer"},
+                  "specs": {"type": "object"},
+                  "currency": {"type": "string", "default": "JOD"}
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Price estimate",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {"type": "boolean"},
+                    "estimate": {"type": "number"},
+                    "currency": {"type": "string"},
+                    "range": {
+                      "type": "object",
+                      "properties": {
+                        "low": {"type": "number"},
+                        "high": {"type": "number"}
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/semantic-search": {
+      "get": {
+        "tags": ["AI"],
+        "summary": "Semantic search for cars",
+        "parameters": [
+          {"name": "q", "in": "query", "required": true, "schema": {"type": "string"}, "description": "Search query"},
+          {"name": "limit", "in": "query", "schema": {"type": "integer", "default": 6, "maximum": 20}}
+        ],
+        "responses": {
+          "200": {
+            "description": "Search results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {"type": "boolean"},
+                    "results": {"type": "array", "items": {"$ref": "#/components/schemas/Car"}}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/vision-helper": {
+      "post": {
+        "tags": ["AI"],
+        "summary": "Analyze car image with AI",
+        "security": [{"BearerAuth": []}],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["image_base64"],
+                "properties": {
+                  "image_base64": {"type": "string", "description": "Base64 encoded image"}
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Image analysis",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {"type": "boolean"},
+                    "attributes": {"type": "object"}
+                  }
+                }
+              }
+            }
+          },
+          "401": {"description": "Authentication required"}
+        }
+      }
+    },
+    "/listing-assistant": {
+      "post": {
+        "tags": ["AI"],
+        "summary": "AI listing assistant",
+        "security": [{"BearerAuth": []}],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["query"],
+                "properties": {
+                  "query": {"type": "string", "maxLength": 2000},
+                  "history": {"type": "array", "items": {"type": "object"}}
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {"description": "AI response"},
+          "401": {"description": "Authentication required"}
+        }
+      }
+    },
+    "/dealers": {
+      "get": {
+        "tags": ["Dealers"],
+        "summary": "List all dealers",
+        "responses": {
+          "200": {
+            "description": "List of dealers",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {"type": "boolean"},
+                    "dealers": {"type": "array", "items": {"$ref": "#/components/schemas/Dealer"}}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/dealers/{id}": {
+      "get": {
+        "tags": ["Dealers"],
+        "summary": "Get dealer by ID",
+        "parameters": [
+          {"name": "id", "in": "path", "required": true, "schema": {"type": "integer"}}
+        ],
+        "responses": {
+          "200": {
+            "description": "Dealer details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {"type": "boolean"},
+                    "dealer": {"$ref": "#/components/schemas/DealerDetail"}
+                  }
+                }
+              }
+            }
+          },
+          "404": {"description": "Dealer not found"}
+        }
+      }
+    },
+    "/favorites": {
+      "get": {
+        "tags": ["Favorites"],
+        "summary": "Get user's favorite cars",
+        "security": [{"BearerAuth": []}],
+        "responses": {
+          "200": {
+            "description": "Favorite cars",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {"type": "boolean"},
+                    "cars": {"type": "array", "items": {"$ref": "#/components/schemas/Car"}}
+                  }
+                }
+              }
+            }
+          },
+          "401": {"description": "Authentication required"}
+        }
+      },
+      "post": {
+        "tags": ["Favorites"],
+        "summary": "Add car to favorites",
+        "security": [{"BearerAuth": []}],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["car_id"],
+                "properties": {
+                  "car_id": {"type": "integer"}
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {"description": "Added to favorites"},
+          "401": {"description": "Authentication required"}
+        }
+      }
+    },
+    "/favorites/{car_id}": {
+      "delete": {
+        "tags": ["Favorites"],
+        "summary": "Remove car from favorites",
+        "security": [{"BearerAuth": []}],
+        "parameters": [
+          {"name": "car_id", "in": "path", "required": true, "schema": {"type": "integer"}}
+        ],
+        "responses": {
+          "200": {"description": "Removed from favorites"},
+          "401": {"description": "Authentication required"}
+        }
+      }
+    },
+    "/makes": {
+      "get": {
+        "tags": ["Listings"],
+        "summary": "Get all car makes",
+        "responses": {
+          "200": {
+            "description": "List of makes",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {"type": "boolean"},
+                    "makes": {"type": "array", "items": {"type": "string"}}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/models": {
+      "get": {
+        "tags": ["Listings"],
+        "summary": "Get car models",
+        "parameters": [
+          {"name": "make", "in": "query", "schema": {"type": "string"}, "description": "Filter by make"}
+        ],
+        "responses": {
+          "200": {
+            "description": "List of models",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {"type": "boolean"},
+                    "models": {"type": "array", "items": {"type": "string"}},
+                    "models_by_make": {"type": "object"}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/engines": {
+      "get": {
+        "tags": ["Listings"],
+        "summary": "Get engines for make/model",
+        "parameters": [
+          {"name": "make", "in": "query", "required": true, "schema": {"type": "string"}},
+          {"name": "model", "in": "query", "required": true, "schema": {"type": "string"}}
+        ],
+        "responses": {
+          "200": {
+            "description": "List of engines",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {"type": "boolean"},
+                    "engines": {"type": "array", "items": {"type": "string"}}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/my-listings": {
+      "get": {
+        "tags": ["Listings"],
+        "summary": "Get user's own listings",
+        "security": [{"BearerAuth": []}],
+        "responses": {
+          "200": {
+            "description": "User's car listings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {"type": "boolean"},
+                    "cars": {"type": "array", "items": {"$ref": "#/components/schemas/Car"}}
+                  }
+                }
+              }
+            }
+          },
+          "401": {"description": "Authentication required"}
+        }
+      }
+    },
+    "/my-listings/analytics": {
+      "get": {
+        "tags": ["Listings"],
+        "summary": "Get analytics for user's listings",
+        "security": [{"BearerAuth": []}],
+        "responses": {
+          "200": {"description": "Listing analytics"},
+          "401": {"description": "Authentication required"}
+        }
+      }
+    },
+    "/reviews/car/{car_id}": {
+      "get": {
+        "tags": ["Reviews"],
+        "summary": "Get reviews for a car",
+        "parameters": [
+          {"name": "car_id", "in": "path", "required": true, "schema": {"type": "integer"}}
+        ],
+        "responses": {
+          "200": {
+            "description": "Car reviews",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {"type": "boolean"},
+                    "reviews": {"type": "array", "items": {"$ref": "#/components/schemas/Review"}},
+                    "stats": {
+                      "type": "object",
+                      "properties": {
+                        "average_rating": {"type": "number"},
+                        "total_reviews": {"type": "integer"}
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Reviews"],
+        "summary": "Add a review for a car",
+        "security": [{"BearerAuth": []}],
+        "parameters": [
+          {"name": "car_id", "in": "path", "required": true, "schema": {"type": "integer"}}
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["rating"],
+                "properties": {
+                  "rating": {"type": "integer", "minimum": 1, "maximum": 5},
+                  "comment": {"type": "string", "maxLength": 1000}
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {"description": "Review created"},
+          "401": {"description": "Authentication required"}
+        }
+      }
+    },
+    "/reviews/{review_id}": {
+      "put": {
+        "tags": ["Reviews"],
+        "summary": "Update a review",
+        "security": [{"BearerAuth": []}],
+        "parameters": [
+          {"name": "review_id", "in": "path", "required": true, "schema": {"type": "integer"}}
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "rating": {"type": "integer", "minimum": 1, "maximum": 5},
+                  "comment": {"type": "string", "maxLength": 1000}
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {"description": "Review updated"},
+          "401": {"description": "Authentication required"},
+          "403": {"description": "Not authorized to edit this review"},
+          "404": {"description": "Review not found"}
+        }
+      },
+      "delete": {
+        "tags": ["Reviews"],
+        "summary": "Delete a review",
+        "security": [{"BearerAuth": []}],
+        "parameters": [
+          {"name": "review_id", "in": "path", "required": true, "schema": {"type": "integer"}}
+        ],
+        "responses": {
+          "200": {"description": "Review deleted"},
+          "401": {"description": "Authentication required"},
+          "403": {"description": "Not authorized to delete this review"},
+          "404": {"description": "Review not found"}
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Enter your token from login/signup response"
+      }
+    },
+    "schemas": {
+      "User": {
+        "type": "object",
+        "properties": {
+          "id": {"type": "integer"},
+          "username": {"type": "string"},
+          "email": {"type": "string"},
+          "role": {"type": "string"}
+        }
+      },
+      "AuthResponse": {
+        "type": "object",
+        "properties": {
+          "success": {"type": "boolean"},
+          "token": {"type": "string"},
+          "user": {"$ref": "#/components/schemas/User"}
+        }
+      },
+      "Car": {
+        "type": "object",
+        "properties": {
+          "id": {"type": "integer"},
+          "make": {"type": "string"},
+          "model": {"type": "string"},
+          "year": {"type": "integer"},
+          "price": {"type": "number"},
+          "currency": {"type": "string"},
+          "description": {"type": "string"},
+          "image": {"type": "string"},
+          "image_url": {"type": "string"},
+          "video_url": {"type": "string"},
+          "specs": {"type": "object"},
+          "engines": {"type": "array", "items": {"type": "object"}},
+          "gallery_images": {"type": "array", "items": {"type": "string"}},
+          "rating": {"type": "number"},
+          "reviews": {"type": "integer"},
+          "created_at": {"type": "string"}
+        }
+      },
+      "CarInput": {
+        "type": "object",
+        "required": ["make", "model"],
+        "properties": {
+          "make": {"type": "string", "maxLength": 50},
+          "model": {"type": "string", "maxLength": 100},
+          "year": {"type": "integer", "minimum": 1900, "maximum": 2100},
+          "price": {"type": "number", "minimum": 0},
+          "currency": {"type": "string", "default": "JOD"},
+          "description": {"type": "string", "maxLength": 5000},
+          "specs": {"type": "object"},
+          "image": {"type": "string"},
+          "videoUrl": {"type": "string"},
+          "galleryImages": {"type": "array", "items": {"type": "string"}},
+          "mediaGallery": {"type": "array", "items": {"type": "object"}}
+        }
+      },
+      "Dealer": {
+        "type": "object",
+        "properties": {
+          "id": {"type": "integer"},
+          "name": {"type": "string"},
+          "location": {"type": "string"},
+          "rating": {"type": "number"},
+          "reviews": {"type": "integer"},
+          "logo": {"type": "string"}
+        }
+      },
+      "DealerDetail": {
+        "allOf": [
+          {"$ref": "#/components/schemas/Dealer"},
+          {
+            "type": "object",
+            "properties": {
+              "inventory": {"type": "array", "items": {"$ref": "#/components/schemas/Car"}},
+              "reviews": {"type": "array", "items": {"$ref": "#/components/schemas/Review"}}
+            }
+          }
+        ]
+      },
+      "Review": {
+        "type": "object",
+        "properties": {
+          "id": {"type": "integer"},
+          "car_id": {"type": "integer"},
+          "user_id": {"type": "integer"},
+          "user_name": {"type": "string"},
+          "rating": {"type": "integer"},
+          "comment": {"type": "string"},
+          "created_at": {"type": "string"},
+          "updated_at": {"type": "string"}
+        }
+      }
+    }
+  }
+}

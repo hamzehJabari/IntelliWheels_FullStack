@@ -1,6 +1,7 @@
 import os
 from flask import Flask
 from flask_cors import CORS
+from flask_swagger_ui import get_swaggerui_blueprint
 from dotenv import load_dotenv
 from .db import init_app as init_db
 from .security import add_security_headers
@@ -89,6 +90,21 @@ def create_app(test_config=None):
     app.register_blueprint(favorites.bp)
     app.register_blueprint(listings.bp)
     app.register_blueprint(reviews.bp)
+    
+    # Setup Swagger UI
+    SWAGGER_URL = '/api/docs'
+    API_URL = '/api/swagger.json'
+    swaggerui_blueprint = get_swaggerui_blueprint(
+        SWAGGER_URL,
+        API_URL,
+        config={'app_name': "IntelliWheels API"}
+    )
+    app.register_blueprint(swaggerui_blueprint, url_prefix=SWAGGER_URL)
+    
+    # Serve swagger.json from static folder
+    @app.route('/api/swagger.json')
+    def swagger_spec():
+        return app.send_static_file('swagger.json')
 
     return app
 
