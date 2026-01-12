@@ -14,13 +14,33 @@ def get_car_reviews(car_id):
     
     db = get_db()
     
+    # Ensure reviews table exists
     try:
-        # Get reviews with user info - use username, not name
+        db.execute('''
+            CREATE TABLE IF NOT EXISTS reviews (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                car_id INTEGER NOT NULL,
+                user_id INTEGER NOT NULL,
+                rating INTEGER NOT NULL CHECK(rating >= 1 AND rating <= 5),
+                comment TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (car_id) REFERENCES cars (id) ON DELETE CASCADE,
+                FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+                UNIQUE(car_id, user_id)
+            )
+        ''')
+        db.commit()
+    except Exception as e:
+        print(f"Reviews table creation note: {e}")
+    
+    try:
+        # Get reviews with user info - use LEFT JOIN to handle missing users gracefully
         cursor = db.execute('''
             SELECT r.id, r.car_id, r.user_id, r.rating, r.comment, r.created_at, r.updated_at,
-                   u.username as user_name
+                   COALESCE(u.username, 'Anonymous') as user_name
             FROM reviews r
-            JOIN users u ON r.user_id = u.id
+            LEFT JOIN users u ON r.user_id = u.id
             WHERE r.car_id = ?
             ORDER BY r.created_at DESC
         ''', (car_id,))

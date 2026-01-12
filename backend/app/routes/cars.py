@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify, current_app
 from ..db import get_db
-from ..security import sanitize_string, sanitize_search_query, validate_text_field, validate_integer, validate_float
+from ..security import sanitize_string, sanitize_search_query, validate_text_field, validate_integer, validate_float, require_auth
 import json
 import sqlite3
 
@@ -77,6 +77,10 @@ def get_car(id):
 
 @bp.route('', methods=['POST'])
 def create_car():
+    # Get authenticated user (optional - allows anonymous listings too)
+    user = require_auth()
+    owner_id = user['id'] if user else None
+    
     if not request.is_json:
         return jsonify({'success': False, 'error': 'Content-Type must be application/json'}), 400
     
@@ -138,9 +142,9 @@ def create_car():
     db = get_db()
     try:
         cursor = db.execute(
-            '''INSERT INTO cars (make, model, year, price, currency, description, specs, image_url, video_url, gallery_images, media_gallery)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
-            (make, model, year, price, currency, description, json.dumps(specs), image_url, video_url, json.dumps(gallery_images), json.dumps(media_gallery))
+            '''INSERT INTO cars (owner_id, make, model, year, price, currency, description, specs, image_url, video_url, gallery_images, media_gallery)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+            (owner_id, make, model, year, price, currency, description, json.dumps(specs), image_url, video_url, json.dumps(gallery_images), json.dumps(media_gallery))
         )
         db.commit()
         return jsonify({'success': True, 'id': cursor.lastrowid}), 201
