@@ -37,7 +37,9 @@ def health_check():
         'ai_working': gemini_working,
         'ai_model': active_model,
         'ai_error': init_error if not gemini_working else None,
-        'frontend_origin': os.environ.get('FRONTEND_ORIGIN', 'not set')
+        'frontend_origin': os.environ.get('FRONTEND_ORIGIN', 'not set'),
+        'database_type': 'postgresql' if os.environ.get('DATABASE_URL') else 'sqlite',
+        'database_url_set': bool(os.environ.get('DATABASE_URL'))
     })
 
 @bp.route('/uploads/images/<path:filename>')

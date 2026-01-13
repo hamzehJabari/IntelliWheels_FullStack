@@ -17,6 +17,15 @@ def car_row_to_dict(row):
     # Map image_url to image for frontend compatibility
     if d.get('image_url') and not d.get('image'):
         d['image'] = d['image_url']
+    # Map gallery_images to galleryImages for frontend compatibility (camelCase)
+    if d.get('gallery_images'):
+        d['galleryImages'] = d['gallery_images']
+    # Map media_gallery to mediaGallery for frontend compatibility
+    if d.get('media_gallery'):
+        d['mediaGallery'] = d['media_gallery']
+    # Map video_url to videoUrl for frontend
+    if d.get('video_url'):
+        d['videoUrl'] = d['video_url']
     return d
 
 @bp.route('', methods=['GET'])
@@ -150,4 +159,154 @@ def create_car():
     except Exception as e:
         print(f"Create car error: {e}")
         return jsonify({'success': False, 'error': 'Failed to create listing'}), 500
+
+
+@bp.route('/<int:id>', methods=['PATCH', 'PUT'])
+def update_car(id):
+    """Update a car listing (only by owner)."""
+    user = require_auth()
+    if not user:
+        return jsonify({'success': False, 'error': 'Authentication required'}), 401
+    
+    db = get_db()
+    
+    # Check if car exists and user owns it
+    car = db.execute("SELECT * FROM cars WHERE id = ?", (id,)).fetchone()
+    if not car:
+        return jsonify({'success': False, 'error': 'Car not found'}), 404
+    
+    if car['owner_id'] != user['id']:
+        return jsonify({'success': False, 'error': 'Not authorized to edit this listing'}), 403
+    
+    if not request.is_json:
+        return jsonify({'success': False, 'error': 'Content-Type must be application/json'}), 400
+    
+    data = request.get_json(silent=True)
+    if not data:
+        return jsonify({'success': False, 'error': 'Invalid JSON body'}), 400
+    
+    # Build update query dynamically based on provided fields
+    updates = []
+    params = []
+    
+    if 'make' in data:
+        make = sanitize_string(data['make'])[:50]
+        updates.append("make = ?")
+        params.append(make)
+    
+    if 'model' in data:
+        model = sanitize_string(data['model'])[:100]
+        updates.append("model = ?")
+        params.append(model)
+    
+    if 'year' in data:
+        year = data['year']
+        if year is not None:
+            valid, error = validate_integer(year, 'Year', min_val=1900, max_val=2100)
+            if not valid:
+                return jsonify({'success': False, 'error': error}), 400
+            year = int(year)
+        updates.append("year = ?")
+        params.append(year)
+    
+    if 'price' in data:
+        price = data['price']
+        if price is not None:
+            valid, error = validate_float(price, 'Price', min_val=0, max_val=100000000)
+            if not valid:
+                return jsonify({'success': False, 'error': error}), 400
+            price = float(price)
+        updates.append("price = ?")
+        params.append(price)
+    
+    if 'currency' in data:
+        currency = sanitize_string(data['currency'])[:10]
+        updates.append("currency = ?")
+        params.append(currency)
+    
+    if 'description' in data:
+        description = sanitize_string(data['description'])[:5000]
+        updates.append("description = ?")
+        params.append(description)
+    
+    if 'specs' in data:
+        specs = data['specs'] if isinstance(data['specs'], dict) else {}
+        updates.append("specs = ?")
+        params.append(json.dumps(specs))
+    
+    if 'image' in data:
+        image_url = sanitize_string(data['image'])[:500]
+        updates.append("image_url = ?")
+        params.append(image_url)
+    
+    if 'videoUrl' in data:
+        video_url = sanitize_string(data['videoUrl'])[:500]
+        updates.append("video_url = ?")
+        params.append(video_url)
+    
+    if 'galleryImages' in data:
+        gallery_images = data['galleryImages']
+        if not isinstance(gallery_images, list):
+            gallery_images = []
+        gallery_images = [sanitize_string(url)[:500] for url in gallery_images if isinstance(url, str)]
+        updates.append("gallery_images = ?")
+        params.append(json.dumps(gallery_images))
+    
+    if 'mediaGallery' in data:
+        media_gallery = data['mediaGallery']
+        if not isinstance(media_gallery, list):
+            media_gallery = []
+        updates.append("media_gallery = ?")
+        params.append(json.dumps(media_gallery))
+    
+    if 'odometerKm' in data:
+        # Note: This field might need to be added to the schema
+        pass
+    
+    if not updates:
+        return jsonify({'success': False, 'error': 'No fields to update'}), 400
+    
+    # Add updated_at timestamp
+    updates.append("updated_at = CURRENT_TIMESTAMP")
+    
+    # Add car ID to params
+    params.append(id)
+    
+    try:
+        query = f"UPDATE cars SET {', '.join(updates)} WHERE id = ?"
+        db.execute(query, params)
+        db.commit()
+        
+        # Return updated car
+        updated_car = db.execute("SELECT * FROM cars WHERE id = ?", (id,)).fetchone()
+        return jsonify({'success': True, 'car': car_row_to_dict(updated_car)})
+    except Exception as e:
+        print(f"Update car error: {e}")
+        return jsonify({'success': False, 'error': 'Failed to update listing'}), 500
+
+
+@bp.route('/<int:id>', methods=['DELETE'])
+def delete_car(id):
+    """Delete a car listing (only by owner)."""
+    user = require_auth()
+    if not user:
+        return jsonify({'success': False, 'error': 'Authentication required'}), 401
+    
+    db = get_db()
+    
+    # Check if car exists and user owns it
+    car = db.execute("SELECT * FROM cars WHERE id = ?", (id,)).fetchone()
+    if not car:
+        return jsonify({'success': False, 'error': 'Car not found'}), 404
+    
+    if car['owner_id'] != user['id']:
+        return jsonify({'success': False, 'error': 'Not authorized to delete this listing'}), 403
+    
+    try:
+        db.execute("DELETE FROM cars WHERE id = ?", (id,))
+        db.commit()
+        return jsonify({'success': True, 'message': 'Listing deleted'})
+    except Exception as e:
+        print(f"Delete car error: {e}")
+        return jsonify({'success': False, 'error': 'Failed to delete listing'}), 500
 
