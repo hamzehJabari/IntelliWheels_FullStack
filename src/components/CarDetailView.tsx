@@ -59,6 +59,9 @@ export function CarDetailView({ carId }: CarDetailViewProps) {
       try {
         setLoading(true);
         const response = await fetchCarById(numericId, token);
+        console.log('[CarDetailView] API response:', response);
+        console.log('[CarDetailView] mediaGallery:', response.car?.mediaGallery);
+        console.log('[CarDetailView] galleryImages:', response.car?.galleryImages);
         if (!response.success || !response.car) {
           throw new Error('Unable to load car');
         }
@@ -157,10 +160,14 @@ export function CarDetailView({ carId }: CarDetailViewProps) {
     if (!car) {
       return heroImage ? [heroImage] : ['/placeholder-car.svg'];
     }
+    console.log('[Gallery] car.mediaGallery:', car.mediaGallery);
+    console.log('[Gallery] car.galleryImages:', car.galleryImages);
     const mediaImages = (car.mediaGallery || [])
       .filter((entry) => entry.type === 'image' && entry.url)
       .map((entry) => resolveImageUrl(entry.url));
+    console.log('[Gallery] mediaImages extracted:', mediaImages);
     const galleryImages = (car.galleryImages || []).map((url) => resolveImageUrl(url));
+    console.log('[Gallery] galleryImages extracted:', galleryImages);
     const fallbackImages = (car.imageUrls || []).map((url) => resolveImageUrl(url));
     const combined = [
       ...mediaImages,
@@ -168,7 +175,9 @@ export function CarDetailView({ carId }: CarDetailViewProps) {
       ...fallbackImages,
       heroImage,
     ].filter(Boolean) as string[];
+    console.log('[Gallery] combined before dedup:', combined);
     const deduped = Array.from(new Set(combined));
+    console.log('[Gallery] final deduped:', deduped);
     if (car) {
       const synthetic = buildFallbackGallery(car, deduped);
       synthetic.forEach((url) => {
@@ -207,14 +216,18 @@ export function CarDetailView({ carId }: CarDetailViewProps) {
   // Collect all video URLs from both videoUrl and mediaGallery
   const videoSources = useMemo(() => {
     if (!car) return [];
+    console.log('[Videos] car.videoUrl:', car.videoUrl);
+    console.log('[Videos] car.mediaGallery:', car.mediaGallery);
     const videos: string[] = [];
     if (car.videoUrl) videos.push(resolveVideoUrl(car.videoUrl));
     const mediaVideos = (car.mediaGallery || [])
       .filter((entry) => entry.type === 'video' && entry.url)
       .map((entry) => resolveVideoUrl(entry.url));
+    console.log('[Videos] mediaVideos extracted:', mediaVideos);
     mediaVideos.forEach((v) => {
       if (v && !videos.includes(v)) videos.push(v);
     });
+    console.log('[Videos] final videos:', videos);
     return videos.filter(Boolean);
   }, [car, resolveVideoUrl]);
 

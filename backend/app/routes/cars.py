@@ -10,10 +10,13 @@ def car_row_to_dict(row):
     d = dict(row)
     for field in ['specs', 'engines', 'statistics', 'gallery_images', 'media_gallery', 'image_urls', 'source_sheets']:
         if d.get(field):
-            try:
-                d[field] = json.loads(d[field])
-            except:
-                d[field] = None
+            # Handle both string (SQLite) and already-parsed (PostgreSQL JSONB) data
+            if isinstance(d[field], str):
+                try:
+                    d[field] = json.loads(d[field])
+                except:
+                    d[field] = None
+            # If it's already a list/dict (PostgreSQL), keep it as-is
     # Map image_url to image for frontend compatibility
     if d.get('image_url') and not d.get('image'):
         d['image'] = d['image_url']
