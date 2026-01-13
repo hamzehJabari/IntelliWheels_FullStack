@@ -304,6 +304,17 @@ export async function uploadListingImage(file: File, token: string | null) {
   });
 }
 
+export async function uploadListingVideo(file: File, token: string | null) {
+  const formData = new FormData();
+  formData.append('file', file);
+  return apiRequest<{ success: boolean; url: string; path?: string; filename?: string }>(`/uploads/videos`, {
+    method: 'POST',
+    token,
+    body: formData,
+    isFormData: true,
+  });
+}
+
 export interface ChatbotPayload {
   query: string;
   history?: Array<{ role: 'user' | 'bot'; text: string }>;

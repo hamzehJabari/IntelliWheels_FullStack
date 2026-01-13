@@ -22,6 +22,7 @@ import {
   semanticSearch,
   updateListing,
   uploadListingImage,
+  uploadListingVideo,
 } from '@/lib/api';
 import { useAuth } from '@/context/AuthContext';
 import {
@@ -460,7 +461,7 @@ interface ListingFormState {
   odometer: string;
   image: string;
   galleryImages: string[];
-  videoUrl: string;
+  videoUrls: string[];
   description: string;
 }
 
@@ -494,6 +495,23 @@ export function AppView() {
   const [navMenuOpen, setNavMenuOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [isSubmittingListing, setIsSubmittingListing] = useState(false);
+  const [editingListing, setEditingListing] = useState<Car | null>(null);
+  const [editForm, setEditForm] = useState<ListingFormState>({
+    make: '',
+    model: '',
+    year: '',
+    price: '',
+    currency: 'JOD',
+    bodyStyle: '',
+    horsepower: '',
+    engine: '',
+    fuelEconomy: '',
+    odometer: '',
+    image: '',
+    galleryImages: [],
+    videoUrls: [],
+    description: '',
+  });
   const [listingForm, setListingForm] = useState<ListingFormState>({
     make: '',
     model: '',
@@ -507,7 +525,7 @@ export function AppView() {
     odometer: '',
     image: '',
     galleryImages: [],
-    videoUrl: '',
+    videoUrls: [],
     description: '',
   });
   const [language, setLanguage] = useState<'en' | 'ar'>('en');
@@ -523,7 +541,6 @@ export function AppView() {
   const [chatAbortController, setChatAbortController] = useState<AbortController | null>(null);
   const [chatAttachment, setChatAttachment] = useState<{ preview: string; base64: string; mime: string } | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const [pendingGalleryUrl, setPendingGalleryUrl] = useState('');
   const [headerSearchOpen, setHeaderSearchOpen] = useState(false);
   const [headerSearchQuery, setHeaderSearchQuery] = useState('');
   const serviceMenuRef = useRef<HTMLDivElement | null>(null);
@@ -1076,6 +1093,18 @@ export function AppView() {
     [token]
   );
 
+  const uploadVideoAsset = useCallback(
+    async (file: File) => {
+      const response = await uploadListingVideo(file, token);
+      if (response.success && response.url) {
+        return response.url;
+      }
+      const errorMessage = (response as { error?: string }).error;
+      throw new Error(errorMessage || 'Video upload failed');
+    },
+    [token]
+  );
+
   const handleUploadImage = async (file: File) => {
     if (!requireAuth()) return;
     try {
@@ -1090,7 +1119,13 @@ export function AppView() {
   const handleGalleryUpload = async (fileList: FileList | null) => {
     if (!requireAuth() || !fileList || fileList.length === 0) return;
     try {
-      const uploads = Array.from(fileList).slice(0, 6);
+      // Calculate remaining slots (max 12 images)
+      const remainingSlots = 12 - listingForm.galleryImages.length;
+      if (remainingSlots <= 0) {
+        showToast('Maximum 12 images allowed', 'info');
+        return;
+      }
+      const uploads = Array.from(fileList).slice(0, remainingSlots);
       const uploadedUrls: string[] = [];
       for (const file of uploads) {
         // eslint-disable-next-line no-await-in-loop
@@ -1099,31 +1134,48 @@ export function AppView() {
       }
       if (!uploadedUrls.length) return;
       setListingForm((prev) => {
-        const combined = [...prev.galleryImages, ...uploadedUrls];
+        const combined = [...prev.galleryImages, ...uploadedUrls].slice(0, 12);
         const primaryImage = prev.image || combined[0] || '';
         return { ...prev, galleryImages: combined, image: primaryImage };
       });
-      showToast('Gallery updated');
+      showToast(`${uploadedUrls.length} image(s) uploaded`);
     } catch (err: any) {
       showToast(err.message || 'Gallery upload failed', 'error');
     }
   };
 
-  const handleAddGalleryUrl = () => {
-    const trimmed = pendingGalleryUrl.trim();
-    if (!trimmed) return;
-    setListingForm((prev) => {
-      if (prev.galleryImages.includes(trimmed)) {
-        return prev;
+  const handleVideoUpload = async (fileList: FileList | null) => {
+    if (!requireAuth() || !fileList || fileList.length === 0) return;
+    try {
+      // Calculate remaining slots (max 2 videos)
+      const remainingSlots = 2 - listingForm.videoUrls.length;
+      if (remainingSlots <= 0) {
+        showToast('Maximum 2 videos allowed', 'info');
+        return;
       }
-      const gallery = [...prev.galleryImages, trimmed];
-      return {
-        ...prev,
-        galleryImages: gallery,
-        image: prev.image || gallery[0] || '',
-      };
+      const uploads = Array.from(fileList).slice(0, remainingSlots);
+      const uploadedUrls: string[] = [];
+      for (const file of uploads) {
+        // eslint-disable-next-line no-await-in-loop
+        const url = await uploadVideoAsset(file);
+        uploadedUrls.push(url);
+      }
+      if (!uploadedUrls.length) return;
+      setListingForm((prev) => {
+        const combined = [...prev.videoUrls, ...uploadedUrls].slice(0, 2);
+        return { ...prev, videoUrls: combined };
+      });
+      showToast(`${uploadedUrls.length} video(s) uploaded`);
+    } catch (err: any) {
+      showToast(err.message || 'Video upload failed', 'error');
+    }
+  };
+
+  const handleRemoveVideo = (index: number) => {
+    setListingForm((prev) => {
+      const nextVideos = prev.videoUrls.filter((_, idx) => idx !== index);
+      return { ...prev, videoUrls: nextVideos };
     });
-    setPendingGalleryUrl('');
   };
 
   const handleRemoveGalleryImage = (index: number) => {
@@ -1177,10 +1229,10 @@ export function AppView() {
     try {
       const cleanedGallery = listingForm.galleryImages.filter((url) => Boolean(url?.trim()));
       const normalizedGallery = cleanedGallery.length ? cleanedGallery : listingForm.image ? [listingForm.image] : [];
-      const normalizedVideo = listingForm.videoUrl.trim();
+      const cleanedVideos = listingForm.videoUrls.filter((url) => Boolean(url?.trim()));
       const mediaGalleryPayload = [
         ...normalizedGallery.map((url) => ({ type: 'image' as const, url })),
-        ...(normalizedVideo ? [{ type: 'video' as const, url: normalizedVideo }] : []),
+        ...cleanedVideos.map((url) => ({ type: 'video' as const, url })),
       ];
       const payload: Partial<Car> = {
         make: listingForm.make,
@@ -1192,7 +1244,7 @@ export function AppView() {
         image: listingForm.image || normalizedGallery[0],
         galleryImages: normalizedGallery,
         mediaGallery: mediaGalleryPayload,
-        videoUrl: normalizedVideo || undefined,
+        videoUrl: cleanedVideos[0] || undefined,
         description: listingForm.description,
         specs: {
           bodyStyle: listingForm.bodyStyle,
@@ -1217,10 +1269,9 @@ export function AppView() {
           odometer: '',
           image: '',
           galleryImages: [],
-          videoUrl: '',
+          videoUrls: [],
           description: '',
         });
-        setPendingGalleryUrl('');
         setPriceEstimate(null);
         setVisionSuggestion(null);
         const refresh = await fetchMyListings(token);
@@ -1243,6 +1294,147 @@ export function AppView() {
       showToast('Listing removed', 'info');
     } catch (err: any) {
       showToast(err.message || 'Unable to delete listing', 'error');
+    }
+  };
+
+  const handleStartEditListing = (car: Car) => {
+    setEditingListing(car);
+    setEditForm({
+      make: car.make || '',
+      model: car.model || '',
+      year: car.year?.toString() || '',
+      price: car.price?.toString() || '',
+      currency: car.currency || 'JOD',
+      bodyStyle: car.specs?.bodyStyle || '',
+      horsepower: car.specs?.horsepower?.toString() || '',
+      engine: car.specs?.engine || '',
+      fuelEconomy: car.specs?.fuelEconomy || '',
+      odometer: car.odometerKm?.toString() || '',
+      image: car.image || '',
+      galleryImages: car.galleryImages || [],
+      videoUrls: car.mediaGallery?.filter(m => m.type === 'video').map(m => m.url) || [],
+      description: car.description || '',
+    });
+  };
+
+  const handleEditFormInput = (field: keyof ListingFormState, value: string | string[]) => {
+    setEditForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleEditGalleryUpload = async (fileList: FileList | null) => {
+    if (!requireAuth() || !fileList || fileList.length === 0) return;
+    try {
+      const remainingSlots = 12 - editForm.galleryImages.length;
+      if (remainingSlots <= 0) {
+        showToast('Maximum 12 images allowed', 'info');
+        return;
+      }
+      const uploads = Array.from(fileList).slice(0, remainingSlots);
+      const uploadedUrls: string[] = [];
+      for (const file of uploads) {
+        const url = await uploadImageAsset(file);
+        uploadedUrls.push(url);
+      }
+      if (!uploadedUrls.length) return;
+      setEditForm((prev) => {
+        const combined = [...prev.galleryImages, ...uploadedUrls].slice(0, 12);
+        const primaryImage = prev.image || combined[0] || '';
+        return { ...prev, galleryImages: combined, image: primaryImage };
+      });
+      showToast(`${uploadedUrls.length} image(s) uploaded`);
+    } catch (err: any) {
+      showToast(err.message || 'Gallery upload failed', 'error');
+    }
+  };
+
+  const handleEditVideoUpload = async (fileList: FileList | null) => {
+    if (!requireAuth() || !fileList || fileList.length === 0) return;
+    try {
+      const remainingSlots = 2 - editForm.videoUrls.length;
+      if (remainingSlots <= 0) {
+        showToast('Maximum 2 videos allowed', 'info');
+        return;
+      }
+      const uploads = Array.from(fileList).slice(0, remainingSlots);
+      const uploadedUrls: string[] = [];
+      for (const file of uploads) {
+        const url = await uploadVideoAsset(file);
+        uploadedUrls.push(url);
+      }
+      if (!uploadedUrls.length) return;
+      setEditForm((prev) => {
+        const combined = [...prev.videoUrls, ...uploadedUrls].slice(0, 2);
+        return { ...prev, videoUrls: combined };
+      });
+      showToast(`${uploadedUrls.length} video(s) uploaded`);
+    } catch (err: any) {
+      showToast(err.message || 'Video upload failed', 'error');
+    }
+  };
+
+  const handleRemoveEditGalleryImage = (index: number) => {
+    setEditForm((prev) => {
+      const target = prev.galleryImages[index];
+      const nextGallery = prev.galleryImages.filter((_, idx) => idx !== index);
+      let nextImage = prev.image;
+      if (nextImage === target) {
+        nextImage = nextGallery[0] || '';
+      }
+      return { ...prev, galleryImages: nextGallery, image: nextImage };
+    });
+  };
+
+  const handleRemoveEditVideo = (index: number) => {
+    setEditForm((prev) => {
+      const nextVideos = prev.videoUrls.filter((_, idx) => idx !== index);
+      return { ...prev, videoUrls: nextVideos };
+    });
+  };
+
+  const handleSaveEditListing = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!requireAuth() || !editingListing) return;
+    setIsSubmittingListing(true);
+    try {
+      const cleanedGallery = editForm.galleryImages.filter((url) => Boolean(url?.trim()));
+      const normalizedGallery = cleanedGallery.length ? cleanedGallery : editForm.image ? [editForm.image] : [];
+      const cleanedVideos = editForm.videoUrls.filter((url) => Boolean(url?.trim()));
+      const mediaGalleryPayload = [
+        ...normalizedGallery.map((url) => ({ type: 'image' as const, url })),
+        ...cleanedVideos.map((url) => ({ type: 'video' as const, url })),
+      ];
+      const payload: Partial<Car> = {
+        make: editForm.make,
+        model: editForm.model,
+        year: editForm.year ? Number(editForm.year) : undefined,
+        price: editForm.price ? Number(editForm.price) : undefined,
+        currency: editForm.currency as CurrencyCode,
+        odometerKm: editForm.odometer ? Number(editForm.odometer) : undefined,
+        image: editForm.image || normalizedGallery[0],
+        galleryImages: normalizedGallery,
+        mediaGallery: mediaGalleryPayload,
+        videoUrl: cleanedVideos[0] || undefined,
+        description: editForm.description,
+        specs: {
+          bodyStyle: editForm.bodyStyle,
+          horsepower: editForm.horsepower ? Number(editForm.horsepower) : undefined,
+          engine: editForm.engine,
+          fuelEconomy: editForm.fuelEconomy,
+        },
+      };
+      const response = await updateListing(editingListing.id, payload, token);
+      if (response.success) {
+        showToast('Listing updated successfully');
+        setEditingListing(null);
+        const refresh = await fetchMyListings(token);
+        if (refresh.success) setMyListings(refresh.cars || []);
+      } else {
+        showToast(response.error || 'Could not update listing', 'error');
+      }
+    } catch (err: any) {
+      showToast(err.message || 'Could not update listing', 'error');
+    } finally {
+      setIsSubmittingListing(false);
     }
   };
 
@@ -2221,9 +2413,12 @@ export function AppView() {
                       ) : null}
                     </div>
                   </div>
-                  <div className="mt-4 flex gap-3">
+                  <div className="mt-4 flex gap-2">
                     <button className="flex-1 rounded-2xl bg-slate-900/5 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-900/10" onClick={() => handleOpenCarDetails(car.id)}>
                       View
+                    </button>
+                    <button className="flex-1 rounded-2xl bg-sky-500 py-2 text-sm font-semibold text-white hover:bg-sky-600" onClick={() => handleStartEditListing(car)}>
+                      Edit
                     </button>
                     <button className="flex-1 rounded-2xl bg-rose-500 py-2 text-sm font-semibold text-white hover:bg-rose-600" onClick={() => handleDeleteListing(car.id)}>
                       Delete
@@ -2232,6 +2427,194 @@ export function AppView() {
                 </div>
               ))}
             </div>
+
+            {/* Edit Listing Modal */}
+            {editingListing && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+                <div className="relative max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-3xl bg-white p-6 shadow-xl">
+                  <button
+                    onClick={() => setEditingListing(null)}
+                    className="absolute right-4 top-4 rounded-full bg-slate-100 p-2 text-slate-600 hover:bg-slate-200"
+                  >
+                    ✕
+                  </button>
+                  <h2 className="mb-6 text-xl font-bold text-slate-900">Edit Listing</h2>
+                  <form onSubmit={handleSaveEditListing} className="space-y-4">
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div>
+                        <label className="text-xs uppercase tracking-wide text-slate-500">Make</label>
+                        <input
+                          type="text"
+                          value={editForm.make}
+                          onChange={(e) => handleEditFormInput('make', e.target.value)}
+                          className={`mt-1 w-full ${inputFieldClass}`}
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs uppercase tracking-wide text-slate-500">Model</label>
+                        <input
+                          type="text"
+                          value={editForm.model}
+                          onChange={(e) => handleEditFormInput('model', e.target.value)}
+                          className={`mt-1 w-full ${inputFieldClass}`}
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs uppercase tracking-wide text-slate-500">Year</label>
+                        <input
+                          type="number"
+                          value={editForm.year}
+                          onChange={(e) => handleEditFormInput('year', e.target.value)}
+                          className={`mt-1 w-full ${inputFieldClass}`}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs uppercase tracking-wide text-slate-500">Price</label>
+                        <input
+                          type="number"
+                          value={editForm.price}
+                          onChange={(e) => handleEditFormInput('price', e.target.value)}
+                          className={`mt-1 w-full ${inputFieldClass}`}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs uppercase tracking-wide text-slate-500">Body Style</label>
+                        <input
+                          type="text"
+                          value={editForm.bodyStyle}
+                          onChange={(e) => handleEditFormInput('bodyStyle', e.target.value)}
+                          className={`mt-1 w-full ${inputFieldClass}`}
+                          placeholder="SUV, Sedan, Coupe..."
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs uppercase tracking-wide text-slate-500">Odometer (km)</label>
+                        <input
+                          type="number"
+                          value={editForm.odometer}
+                          onChange={(e) => handleEditFormInput('odometer', e.target.value)}
+                          className={`mt-1 w-full ${inputFieldClass}`}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs uppercase tracking-wide text-slate-500">Engine</label>
+                        <input
+                          type="text"
+                          value={editForm.engine}
+                          onChange={(e) => handleEditFormInput('engine', e.target.value)}
+                          className={`mt-1 w-full ${inputFieldClass}`}
+                          placeholder="2.0L Turbo, V8..."
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs uppercase tracking-wide text-slate-500">Horsepower</label>
+                        <input
+                          type="number"
+                          value={editForm.horsepower}
+                          onChange={(e) => handleEditFormInput('horsepower', e.target.value)}
+                          className={`mt-1 w-full ${inputFieldClass}`}
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-xs uppercase tracking-wide text-slate-500">Description</label>
+                      <textarea
+                        value={editForm.description}
+                        onChange={(e) => handleEditFormInput('description', e.target.value)}
+                        className={`mt-1 h-24 w-full ${inputFieldClass}`}
+                      />
+                    </div>
+
+                    {/* Image Gallery */}
+                    <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-semibold text-slate-900">Images ({editForm.galleryImages.length}/12)</p>
+                        </div>
+                        <label className="cursor-pointer rounded-2xl bg-slate-900/10 px-3 py-2 text-xs font-semibold text-slate-900 hover:bg-slate-900/20">
+                          + Add Images
+                          <input
+                            type="file"
+                            accept=".png,.jpg,.jpeg,.gif,.webp"
+                            multiple
+                            className="hidden"
+                            onChange={(e) => handleEditGalleryUpload(e.target.files)}
+                          />
+                        </label>
+                      </div>
+                      <div className="grid grid-cols-4 gap-2">
+                        {editForm.galleryImages.map((url, index) => (
+                          <div key={`${url}-${index}`} className="relative">
+                            <img src={url} alt={`Gallery ${index + 1}`} className="h-20 w-full rounded-xl object-cover" />
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveEditGalleryImage(index)}
+                              className="absolute -right-1 -top-1 rounded-full bg-rose-500 px-1.5 py-0.5 text-xs text-white"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Video Gallery */}
+                    <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-semibold text-slate-900">Videos ({editForm.videoUrls.length}/2)</p>
+                        </div>
+                        <label className="cursor-pointer rounded-2xl bg-slate-900/10 px-3 py-2 text-xs font-semibold text-slate-900 hover:bg-slate-900/20">
+                          + Add Video
+                          <input
+                            type="file"
+                            accept=".mp4,.mov,.avi,.mkv,.webm"
+                            className="hidden"
+                            onChange={(e) => handleEditVideoUpload(e.target.files)}
+                          />
+                        </label>
+                      </div>
+                      {editForm.videoUrls.length > 0 && (
+                        <div className="space-y-2">
+                          {editForm.videoUrls.map((url, index) => (
+                            <div key={`video-${index}`} className="flex items-center gap-2 rounded-xl bg-white p-2">
+                              <span className="flex-1 truncate text-sm text-slate-600">🎥 Video {index + 1}</span>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveEditVideo(index)}
+                                className="rounded-full bg-rose-500 px-2 py-1 text-xs text-white"
+                              >
+                                Remove
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex gap-3 pt-4">
+                      <button
+                        type="button"
+                        onClick={() => setEditingListing(null)}
+                        className="flex-1 rounded-2xl border border-slate-200 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={isSubmittingListing}
+                        className="flex-1 rounded-2xl bg-emerald-600 py-3 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+                      >
+                        {isSubmittingListing ? 'Saving...' : 'Save Changes'}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
+
             {myListings.length === 0 && (
               <div className="rounded-3xl border border-dashed border-slate-200 bg-slate-50 p-8 text-center">
                 <p className="text-slate-500 mb-4">No personal listings yet.</p>
@@ -2342,58 +2725,70 @@ export function AppView() {
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
                     <p className="text-sm font-semibold text-slate-900">{copy.galleryLabel}</p>
-                    <p className="text-xs text-slate-500">{copy.galleryHint}</p>
+                    <p className="text-xs text-slate-500">Upload up to 12 images (PNG, JPG, JPEG, GIF, WEBP)</p>
                   </div>
-                  <label className="cursor-pointer rounded-2xl border border-dashed border-slate-300 px-3 py-2 text-xs font-semibold text-slate-900">
-                    {copy.galleryUploadLabel}
+                  <label className="cursor-pointer rounded-2xl border border-dashed border-slate-300 px-3 py-2 text-xs font-semibold text-slate-900 hover:bg-slate-100">
+                    📷 {copy.galleryUploadLabel} ({listingForm.galleryImages.length}/12)
                     <input
                       type="file"
-                      accept="image/*"
-                      name="gallery-url"
-                      id="gallery-url"
+                      accept=".png,.jpg,.jpeg,.gif,.webp"
+                      name="gallery-upload"
+                      id="gallery-upload"
                       multiple
                       className="hidden"
                       onChange={(event) => handleGalleryUpload(event.target.files)}
                     />
                   </label>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  <label htmlFor="pending-gallery-url" className="sr-only">Gallery image URL</label>
-                  <input
-                    name="pending-gallery-url"
-                    id="pending-gallery-url"
-                    value={pendingGalleryUrl}
-                    onChange={(event) => setPendingGalleryUrl(event.target.value)}
-                    placeholder="Paste image URL"
-                    className={`flex-1 ${inputFieldClass}`}
-                  />
-                  <button type="button" className="rounded-2xl bg-slate-900/10 px-4 py-2 text-sm font-semibold text-slate-900" onClick={handleAddGalleryUrl}>
-                    {copy.galleryAddButton}
-                  </button>
-                </div>
-                <div className="grid gap-3 sm:grid-cols-3">
+                <div className="grid gap-3 sm:grid-cols-3 md:grid-cols-4">
                   {listingForm.galleryImages.length === 0 && (
-                    <p className="text-sm text-slate-500 sm:col-span-3">{copy.galleryEmpty}</p>
+                    <p className="text-sm text-slate-500 sm:col-span-3 md:col-span-4">{copy.galleryEmpty}</p>
                   )}
                   {listingForm.galleryImages.map((url, index) => (
                     <div key={`${url}-${index}`} className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white">
                       <img src={url} alt={`Gallery ${index + 1}`} className="h-32 w-full object-cover" />
-                      <button type="button" className="absolute right-2 top-2 rounded-full bg-white/90 px-2 py-1 text-xs font-semibold text-rose-500" onClick={() => handleRemoveGalleryImage(index)}>
-                        {copy.galleryRemove}
+                      <button type="button" className="absolute right-2 top-2 rounded-full bg-white/90 px-2 py-1 text-xs font-semibold text-rose-500 hover:bg-rose-100" onClick={() => handleRemoveGalleryImage(index)}>
+                        ✕
                       </button>
+                      {index === 0 && (
+                        <span className="absolute left-2 top-2 rounded-full bg-indigo-500 px-2 py-0.5 text-xs font-semibold text-white">Main</span>
+                      )}
                     </div>
                   ))}
                 </div>
-                <div>
-                  <label htmlFor="listing-video-url" className="text-xs uppercase tracking-wide text-slate-500">{copy.videoLabel}</label>
-                  <input
-                    name="listing-video-url"
-                    id="listing-video-url"
-                    value={listingForm.videoUrl}
-                    onChange={(event) => handleListingInput('videoUrl', event.target.value)}
-                    placeholder="https://www.youtube.com/watch?v=..."
-                    className={`mt-1 w-full ${inputFieldClass}`}
-                  />
+                {/* Video Upload Section */}
+                <div className="mt-4 border-t border-slate-200 pt-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-900">{copy.videoLabel}</p>
+                      <p className="text-xs text-slate-500">Upload up to 2 videos (MP4, MOV, AVI, MKV, WEBM - Max 100MB each)</p>
+                    </div>
+                    <label className="cursor-pointer rounded-2xl border border-dashed border-slate-300 px-3 py-2 text-xs font-semibold text-slate-900 hover:bg-slate-100">
+                      🎥 Upload Video ({listingForm.videoUrls.length}/2)
+                      <input
+                        type="file"
+                        accept=".mp4,.mov,.avi,.mkv,.webm"
+                        name="video-upload"
+                        id="video-upload"
+                        multiple
+                        className="hidden"
+                        onChange={(event) => handleVideoUpload(event.target.files)}
+                      />
+                    </label>
+                  </div>
+                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                    {listingForm.videoUrls.length === 0 && (
+                      <p className="text-sm text-slate-500 sm:col-span-2">No videos uploaded yet</p>
+                    )}
+                    {listingForm.videoUrls.map((url, index) => (
+                      <div key={`video-${url}-${index}`} className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                        <video src={url} className="h-32 w-full object-cover" controls />
+                        <button type="button" className="absolute right-2 top-2 rounded-full bg-white/90 px-2 py-1 text-xs font-semibold text-rose-500 hover:bg-rose-100" onClick={() => handleRemoveVideo(index)}>
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
               {priceEstimate && (
@@ -2448,7 +2843,7 @@ export function AppView() {
       <div className="relative z-10">
       {renderToast()}
       <header className={`sticky top-0 z-50 border-b backdrop-blur-md transition-colors duration-300 ${headerSurfaceClass} ${subtleBorderClass}`}>
-        <div className="mx-auto flex h-28 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+        <div className="mx-auto flex h-32 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-8">
             {/* Logo */}
             <div
@@ -2458,7 +2853,7 @@ export function AppView() {
               <img
                 src="/IntelliWheels.svg"
                 alt="IntelliWheels"
-                className="h-24 w-auto object-contain transition-transform group-hover:scale-105"
+                className="h-32 w-auto object-contain transition-transform group-hover:scale-105 drop-shadow-lg"
               />
             </div>
 
