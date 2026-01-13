@@ -237,6 +237,12 @@ def _init_postgres_tables(db):
         )
     ''')
     
+    # Migration: Add odometer_km column if it doesn't exist
+    try:
+        cursor.execute("ALTER TABLE cars ADD COLUMN IF NOT EXISTS odometer_km INTEGER")
+    except Exception as e:
+        print(f"[DB] Migration note: {e}")
+    
     db._connection.commit()
     print("[DB] PostgreSQL tables initialized")
 
@@ -340,6 +346,13 @@ def _init_sqlite_tables(db):
             UNIQUE(car_id, user_id)
         )
     ''')
+    
+    # Migration: Add odometer_km column if it doesn't exist (SQLite doesn't support IF NOT EXISTS for ALTER)
+    try:
+        cursor.execute("ALTER TABLE cars ADD COLUMN odometer_km INTEGER")
+    except Exception as e:
+        # Column likely already exists
+        pass
     
     db.commit()
     print("[DB] SQLite tables initialized")
