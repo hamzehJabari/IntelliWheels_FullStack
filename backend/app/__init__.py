@@ -40,7 +40,7 @@ def create_app(test_config=None):
         SECRET_KEY=secret_key,
         DATABASE=db_path,
         UPLOAD_FOLDER=os.path.join(app.root_path, '..', 'uploads'),
-        MAX_CONTENT_LENGTH=16 * 1024 * 1024,  # 16MB max upload
+        MAX_CONTENT_LENGTH=500 * 1024 * 1024,  # 500MB max upload for 4K videos
         # Security settings
         SESSION_COOKIE_SECURE=os.environ.get('FLASK_ENV') == 'production',
         SESSION_COOKIE_HTTPONLY=True,

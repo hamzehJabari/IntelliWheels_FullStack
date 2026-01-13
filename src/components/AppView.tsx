@@ -1147,10 +1147,10 @@ export function AppView() {
   const handleVideoUpload = async (fileList: FileList | null) => {
     if (!requireAuth() || !fileList || fileList.length === 0) return;
     try {
-      // Calculate remaining slots (max 2 videos)
-      const remainingSlots = 2 - listingForm.videoUrls.length;
+      // Calculate remaining slots (max 4 videos)
+      const remainingSlots = 4 - listingForm.videoUrls.length;
       if (remainingSlots <= 0) {
-        showToast('Maximum 2 videos allowed', 'info');
+        showToast('Maximum 4 videos allowed', 'info');
         return;
       }
       const uploads = Array.from(fileList).slice(0, remainingSlots);
@@ -1162,7 +1162,7 @@ export function AppView() {
       }
       if (!uploadedUrls.length) return;
       setListingForm((prev) => {
-        const combined = [...prev.videoUrls, ...uploadedUrls].slice(0, 2);
+        const combined = [...prev.videoUrls, ...uploadedUrls].slice(0, 4);
         return { ...prev, videoUrls: combined };
       });
       showToast(`${uploadedUrls.length} video(s) uploaded`);
@@ -1299,6 +1299,13 @@ export function AppView() {
 
   const handleStartEditListing = (car: Car) => {
     setEditingListing(car);
+    // Collect all videos from mediaGallery and videoUrl
+    const mediaVideos = car.mediaGallery?.filter(m => m.type === 'video').map(m => m.url) || [];
+    const allVideos = car.videoUrl ? [car.videoUrl, ...mediaVideos.filter(v => v !== car.videoUrl)] : mediaVideos;
+    // Collect all images from galleryImages and mediaGallery
+    const mediaImages = car.mediaGallery?.filter(m => m.type === 'image').map(m => m.url) || [];
+    const allImages = [...(car.galleryImages || []), ...mediaImages.filter(img => !(car.galleryImages || []).includes(img))];
+    
     setEditForm({
       make: car.make || '',
       model: car.model || '',
@@ -1311,8 +1318,8 @@ export function AppView() {
       fuelEconomy: car.specs?.fuelEconomy || '',
       odometer: car.odometerKm?.toString() || '',
       image: car.image || '',
-      galleryImages: car.galleryImages || [],
-      videoUrls: car.mediaGallery?.filter(m => m.type === 'video').map(m => m.url) || [],
+      galleryImages: allImages,
+      videoUrls: allVideos,
       description: car.description || '',
     });
   };
@@ -1350,9 +1357,9 @@ export function AppView() {
   const handleEditVideoUpload = async (fileList: FileList | null) => {
     if (!requireAuth() || !fileList || fileList.length === 0) return;
     try {
-      const remainingSlots = 2 - editForm.videoUrls.length;
+      const remainingSlots = 4 - editForm.videoUrls.length;
       if (remainingSlots <= 0) {
-        showToast('Maximum 2 videos allowed', 'info');
+        showToast('Maximum 4 videos allowed', 'info');
         return;
       }
       const uploads = Array.from(fileList).slice(0, remainingSlots);
@@ -1363,7 +1370,7 @@ export function AppView() {
       }
       if (!uploadedUrls.length) return;
       setEditForm((prev) => {
-        const combined = [...prev.videoUrls, ...uploadedUrls].slice(0, 2);
+        const combined = [...prev.videoUrls, ...uploadedUrls].slice(0, 4);
         return { ...prev, videoUrls: combined };
       });
       showToast(`${uploadedUrls.length} video(s) uploaded`);

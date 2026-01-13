@@ -117,12 +117,12 @@ def upload_video():
     if not allowed_video_file(file.filename):
         return jsonify({'success': False, 'error': 'File type not allowed. Allowed: mp4, mov, avi, mkv, webm'}), 400
     
-    # Check file size (max 100MB for videos)
+    # Check file size (max 500MB for 4K videos)
     file.seek(0, 2)  # Seek to end
     file_size = file.tell()
     file.seek(0)  # Seek back to start
-    if file_size > 100 * 1024 * 1024:
-        return jsonify({'success': False, 'error': 'Video file too large. Maximum size is 100MB'}), 400
+    if file_size > 500 * 1024 * 1024:
+        return jsonify({'success': False, 'error': 'Video file too large. Maximum size is 500MB'}), 400
     
     # Generate unique filename
     ext = file.filename.rsplit('.', 1)[1].lower()

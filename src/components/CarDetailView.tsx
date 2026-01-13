@@ -190,9 +190,19 @@ export function CarDetailView({ carId }: CarDetailViewProps) {
 
   const activeImage = gallery[activeIndex] || heroImage;
   const hasMultipleImages = gallery.length > 1;
-  const videoSource = useMemo(() => {
-    if (!car) return null;
-    return car.videoUrl || car.mediaGallery?.find((entry) => entry.type === 'video')?.url || null;
+  
+  // Collect all video URLs from both videoUrl and mediaGallery
+  const videoSources = useMemo(() => {
+    if (!car) return [];
+    const videos: string[] = [];
+    if (car.videoUrl) videos.push(car.videoUrl);
+    const mediaVideos = (car.mediaGallery || [])
+      .filter((entry) => entry.type === 'video' && entry.url)
+      .map((entry) => entry.url);
+    mediaVideos.forEach((v) => {
+      if (!videos.includes(v)) videos.push(v);
+    });
+    return videos;
   }, [car]);
 
   const descriptionText = useMemo(() => buildDescriptionCopy(car), [car]);
@@ -373,11 +383,17 @@ export function CarDetailView({ carId }: CarDetailViewProps) {
                   )}
                 </div>
               )}
-              {videoSource && (
+              {videoSources.length > 0 && (
                 <div className="rounded-2xl border border-slate-100 p-4">
-                  <p className="text-sm font-semibold text-slate-900">Video spotlight</p>
-                  <div className="mt-3 overflow-hidden rounded-2xl border border-slate-200 bg-black/80">
-                    {renderVideoEmbed(videoSource)}
+                  <p className="text-sm font-semibold text-slate-900">
+                    {videoSources.length === 1 ? 'Video spotlight' : `Videos (${videoSources.length})`}
+                  </p>
+                  <div className="mt-3 space-y-4">
+                    {videoSources.map((videoUrl, idx) => (
+                      <div key={idx} className="overflow-hidden rounded-2xl border border-slate-200 bg-black/80">
+                        {renderVideoEmbed(videoUrl)}
+                      </div>
+                    ))}
                   </div>
                 </div>
               )}
@@ -640,23 +656,9 @@ function buildDescriptionCopy(car: Car | null) {
 }
 
 function buildFallbackGallery(car: Car | null, existing: string[]) {
-  if (!car) return [];
-  const MIN_GALLERY_SIZE = 3;
-  if (existing.length >= MIN_GALLERY_SIZE) {
-    return [];
-  }
-  const views = ['front', '45', 'rear'];
-  const stockAngles: string[] = [];
-  for (const angle of views) {
-    if (existing.length + stockAngles.length >= MIN_GALLERY_SIZE) {
-      break;
-    }
-    const url = buildStockImageUrl(car, angle);
-    if (url && !existing.includes(url) && !stockAngles.includes(url)) {
-      stockAngles.push(url);
-    }
-  }
-  return stockAngles;
+  // Don't add fallback/stock images - only show actual uploaded images
+  // Users want to see only their uploaded photos, not placeholder stock images
+  return [];
 }
 
 function buildStockImageUrl(car: Car, angle: string) {
