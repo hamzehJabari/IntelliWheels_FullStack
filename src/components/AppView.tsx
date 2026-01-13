@@ -2843,7 +2843,7 @@ export function AppView() {
       <div className="relative z-10">
       {renderToast()}
       <header className={`sticky top-0 z-50 border-b backdrop-blur-md transition-colors duration-300 ${headerSurfaceClass} ${subtleBorderClass}`}>
-        <div className="mx-auto flex h-32 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+        <div className="mx-auto flex h-72 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-8">
             {/* Logo */}
             <div
@@ -2853,7 +2853,7 @@ export function AppView() {
               <img
                 src="/IntelliWheels.svg"
                 alt="IntelliWheels"
-                className="h-32 w-auto object-contain transition-transform group-hover:scale-105 drop-shadow-lg"
+                className="h-80 w-auto object-contain transition-transform group-hover:scale-105 drop-shadow-lg"
               />
             </div>
 
