@@ -6,7 +6,6 @@ from ..security import (
     sanitize_string, rate_limit, validate_json_request
 )
 import secrets
-import sqlite3
 from datetime import datetime, timedelta
 
 bp = Blueprint('auth', __name__, url_prefix='/api/auth')
@@ -94,9 +93,10 @@ def signup():
             }
         }), 201
 
-    except sqlite3.IntegrityError:
-        return jsonify({'success': False, 'error': 'Username or email already exists'}), 409
     except Exception as e:
+        error_str = str(e).lower()
+        if 'unique' in error_str or 'duplicate' in error_str or 'integrity' in error_str:
+            return jsonify({'success': False, 'error': 'Username or email already exists'}), 409
         # Don't expose internal errors to users
         print(f"Signup error: {e}")
         return jsonify({'success': False, 'error': 'Registration failed. Please try again.'}), 500

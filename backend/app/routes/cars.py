@@ -2,7 +2,6 @@ from flask import Blueprint, request, jsonify, current_app
 from ..db import get_db
 from ..security import sanitize_string, sanitize_search_query, validate_text_field, validate_integer, validate_float, require_auth
 import json
-import sqlite3
 
 bp = Blueprint('cars', __name__, url_prefix='/api/cars')
 

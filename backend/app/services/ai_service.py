@@ -336,26 +336,17 @@ Be helpful, concise, and knowledgeable about cars."""
 
     def semantic_search(self, query, limit):
         """Search cars using semantic scoring - always returns results ranked by relevance."""
-        import sqlite3
         import re
-        from flask import current_app
+        from ..db import get_db
         
         try:
-            db_path = current_app.config.get('DATABASE')
-            if not db_path:
-                print("[Semantic Search] ERROR: No DATABASE config found")
-                return []
-            
-            print(f"[Semantic Search] Connecting to DB: {db_path}")
-            conn = sqlite3.connect(db_path)
-            conn.row_factory = sqlite3.Row
-            cursor = conn.cursor()
+            db = get_db()
+            print(f"[Semantic Search] Using shared DB connection")
             
             # Get ALL cars from database to score them
-            cursor.execute("SELECT id, make, model, year, price, currency, image_url, specs FROM cars")
+            cursor = db.execute("SELECT id, make, model, year, price, currency, image_url, specs FROM cars")
             all_cars = cursor.fetchall()
             print(f"[Semantic Search] Total cars in DB: {len(all_cars)}")
-            conn.close()
             
             if not all_cars:
                 return []
