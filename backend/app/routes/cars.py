@@ -26,6 +26,9 @@ def car_row_to_dict(row):
     # Map video_url to videoUrl for frontend
     if d.get('video_url'):
         d['videoUrl'] = d['video_url']
+    # Map odometer_km to odometerKm for frontend
+    if d.get('odometer_km') is not None:
+        d['odometerKm'] = d['odometer_km']
     return d
 
 @bp.route('', methods=['GET'])
@@ -127,6 +130,14 @@ def create_car():
     currency = sanitize_string(data.get('currency', 'JOD'))[:10]
     description = sanitize_string(data.get('description', ''))[:5000]
     
+    # Handle odometer
+    odometer_km = data.get('odometerKm')
+    if odometer_km is not None:
+        valid, error = validate_integer(odometer_km, 'Odometer', min_val=0, max_val=10000000)
+        if not valid:
+            return jsonify({'success': False, 'error': error}), 400
+        odometer_km = int(odometer_km)
+    
     # Handle specs as JSON
     specs = data.get('specs', {})
     if not isinstance(specs, dict):
@@ -150,9 +161,9 @@ def create_car():
     db = get_db()
     try:
         cursor = db.execute(
-            '''INSERT INTO cars (owner_id, make, model, year, price, currency, description, specs, image_url, video_url, gallery_images, media_gallery)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
-            (owner_id, make, model, year, price, currency, description, json.dumps(specs), image_url, video_url, json.dumps(gallery_images), json.dumps(media_gallery))
+            '''INSERT INTO cars (owner_id, make, model, year, price, currency, odometer_km, description, specs, image_url, video_url, gallery_images, media_gallery)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+            (owner_id, make, model, year, price, currency, odometer_km, description, json.dumps(specs), image_url, video_url, json.dumps(gallery_images), json.dumps(media_gallery))
         )
         db.commit()
         return jsonify({'success': True, 'id': cursor.lastrowid}), 201
@@ -260,8 +271,14 @@ def update_car(id):
         params.append(json.dumps(media_gallery))
     
     if 'odometerKm' in data:
-        # Note: This field might need to be added to the schema
-        pass
+        odometer_km = data['odometerKm']
+        if odometer_km is not None:
+            valid, error = validate_integer(odometer_km, 'Odometer', min_val=0, max_val=10000000)
+            if not valid:
+                return jsonify({'success': False, 'error': error}), 400
+            odometer_km = int(odometer_km)
+        updates.append("odometer_km = ?")
+        params.append(odometer_km)
     
     if not updates:
         return jsonify({'success': False, 'error': 'No fields to update'}), 400

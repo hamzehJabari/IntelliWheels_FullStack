@@ -1147,10 +1147,10 @@ export function AppView() {
   const handleVideoUpload = async (fileList: FileList | null) => {
     if (!requireAuth() || !fileList || fileList.length === 0) return;
     try {
-      // Calculate remaining slots (max 4 videos)
-      const remainingSlots = 4 - listingForm.videoUrls.length;
+      // Calculate remaining slots (max 2 videos)
+      const remainingSlots = 2 - listingForm.videoUrls.length;
       if (remainingSlots <= 0) {
-        showToast('Maximum 4 videos allowed', 'info');
+        showToast('Maximum 2 videos allowed', 'info');
         return;
       }
       const uploads = Array.from(fileList).slice(0, remainingSlots);
@@ -1162,7 +1162,7 @@ export function AppView() {
       }
       if (!uploadedUrls.length) return;
       setListingForm((prev) => {
-        const combined = [...prev.videoUrls, ...uploadedUrls].slice(0, 4);
+        const combined = [...prev.videoUrls, ...uploadedUrls].slice(0, 2);
         return { ...prev, videoUrls: combined };
       });
       showToast(`${uploadedUrls.length} video(s) uploaded`);
@@ -1357,9 +1357,9 @@ export function AppView() {
   const handleEditVideoUpload = async (fileList: FileList | null) => {
     if (!requireAuth() || !fileList || fileList.length === 0) return;
     try {
-      const remainingSlots = 4 - editForm.videoUrls.length;
+      const remainingSlots = 2 - editForm.videoUrls.length;
       if (remainingSlots <= 0) {
-        showToast('Maximum 4 videos allowed', 'info');
+        showToast('Maximum 2 videos allowed', 'info');
         return;
       }
       const uploads = Array.from(fileList).slice(0, remainingSlots);
@@ -1370,7 +1370,7 @@ export function AppView() {
       }
       if (!uploadedUrls.length) return;
       setEditForm((prev) => {
-        const combined = [...prev.videoUrls, ...uploadedUrls].slice(0, 4);
+        const combined = [...prev.videoUrls, ...uploadedUrls].slice(0, 2);
         return { ...prev, videoUrls: combined };
       });
       showToast(`${uploadedUrls.length} video(s) uploaded`);

@@ -190,20 +190,33 @@ export function CarDetailView({ carId }: CarDetailViewProps) {
 
   const activeImage = gallery[activeIndex] || heroImage;
   const hasMultipleImages = gallery.length > 1;
+
+  // Helper to resolve video URLs (same as images but for videos)
+  const resolveVideoUrl = useCallback(
+    (src?: string | null) => {
+      if (!src) return '';
+      // External URLs or data URIs remain as-is
+      if (src.startsWith('http') || src.startsWith('data:')) return src;
+      // Local paths need API host prefix
+      if (!apiHost) return src;
+      return `${apiHost}${src.startsWith('/') ? src : `/${src}`}`;
+    },
+    [apiHost]
+  );
   
   // Collect all video URLs from both videoUrl and mediaGallery
   const videoSources = useMemo(() => {
     if (!car) return [];
     const videos: string[] = [];
-    if (car.videoUrl) videos.push(car.videoUrl);
+    if (car.videoUrl) videos.push(resolveVideoUrl(car.videoUrl));
     const mediaVideos = (car.mediaGallery || [])
       .filter((entry) => entry.type === 'video' && entry.url)
-      .map((entry) => entry.url);
+      .map((entry) => resolveVideoUrl(entry.url));
     mediaVideos.forEach((v) => {
-      if (!videos.includes(v)) videos.push(v);
+      if (v && !videos.includes(v)) videos.push(v);
     });
-    return videos;
-  }, [car]);
+    return videos.filter(Boolean);
+  }, [car, resolveVideoUrl]);
 
   const descriptionText = useMemo(() => buildDescriptionCopy(car), [car]);
 
@@ -227,22 +240,32 @@ export function CarDetailView({ carId }: CarDetailViewProps) {
     return () => window.removeEventListener('keydown', handler);
   }, [gallery.length, isFullscreen]);
 
-  const renderVideoEmbed = (url: string) => {
+  const renderVideoEmbed = (url: string, index: number) => {
     if (!url) return null;
     const youtubeMatch = url.match(/(?:v=|youtu\.be\/|embed\/)([\w-]+)/i);
     if (youtubeMatch) {
       return (
         <iframe
-          title="car-video"
+          title={`car-video-${index}`}
           src={`https://www.youtube.com/embed/${youtubeMatch[1]}`}
-          className="h-64 w-full"
+          className="aspect-video h-auto w-full"
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
           allowFullScreen
         />
       );
     }
-    if (/\.(mp4|webm|ogg)$/i.test(url)) {
-      return <video controls src={url} className="h-64 w-full rounded-2xl object-cover" />;
+    // Handle uploaded videos (mp4, webm, ogg, mov, etc.)
+    if (/\.(mp4|webm|ogg|mov|avi|mkv)$/i.test(url) || url.includes('/uploads/')) {
+      return (
+        <video 
+          controls 
+          src={url} 
+          className="aspect-video h-auto w-full rounded-2xl bg-black object-contain"
+          preload="metadata"
+        >
+          Your browser does not support the video tag.
+        </video>
+      );
     }
     return (
       <a href={url} target="_blank" rel="noreferrer" className="text-sky-500 underline">
@@ -388,10 +411,10 @@ export function CarDetailView({ carId }: CarDetailViewProps) {
                   <p className="text-sm font-semibold text-slate-900">
                     {videoSources.length === 1 ? 'Video spotlight' : `Videos (${videoSources.length})`}
                   </p>
-                  <div className="mt-3 space-y-4">
+                  <div className="mt-3 grid gap-4 md:grid-cols-2">
                     {videoSources.map((videoUrl, idx) => (
-                      <div key={idx} className="overflow-hidden rounded-2xl border border-slate-200 bg-black/80">
-                        {renderVideoEmbed(videoUrl)}
+                      <div key={idx} className="overflow-hidden rounded-2xl border border-slate-200 bg-black">
+                        {renderVideoEmbed(videoUrl, idx)}
                       </div>
                     ))}
                   </div>
