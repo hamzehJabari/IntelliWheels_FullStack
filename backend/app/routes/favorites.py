@@ -39,6 +39,23 @@ def add_favorite():
         return jsonify({'success': False, 'error': 'car_id required'}), 400
 
     db = get_db()
+    
+    # Ensure favorites table exists
+    try:
+        db.execute('''
+            CREATE TABLE IF NOT EXISTS favorites (
+                user_id INTEGER NOT NULL,
+                car_id INTEGER NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (user_id, car_id),
+                FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+                FOREIGN KEY (car_id) REFERENCES cars (id) ON DELETE CASCADE
+            )
+        ''')
+        db.commit()
+    except Exception as e:
+        print(f"Favorites table creation note: {e}")
+
     try:
         db.execute('INSERT OR IGNORE INTO favorites (user_id, car_id) VALUES (?, ?)', (user['id'], car_id))
         db.commit()

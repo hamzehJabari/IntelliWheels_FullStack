@@ -214,8 +214,8 @@ class AIService:
         if not self.gemini_model:
             error = getattr(self, '_init_error', 'Unknown error')
             if 'Invalid API key' in error:
-                return f"AI service error: Your Gemini API key is invalid. Please update it in the Render dashboard with a valid key from https://aistudio.google.com/app/apikey"
-            return f"I am the IntelliWheels AI Assistant. The AI service is currently unavailable. Error: {error}"
+                return {'text': f"AI service error: Your Gemini API key is invalid. Please update it in the Render dashboard with a valid key from https://aistudio.google.com/app/apikey"}
+            return {'text': f"I am the IntelliWheels AI Assistant. The AI service is currently unavailable. Error: {error}"}
 
         try:
             # Detect if message is in Arabic
@@ -245,6 +245,19 @@ class AIService:
 - تحليل صور السيارات
 
 مهم: جميع الأسعار بالدينار الأردني. هذا سوق أردني.
+إذا أراد المستخدم بيع أو عرض سيارة، أو قدم تفاصيل (صورة، سعر، وصف) لغرض البيع، يجب عليك استخراج التفاصيل وإرجاع كتلة JSON في نهاية ردك بالشكل التالي:
+```json_listing
+{
+  "make": "Company",
+  "model": "Model",
+  "year": 2020,
+  "price": 10000,
+  "currency": "JOD",
+  "description": "...",
+  "specs": { "color": "...", "transmission": "...", "odometer": 0 }
+}
+```
+
 مرجع أسعار السيارات المستعملة في الأردن:
 - اقتصادية (تويوتا ياريس، هوندا سيتي): 5,000 - 12,000 دينار
 - متوسطة (تويوتا كامري، هوندا أكورد): 8,000 - 20,000 دينار
@@ -262,6 +275,19 @@ You help users:
 - Analyze car images
 
 IMPORTANT: All prices must be in JOD (Jordanian Dinar). This is a Jordanian marketplace.
+If the user wants to list/sell a car, or provides car details (image, price, description) for listing, you MUST extract the vehicle details and return a JSON block at the very end of your response like this:
+```json_listing
+{
+  "make": "Toyota",
+  "model": "Camry",
+  "year": 2020,
+  "price": 15000,
+  "currency": "JOD",
+  "description": "...",
+  "specs": { "color": "white", "transmission": "automatic", "odometer": 50000 }
+}
+```
+
 Price references for used cars in Jordan:
 - Economy (Toyota Yaris, Honda City): 5,000 - 12,000 JOD
 - Mid-range (Toyota Camry, Honda Accord): 8,000 - 20,000 JOD  
@@ -302,24 +328,43 @@ Be helpful, concise, and knowledgeable about cars."""
                         prompt_parts.append("Please analyze this car image and provide details about the vehicle:")
                     prompt_parts.append(image_part)
                     
-                    response = self.gemini_model.generate_content(prompt_parts)
+                    response_obj = self.gemini_model.generate_content(prompt_parts)
                 except Exception as e:
                     print(f"Image processing error: {e}")
                     # Fall back to text-only if image fails
                     if message:
-                        response = self.gemini_model.generate_content([
+                        response_obj = self.gemini_model.generate_content([
                             system_prompt,
                             "\\n".join(contents)
                         ])
                     else:
-                        return f"I couldn't process that image. Error: {str(e)[:100]}"
+                        return {'text': f"I couldn't process that image. Error: {str(e)[:100]}"}
             else:
-                response = self.gemini_model.generate_content([
+                response_obj = self.gemini_model.generate_content([
                     system_prompt,
                     "\\n".join(contents)
                 ])
             
-            return response.text
+            # Parse response for listing intent
+            response_text = response_obj.text
+            listing_data = None
+            
+            if '```json_listing' in response_text:
+                try:
+                    import re
+                    match = re.search(r'```json_listing\s*({.*?})\s*```', response_text, re.DOTALL)
+                    if match:
+                        json_str = match.group(1)
+                        listing_data = json.loads(json_str)
+                        # Remove the JSON block from the user-facing text
+                        response_text = response_text.replace(match.group(0), '').strip()
+                except Exception as e:
+                    print(f"Failed to parse listing JSON: {e}")
+
+            return {
+                'text': response_text,
+                'listing_data': listing_data
+            }
             
         except Exception as e:
             error_msg = str(e)
@@ -327,12 +372,12 @@ Be helpful, concise, and knowledgeable about cars."""
             # Provide clear error messages - prioritize API key errors
             error_lower = error_msg.lower()
             if any(x in error_lower for x in ['api_key', 'api key', 'invalid', 'authentication', '400', '401', '403']):
-                return "AI service error: The API key needs to be updated. Please contact support or update GEMINI_API_KEY in your environment."
+                return {'text': "AI service error: The API key needs to be updated. Please contact support or update GEMINI_API_KEY in your environment."}
             elif 'blocked' in error_lower or 'safety' in error_lower:
-                return "I cannot process that request. Please rephrase your question."
+                return {'text': "I cannot process that request. Please rephrase your question."}
             elif 'quota' in error_lower or 'resource' in error_lower:
-                return "AI service temporarily unavailable. Please try again in a few minutes."
-            return f"I encountered an issue: {error_msg[:150]}"
+                return {'text': "AI service temporarily unavailable. Please try again in a few minutes."}
+            return {'text': f"I encountered an issue: {error_msg[:150]}"}
 
     def semantic_search(self, query, limit):
         """Search cars using semantic scoring - always returns results ranked by relevance."""

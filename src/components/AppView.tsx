@@ -596,7 +596,7 @@ export function AppView() {
     backgroundRepeat: 'no-repeat',
   };
   const headerSurfaceClass = resolvedTheme === 'dark'
-    ? 'bg-slate-950/95 border-b border-slate-800/60 text-slate-100'
+    ? 'bg-slate-800/95 border-b border-slate-700/60 text-slate-100'
     : 'bg-slate-100/95 border-b border-slate-300/60 text-slate-900';
   const mainSurfaceClass = resolvedTheme === 'dark'
     ? 'border-slate-800 bg-slate-900/80 text-slate-100'

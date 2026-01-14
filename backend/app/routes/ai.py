@@ -41,8 +41,17 @@ def chatbot():
     if image_base64 and len(image_base64) > 10 * 1024 * 1024:  # 10MB limit
         return jsonify({'success': False, 'error': 'Image too large'}), 400
     
-    response = ai_service.chat(query, history, image_base64)
-    return jsonify({'success': True, 'response': response})
+    result = ai_service.chat(query, history, image_base64)
+    
+    if isinstance(result, dict):
+        return jsonify({
+            'success': True, 
+            'response': result.get('text', ''),
+            'listing_data': result.get('listing_data'),
+            'action_type': 'create_listing' if result.get('listing_data') else None
+        })
+    
+    return jsonify({'success': True, 'response': result})
 
 @bp.route('/price-estimate', methods=['POST'])
 def price_estimate():
