@@ -1474,6 +1474,56 @@ export function AppView() {
     }
   };
 
+  const handleCreateListingFromChat = async (listingData: any, messageIndex: number) => {
+    if (!requireAuth()) return;
+    
+    try {
+        showToast('Processing listing...', 'info');
+        
+        // Look for image attachment in history
+        let imageUrl = '';
+        const previousMessages = chatMessages.slice(0, messageIndex + 1).reverse();
+        const lastUserMsgWithImage = previousMessages.find(m => m.role === 'user' && m.attachmentUrl);
+        
+        if (lastUserMsgWithImage && lastUserMsgWithImage.attachmentUrl) {
+             try {
+                 const response = await fetch(lastUserMsgWithImage.attachmentUrl);
+                 const blob = await response.blob();
+                 const file = new File([blob], "listing-image.jpg", { type: blob.type });
+                 imageUrl = await uploadListingImage(file);
+             } catch (e) {
+                 console.warn("Failed to upload image from chat:", e);
+             }
+        }
+        
+        const payload: Partial<Car> = {
+            make: listingData.make,
+            model: listingData.model,
+            year: Number(listingData.year),
+            price: Number(listingData.price),
+            currency: listingData.currency || 'JOD',
+            description: listingData.description,
+            image: imageUrl, 
+            specs: listingData.specs,
+            listing_type: 'sale'
+        };
+        
+        await createListing(payload, token);
+        showToast('Listing created successfully!');
+        
+        // Refresh my listings
+        const data = await fetchMyListings(token);
+        if (data.success) {
+            setMyListings(data.cars);
+        }
+        setActivePage('myListings');
+        
+    } catch (error: any) {
+        console.error('Failed to create listing from chat', error);
+        showToast(error.message || 'Failed to create listing', 'error');
+    }
+  };
+
   const handleChatSubmit = async () => {
     if (!requireAuth()) return;
     const message = chatInput.trim();
@@ -1505,19 +1555,16 @@ export function AppView() {
         .filter((msg) => msg.role === 'user' || msg.role === 'assistant')
         .map((msg) => ({ role: msg.role === 'user' ? 'user' : 'bot', text: msg.text }));
 
-      const response =
-        assistantMode === 'listing'
-          ? await handleListingAssistantMessage({ query: message, history: historyPayload }, token, controller.signal)
-          : await handleChatbotMessage(
-            {
-              query: message,
-              history: historyPayload,
-              imageBase64: attachmentData?.base64,
-              imageMimeType: attachmentData?.mime,
-            },
-            token,
-            controller.signal
-          );
+      const response = await handleChatbotMessage(
+        {
+          query: message,
+          history: historyPayload,
+          imageBase64: attachmentData?.base64,
+          imageMimeType: attachmentData?.mime,
+        },
+        token,
+        controller.signal
+      );
 
       const assistantMessage: ChatMessage = {
         id: `assistant-${Date.now()}`,
@@ -1884,17 +1931,6 @@ export function AppView() {
           </div>
         </div>
         <div className="border-t border-slate-100 p-4">
-          <label className="mb-2 block text-xs font-medium uppercase tracking-wide text-slate-400">{copy.chatMode}</label>
-          <select
-            name="assistant-mode"
-            id="assistant-mode"
-            value={assistantMode}
-            onChange={(event) => setAssistantMode(event.target.value as 'general' | 'listing')}
-            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
-          >
-            <option value="general">{copy.chatModeGeneral}</option>
-            <option value="listing">{copy.chatModeListing}</option>
-          </select>
         </div>
       </div>
 
@@ -1910,7 +1946,7 @@ export function AppView() {
             </div>
             <div>
               <h2 className="font-semibold text-slate-900">{copy.chatAssistantName}</h2>
-              <p className="text-xs text-slate-500">{assistantMode === 'listing' ? copy.chatListingAssistant : copy.chatGeneralAssistant}</p>
+              <p className="text-xs text-slate-500">{copy.chatGeneralAssistant}</p>
             </div>
           </div>
           {chatBusy && (
@@ -1950,7 +1986,7 @@ export function AppView() {
             </div>
           ) : (
             <div className="mx-auto max-w-3xl space-y-6">
-              {chatMessages.map((msg) => (
+              {chatMessages.map((msg, idx) => (
                 <div
                   key={msg.id}
                   className={`flex gap-4 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}
@@ -1983,13 +2019,19 @@ export function AppView() {
                         <p className="mb-2 font-semibold text-slate-900">{copy.chatProposedListing}</p>
                         <div className="space-y-1 text-slate-600">
                           {Object.entries(msg.listingData).map(([key, value]) =>
-                            value ? (
+                            value && key !== 'specs' ? (
                               <p key={key}>
                                 <span className="font-medium">{camelToTitle(key)}:</span> {String(value)}
                               </p>
                             ) : null
                           )}
                         </div>
+                        <button
+                          onClick={() => handleCreateListingFromChat(msg.listingData, idx)}
+                          className="mt-3 w-full rounded-lg bg-emerald-600 py-2 text-xs font-semibold text-white hover:bg-emerald-700"
+                        >
+                          Create Listing Now
+                        </button>
                       </div>
                     )}
                     <p className="mt-1 text-xs text-slate-400">

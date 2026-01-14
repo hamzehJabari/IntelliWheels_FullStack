@@ -1,7 +1,7 @@
 'use client';
 
 import { useAuth } from '@/context/AuthContext';
-import { fetchCarById, fetchCarReviews, submitReview, deleteReview } from '@/lib/api';
+import { fetchCarById, fetchCarReviews, submitReview, deleteReview, fetchFavorites, addFavorite, removeFavorite } from '@/lib/api';
 import { Car, Review, ReviewStats } from '@/lib/types';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -17,6 +17,10 @@ export function CarDetailView({ carId }: CarDetailViewProps) {
   const [car, setCar] = useState<Car | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // Favorites state
+  const [isFavorited, setIsFavorited] = useState(false);
+  const [favLoading, setFavLoading] = useState(false);
   
   // Reviews state
   const [reviews, setReviews] = useState<Review[]>([]);
@@ -103,6 +107,42 @@ export function CarDetailView({ carId }: CarDetailViewProps) {
     loadReviews();
   }, [numericId]);
 
+  // Check favourite status
+  useEffect(() => {
+    if (!token || !Number.isFinite(numericId)) return;
+    async function checkFav() {
+      try {
+        const response = await fetchFavorites(token);
+        if (response.success && response.cars) {
+          setIsFavorited(response.cars.some(c => c.id === numericId));
+        }
+      } catch (err) {
+        console.warn('Failed to check favorites:', err);
+      }
+    }
+    checkFav();
+  }, [numericId, token]);
+
+  const handleToggleFavorite = async () => {
+    if (!token) return; // Should show auth prompt ideally
+    setFavLoading(true);
+    const wasFavorited = isFavorited;
+    setIsFavorited(!wasFavorited); // Optimistic update
+    
+    try {
+      if (wasFavorited) {
+        await removeFavorite(numericId, token);
+      } else {
+        await addFavorite(numericId, token);
+      }
+    } catch (err) {
+      console.error('Failed to toggle favorite:', err);
+      setIsFavorited(wasFavorited); // Revert on error
+    } finally {
+      setFavLoading(false);
+    }
+  };
+
   const handleSubmitReview = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!token) {
@@ -112,7 +152,9 @@ export function CarDetailView({ carId }: CarDetailViewProps) {
     setReviewSubmitting(true);
     setReviewError(null);
     try {
+      console.log('Submitting review:', { carId: numericId, rating: reviewRating, comment: reviewComment });
       const response = await submitReview(numericId, reviewRating, reviewComment, token);
+      console.log('Review response:', response);
       if (response.success) {
         // Refresh reviews
         const refreshed = await fetchCarReviews(numericId);
@@ -124,9 +166,10 @@ export function CarDetailView({ carId }: CarDetailViewProps) {
         setReviewRating(5);
         setShowReviewForm(false);
       } else {
-        setReviewError('Failed to submit review');
+        setReviewError(response.error || 'Failed to submit review');
       }
     } catch (err) {
+      console.error('Review submission error:', err);
       setReviewError(err instanceof Error ? err.message : 'Failed to submit review');
     } finally {
       setReviewSubmitting(false);
@@ -376,14 +419,40 @@ export function CarDetailView({ carId }: CarDetailViewProps) {
             )}
             <div className="space-y-6 p-6">
               <div className="flex flex-wrap items-start justify-between gap-4">
-                <div>
+                <div className="flex-1">
                   <p className="text-sm uppercase tracking-wide text-slate-400">Listing</p>
                   <h1 className="text-3xl font-bold text-slate-900">{car.make} {car.model}</h1>
-                  <p className="text-slate-500">{car.year ?? 'Model year TBD'}</p>
+                  <p className="text-lg text-slate-600">{car.year} • {car.specs?.trim}</p>
                 </div>
-                <div className="rounded-2xl bg-slate-50 px-4 py-3 text-right">
-                  <p className="text-xs uppercase text-slate-400">Price</p>
-                  <p className="text-3xl font-bold text-emerald-600">{formatPrice(car.price, car.currency || 'JOD')}</p>
+                <div className="flex flex-col items-end gap-3">
+                  {!Number.isNaN(Number(car.price)) && (
+                    <div className="text-right">
+                      <p className="text-3xl font-bold text-emerald-600">
+                        {formatPrice(car.price, car.currency)}
+                      </p>
+                    </div>
+                  )}
+                  {/* Heart / Favorite Button */}
+                  <button 
+                    onClick={handleToggleFavorite}
+                    disabled={!token || favLoading}
+                    className={`rounded-full p-3 transition ${
+                      isFavorited 
+                        ? 'bg-rose-50 text-rose-500 hover:bg-rose-100' 
+                        : 'bg-slate-100 text-slate-400 hover:bg-slate-200 hover:text-slate-600'
+                    } ${!token ? 'cursor-not-allowed opacity-50' : ''}`}
+                    title={token ? (isFavorited ? 'Remove from favorites' : 'Add to favorites') : 'Sign in to favorite'}
+                  >
+                    <svg 
+                      className={`h-6 w-6 ${isFavorited ? 'fill-current' : 'fill-none'}`} 
+                      stroke="currentColor" 
+                      viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
                 </div>
               </div>
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
