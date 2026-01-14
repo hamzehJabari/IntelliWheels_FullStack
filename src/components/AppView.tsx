@@ -435,10 +435,63 @@ const LANGUAGE_OPTIONS = [
 
 const CURRENCY_OPTIONS: CurrencyCode[] = ['JOD', 'AED', 'USD', 'EUR', 'GBP', 'SAR', 'QAR', 'BHD', 'KWD', 'OMR'];
 
+const CATEGORY_OPTIONS = [
+  { value: 'all', label: 'All Categories' },
+  { value: 'car', label: 'Cars' },
+  { value: 'suv', label: 'SUVs' },
+  { value: 'truck', label: 'Trucks' },
+  { value: 'bike', label: 'Motorcycles' },
+  { value: 'van', label: 'Vans' },
+  { value: 'bus', label: 'Buses' },
+  { value: 'other', label: 'Other' },
+];
+
+const CONDITION_OPTIONS = [
+  { value: 'new', label: 'New' },
+  { value: 'used', label: 'Used' },
+  { value: 'certified', label: 'Certified Pre-Owned' },
+];
+
+const TRANSMISSION_OPTIONS = [
+  { value: '', label: 'Select Transmission' },
+  { value: 'automatic', label: 'Automatic' },
+  { value: 'manual', label: 'Manual' },
+  { value: 'cvt', label: 'CVT' },
+  { value: 'other', label: 'Other' },
+];
+
+const FUEL_TYPE_OPTIONS = [
+  { value: '', label: 'Select Fuel Type' },
+  { value: 'petrol', label: 'Petrol/Gasoline' },
+  { value: 'diesel', label: 'Diesel' },
+  { value: 'electric', label: 'Electric' },
+  { value: 'hybrid', label: 'Hybrid' },
+  { value: 'plugin_hybrid', label: 'Plug-in Hybrid' },
+  { value: 'lpg', label: 'LPG' },
+  { value: 'other', label: 'Other' },
+];
+
+const REGIONAL_SPEC_OPTIONS = [
+  { value: '', label: 'Select Regional Spec' },
+  { value: 'gcc', label: 'GCC Specs' },
+  { value: 'american', label: 'American Specs' },
+  { value: 'european', label: 'European Specs' },
+  { value: 'japanese', label: 'Japanese Specs' },
+  { value: 'korean', label: 'Korean Specs' },
+  { value: 'other', label: 'Other' },
+];
+
+const PAYMENT_TYPE_OPTIONS = [
+  { value: 'cash', label: 'Cash Only' },
+  { value: 'installments', label: 'Installments Only' },
+  { value: 'both', label: 'Cash or Installments' },
+];
+
 const DEFAULT_FILTERS: CarFilters = {
   make: 'all',
   search: '',
   sort: 'default',
+  category: 'all',
 };
 
 const LISTINGS_PER_PAGE = 10;
@@ -463,6 +516,18 @@ interface ListingFormState {
   galleryImages: string[];
   videoUrls: string[];
   description: string;
+  // New fields
+  category: string;
+  condition: string;
+  exteriorColor: string;
+  interiorColor: string;
+  transmission: string;
+  fuelType: string;
+  regionalSpec: string;
+  paymentType: string;
+  city: string;
+  neighborhood: string;
+  trim: string;
 }
 
 interface VisionSuggestion extends VisionAttributes {
@@ -511,6 +576,17 @@ export function AppView() {
     galleryImages: [],
     videoUrls: [],
     description: '',
+    category: 'car',
+    condition: 'used',
+    exteriorColor: '',
+    interiorColor: '',
+    transmission: '',
+    fuelType: '',
+    regionalSpec: '',
+    paymentType: 'cash',
+    city: '',
+    neighborhood: '',
+    trim: '',
   });
   const [listingForm, setListingForm] = useState<ListingFormState>({
     make: '',
@@ -527,6 +603,17 @@ export function AppView() {
     galleryImages: [],
     videoUrls: [],
     description: '',
+    category: 'car',
+    condition: 'used',
+    exteriorColor: '',
+    interiorColor: '',
+    transmission: '',
+    fuelType: '',
+    regionalSpec: '',
+    paymentType: 'cash',
+    city: '',
+    neighborhood: '',
+    trim: '',
   });
   const [language, setLanguage] = useState<'en' | 'ar'>('en');
   const [isDraggingImage, setIsDraggingImage] = useState(false);
@@ -1225,6 +1312,27 @@ export function AppView() {
   const handleListingSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!requireAuth()) return;
+    
+    // Validate required fields
+    const errors: string[] = [];
+    if (!listingForm.make.trim()) errors.push('Make is required');
+    if (!listingForm.model.trim()) errors.push('Model is required');
+    if (!listingForm.year.trim()) errors.push('Year is required');
+    const yearNum = Number(listingForm.year);
+    if (listingForm.year && (yearNum < 1900 || yearNum > new Date().getFullYear() + 2)) {
+      errors.push('Year must be between 1900 and ' + (new Date().getFullYear() + 2));
+    }
+    if (!listingForm.price.trim()) errors.push('Price is required');
+    const priceNum = Number(listingForm.price);
+    if (listingForm.price && (priceNum < 0 || isNaN(priceNum))) {
+      errors.push('Price must be a valid positive number');
+    }
+    
+    if (errors.length > 0) {
+      showToast(errors.join('. '), 'error');
+      return;
+    }
+    
     setIsSubmittingListing(true);
     try {
       const cleanedGallery = listingForm.galleryImages.filter((url) => Boolean(url?.trim()));
@@ -1237,8 +1345,8 @@ export function AppView() {
       const payload: Partial<Car> = {
         make: listingForm.make,
         model: listingForm.model,
-        year: listingForm.year ? Number(listingForm.year) : undefined,
-        price: listingForm.price ? Number(listingForm.price) : undefined,
+        year: yearNum,
+        price: priceNum,
         currency: listingForm.currency as CurrencyCode,
         odometerKm: listingForm.odometer ? Number(listingForm.odometer) : undefined,
         image: listingForm.image || normalizedGallery[0],
@@ -1252,6 +1360,18 @@ export function AppView() {
           engine: listingForm.engine,
           fuelEconomy: listingForm.fuelEconomy,
         },
+        // New fields
+        category: listingForm.category as any || 'car',
+        condition: listingForm.condition as any || 'used',
+        exteriorColor: listingForm.exteriorColor || undefined,
+        interiorColor: listingForm.interiorColor || undefined,
+        transmission: listingForm.transmission as any || undefined,
+        fuelType: listingForm.fuelType as any || undefined,
+        regionalSpec: listingForm.regionalSpec as any || undefined,
+        paymentType: listingForm.paymentType as any || 'cash',
+        city: listingForm.city || undefined,
+        neighborhood: listingForm.neighborhood || undefined,
+        trim: listingForm.trim || undefined,
       };
       const response = await createListing(payload, token);
       if (response.success) {
@@ -1271,6 +1391,17 @@ export function AppView() {
           galleryImages: [],
           videoUrls: [],
           description: '',
+          category: 'car',
+          condition: 'used',
+          exteriorColor: '',
+          interiorColor: '',
+          transmission: '',
+          fuelType: '',
+          regionalSpec: '',
+          paymentType: 'cash',
+          city: '',
+          neighborhood: '',
+          trim: '',
         });
         setPriceEstimate(null);
         setVisionSuggestion(null);
@@ -1321,6 +1452,17 @@ export function AppView() {
       galleryImages: allImages,
       videoUrls: allVideos,
       description: car.description || '',
+      category: car.category || 'car',
+      condition: car.condition || 'used',
+      exteriorColor: car.exteriorColor || '',
+      interiorColor: car.interiorColor || '',
+      transmission: car.transmission || '',
+      fuelType: car.fuelType || '',
+      regionalSpec: car.regionalSpec || '',
+      paymentType: car.paymentType || 'cash',
+      city: car.city || '',
+      neighborhood: car.neighborhood || '',
+      trim: car.trim || '',
     });
   };
 
@@ -1499,15 +1641,27 @@ export function AppView() {
              }
         }
         
+        // Validate and sanitize listing data
+        const currentYear = new Date().getFullYear();
+        let year = Number(listingData.year);
+        if (!year || year < 1900 || year > currentYear + 2) {
+            year = currentYear; // Default to current year if invalid
+        }
+        
+        let price = Number(listingData.price);
+        if (!price || price < 0) {
+            price = 0; // Default to 0 if invalid (user can edit later)
+        }
+        
         const payload: Partial<Car> = {
-            make: listingData.make,
-            model: listingData.model,
-            year: Number(listingData.year),
-            price: Number(listingData.price),
+            make: listingData.make || 'Unknown',
+            model: listingData.model || 'Unknown',
+            year: year,
+            price: price,
             currency: listingData.currency || 'JOD',
-            description: listingData.description,
+            description: listingData.description || '',
             image: imageUrl, 
-            specs: listingData.specs
+            specs: listingData.specs || {}
         };
         
         await createListing(payload, token);
@@ -2191,7 +2345,12 @@ export function AppView() {
           <div className="space-y-6">
             <div className="grid gap-4 lg:grid-cols-[2fr,1fr]">
               <div className="rounded-3xl border border-slate-100 bg-white p-4 shadow-sm">
-                <div className="grid gap-4 md:grid-cols-3">
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                  <select value={filters.category || 'all'} name="filter-category" id="filter-category" onChange={(event) => setFilters((prev) => ({ ...prev, category: event.target.value as any }))} className={inputFieldClass}>
+                    {CATEGORY_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
                   <select value={filters.make} name="filter-make" id="filter-make" onChange={(event) => setFilters((prev) => ({ ...prev, make: event.target.value }))} className={inputFieldClass}>
                     <option value="all">All Makes</option>
                     {allVehicleMakes.map((make) => (
@@ -2751,6 +2910,49 @@ export function AppView() {
                 />
                 <input name="listing-image" id="listing-image" value={listingForm.image} onChange={(event) => handleListingInput('image', event.target.value)} placeholder="Image URL" className={inputFieldClass} />
               </div>
+              
+              {/* Additional Vehicle Details */}
+              <div className="rounded-2xl border border-slate-200 bg-slate-50/50 p-4">
+                <p className="mb-3 text-sm font-semibold text-slate-700">Additional Details (Optional)</p>
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  <select name="listing-category" value={listingForm.category} onChange={(e) => handleListingInput('category', e.target.value)} className={inputFieldClass}>
+                    {CATEGORY_OPTIONS.filter(c => c.value !== 'all').map(opt => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                  <select name="listing-condition" value={listingForm.condition} onChange={(e) => handleListingInput('condition', e.target.value)} className={inputFieldClass}>
+                    {CONDITION_OPTIONS.map(opt => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                  <select name="listing-transmission" value={listingForm.transmission} onChange={(e) => handleListingInput('transmission', e.target.value)} className={inputFieldClass}>
+                    {TRANSMISSION_OPTIONS.map(opt => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                  <select name="listing-fueltype" value={listingForm.fuelType} onChange={(e) => handleListingInput('fuelType', e.target.value)} className={inputFieldClass}>
+                    {FUEL_TYPE_OPTIONS.map(opt => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                  <select name="listing-regionalspec" value={listingForm.regionalSpec} onChange={(e) => handleListingInput('regionalSpec', e.target.value)} className={inputFieldClass}>
+                    {REGIONAL_SPEC_OPTIONS.map(opt => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                  <select name="listing-paymenttype" value={listingForm.paymentType} onChange={(e) => handleListingInput('paymentType', e.target.value)} className={inputFieldClass}>
+                    {PAYMENT_TYPE_OPTIONS.map(opt => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                  <input name="listing-trim" value={listingForm.trim} onChange={(e) => handleListingInput('trim', e.target.value)} placeholder="Trim (SE, Sport, etc.)" className={inputFieldClass} />
+                  <input name="listing-exteriorcolor" value={listingForm.exteriorColor} onChange={(e) => handleListingInput('exteriorColor', e.target.value)} placeholder="Exterior Color" className={inputFieldClass} />
+                  <input name="listing-interiorcolor" value={listingForm.interiorColor} onChange={(e) => handleListingInput('interiorColor', e.target.value)} placeholder="Interior Color" className={inputFieldClass} />
+                  <input name="listing-city" value={listingForm.city} onChange={(e) => handleListingInput('city', e.target.value)} placeholder="City" className={inputFieldClass} />
+                  <input name="listing-neighborhood" value={listingForm.neighborhood} onChange={(e) => handleListingInput('neighborhood', e.target.value)} placeholder="Neighborhood" className={inputFieldClass} />
+                </div>
+              </div>
+              
               <textarea name="listing-description" id="listing-description" value={listingForm.description} onChange={(event) => handleListingInput('description', event.target.value)} placeholder="Description" className={`h-32 w-full ${inputFieldClass}`}
               />
               <div className="flex flex-wrap gap-3">
@@ -2893,18 +3095,18 @@ export function AppView() {
       <div className={`absolute inset-0 ${resolvedTheme === 'dark' ? 'bg-slate-950/85' : 'bg-white/80'}`} />
       <div className="relative z-10">
       {renderToast()}
-      <header className={`sticky top-0 z-50 border-b backdrop-blur-md transition-colors duration-300 ${headerSurfaceClass} ${subtleBorderClass}`}>
-        <div className="mx-auto flex h-40 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+      <header className={`sticky top-0 z-50 border-b backdrop-blur-md transition-colors duration-300 overflow-hidden ${headerSurfaceClass} ${subtleBorderClass}`}>
+        <div className="mx-auto flex h-20 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-8">
             {/* Logo */}
             <div
-              className="group flex cursor-pointer items-center gap-3"
+              className="group flex cursor-pointer items-center gap-3 h-16 overflow-hidden"
               onClick={() => setActivePage('listings')}
             >
               <img
                 src="/IntelliWheels.svg"
                 alt="IntelliWheels"
-                className="h-80 w-auto object-contain transition-transform group-hover:scale-105 drop-shadow-lg"
+                className="h-16 w-auto object-contain object-center transition-transform group-hover:scale-105 drop-shadow-lg"
               />
             </div>
 

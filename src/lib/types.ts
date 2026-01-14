@@ -3,10 +3,21 @@ export type CurrencyCode = 'JOD' | 'AED' | 'USD' | 'EUR' | 'GBP' | 'SAR' | 'QAR'
 
 export type SortOption = 'default' | 'price-asc' | 'price-desc' | 'rating-desc' | 'year-desc';
 
+export type VehicleCategory = 'all' | 'car' | 'suv' | 'truck' | 'bike' | 'van' | 'bus' | 'other';
+export type VehicleCondition = 'new' | 'used' | 'certified';
+export type TransmissionType = 'automatic' | 'manual' | 'cvt' | 'other';
+export type FuelType = 'petrol' | 'diesel' | 'electric' | 'hybrid' | 'plugin_hybrid' | 'lpg' | 'other';
+export type RegionalSpec = 'gcc' | 'american' | 'european' | 'japanese' | 'korean' | 'other';
+export type PaymentType = 'cash' | 'installments' | 'both';
+
 export interface CarFilters {
   make: string;
   search: string;
   sort: SortOption;
+  category?: VehicleCategory;
+  condition?: VehicleCondition;
+  transmission?: TransmissionType;
+  fuelType?: FuelType;
 }
 
 export interface CarSpecs {
@@ -48,6 +59,18 @@ export interface Car {
   owner_id?: number;
   created_at?: string;
   updated_at?: string;
+  // New fields
+  category?: VehicleCategory;
+  condition?: VehicleCondition;
+  exteriorColor?: string;
+  interiorColor?: string;
+  transmission?: TransmissionType;
+  fuelType?: FuelType;
+  regionalSpec?: RegionalSpec;
+  paymentType?: PaymentType;
+  city?: string;
+  neighborhood?: string;
+  trim?: string;
 }
 
 export interface ApiResponse<T> {

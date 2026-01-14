@@ -203,6 +203,17 @@ def _init_postgres_tables(db):
             engines JSONB,
             statistics JSONB,
             source_sheets JSONB,
+            category TEXT DEFAULT 'car',
+            condition TEXT DEFAULT 'used',
+            exterior_color TEXT,
+            interior_color TEXT,
+            transmission TEXT,
+            fuel_type TEXT,
+            regional_spec TEXT,
+            payment_type TEXT DEFAULT 'cash',
+            city TEXT,
+            neighborhood TEXT,
+            trim TEXT,
             created_at TIMESTAMP DEFAULT NOW(),
             updated_at TIMESTAMP DEFAULT NOW()
         )
@@ -247,11 +258,26 @@ def _init_postgres_tables(db):
         )
     ''')
     
-    # Migration: Add odometer_km column if it doesn't exist
-    try:
-        cursor.execute("ALTER TABLE cars ADD COLUMN IF NOT EXISTS odometer_km INTEGER")
-    except Exception as e:
-        print(f"[DB] Migration note: {e}")
+    # Migrations: Add new columns if they don't exist
+    migrations = [
+        "ALTER TABLE cars ADD COLUMN IF NOT EXISTS odometer_km INTEGER",
+        "ALTER TABLE cars ADD COLUMN IF NOT EXISTS category TEXT DEFAULT 'car'",
+        "ALTER TABLE cars ADD COLUMN IF NOT EXISTS condition TEXT DEFAULT 'used'",
+        "ALTER TABLE cars ADD COLUMN IF NOT EXISTS exterior_color TEXT",
+        "ALTER TABLE cars ADD COLUMN IF NOT EXISTS interior_color TEXT",
+        "ALTER TABLE cars ADD COLUMN IF NOT EXISTS transmission TEXT",
+        "ALTER TABLE cars ADD COLUMN IF NOT EXISTS fuel_type TEXT",
+        "ALTER TABLE cars ADD COLUMN IF NOT EXISTS regional_spec TEXT",
+        "ALTER TABLE cars ADD COLUMN IF NOT EXISTS payment_type TEXT DEFAULT 'cash'",
+        "ALTER TABLE cars ADD COLUMN IF NOT EXISTS city TEXT",
+        "ALTER TABLE cars ADD COLUMN IF NOT EXISTS neighborhood TEXT",
+        "ALTER TABLE cars ADD COLUMN IF NOT EXISTS trim TEXT",
+    ]
+    for migration in migrations:
+        try:
+            cursor.execute(migration)
+        except Exception as e:
+            print(f"[DB] Migration note: {e}")
     
     db._connection.commit()
     print("[DB] PostgreSQL tables initialized")
@@ -309,6 +335,17 @@ def _init_sqlite_tables(db):
             engines JSON,
             statistics JSON,
             source_sheets JSON,
+            category TEXT DEFAULT 'car',
+            condition TEXT DEFAULT 'used',
+            exterior_color TEXT,
+            interior_color TEXT,
+            transmission TEXT,
+            fuel_type TEXT,
+            regional_spec TEXT,
+            payment_type TEXT DEFAULT 'cash',
+            city TEXT,
+            neighborhood TEXT,
+            trim TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )

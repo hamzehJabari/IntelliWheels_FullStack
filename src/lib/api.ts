@@ -98,6 +98,10 @@ export async function fetchCars(filters: CarFilters, signal?: AbortSignal, token
   if (filters.make && filters.make !== 'all') params.append('make', filters.make);
   if (filters.search) params.append('search', filters.search);
   if (filters.sort && filters.sort !== 'default') params.append('sort', filters.sort);
+  if (filters.category && filters.category !== 'all') params.append('category', filters.category);
+  if (filters.condition) params.append('condition', filters.condition);
+  if (filters.transmission) params.append('transmission', filters.transmission);
+  if (filters.fuelType) params.append('fuelType', filters.fuelType);
 
   // No fallback - frontend depends on backend API for real car data only
   return apiRequest<{ success: boolean; cars: Car[] }>(`/cars${params.size ? `?${params.toString()}` : ''}`, {

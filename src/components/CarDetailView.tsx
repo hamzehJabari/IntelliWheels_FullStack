@@ -95,13 +95,17 @@ export function CarDetailView({ carId }: CarDetailViewProps) {
     if (!Number.isFinite(numericId)) return;
     async function loadReviews() {
       try {
+        console.log('[Reviews] Fetching reviews for car:', numericId);
         const response = await fetchCarReviews(numericId);
+        console.log('[Reviews] Response:', response);
         if (response.success) {
+          console.log('[Reviews] Setting reviews:', response.reviews);
+          console.log('[Reviews] Setting stats:', response.stats);
           setReviews(response.reviews || []);
           setReviewStats(response.stats || { average_rating: 0, total_reviews: 0 });
         }
       } catch (err) {
-        console.warn('Failed to load reviews:', err);
+        console.error('[Reviews] Failed to load reviews:', err);
       }
     }
     loadReviews();
@@ -477,6 +481,43 @@ export function CarDetailView({ carId }: CarDetailViewProps) {
                   <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-slate-700">{descriptionText}</p>
                 </div>
               )}
+              
+              {/* Vehicle Details */}
+              {(car.condition || car.transmission || car.fuelType || car.regionalSpec || car.exteriorColor || car.interiorColor || car.city || car.trim) && (
+                <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-5">
+                  <p className="text-sm font-semibold text-slate-900 mb-3">Vehicle Details</p>
+                  <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+                    {car.condition && (
+                      <div className="text-sm"><span className="font-medium text-slate-700">Condition:</span> <span className="capitalize text-slate-600">{car.condition}</span></div>
+                    )}
+                    {car.transmission && (
+                      <div className="text-sm"><span className="font-medium text-slate-700">Transmission:</span> <span className="capitalize text-slate-600">{car.transmission}</span></div>
+                    )}
+                    {car.fuelType && (
+                      <div className="text-sm"><span className="font-medium text-slate-700">Fuel Type:</span> <span className="capitalize text-slate-600">{car.fuelType.replace('_', ' ')}</span></div>
+                    )}
+                    {car.regionalSpec && (
+                      <div className="text-sm"><span className="font-medium text-slate-700">Specs:</span> <span className="uppercase text-slate-600">{car.regionalSpec}</span></div>
+                    )}
+                    {car.exteriorColor && (
+                      <div className="text-sm"><span className="font-medium text-slate-700">Exterior:</span> <span className="text-slate-600">{car.exteriorColor}</span></div>
+                    )}
+                    {car.interiorColor && (
+                      <div className="text-sm"><span className="font-medium text-slate-700">Interior:</span> <span className="text-slate-600">{car.interiorColor}</span></div>
+                    )}
+                    {car.trim && (
+                      <div className="text-sm"><span className="font-medium text-slate-700">Trim:</span> <span className="text-slate-600">{car.trim}</span></div>
+                    )}
+                    {car.city && (
+                      <div className="text-sm"><span className="font-medium text-slate-700">Location:</span> <span className="text-slate-600">{car.city}{car.neighborhood ? `, ${car.neighborhood}` : ''}</span></div>
+                    )}
+                    {car.paymentType && car.paymentType !== 'cash' && (
+                      <div className="text-sm"><span className="font-medium text-slate-700">Payment:</span> <span className="capitalize text-slate-600">{car.paymentType === 'both' ? 'Cash or Installments' : car.paymentType}</span></div>
+                    )}
+                  </div>
+                </div>
+              )}
+              
               {car.specs && (
                 <div className="grid gap-3 md:grid-cols-2">
                   {Object.entries(car.specs).map(([key, value]) =>

@@ -32,6 +32,17 @@ def car_row_to_dict(row):
     # Map odometer_km to odometerKm for frontend
     if d.get('odometer_km') is not None:
         d['odometerKm'] = d['odometer_km']
+    # Map snake_case to camelCase for new fields
+    if d.get('exterior_color'):
+        d['exteriorColor'] = d['exterior_color']
+    if d.get('interior_color'):
+        d['interiorColor'] = d['interior_color']
+    if d.get('fuel_type'):
+        d['fuelType'] = d['fuel_type']
+    if d.get('regional_spec'):
+        d['regionalSpec'] = d['regional_spec']
+    if d.get('payment_type'):
+        d['paymentType'] = d['payment_type']
     return d
 
 @bp.route('', methods=['GET'])
@@ -48,6 +59,34 @@ def get_cars():
         make = sanitize_string(make)[:50]  # Limit length
         base_query += " AND make = ?"
         params.append(make)
+    
+    # Category filter
+    category = args.get('category')
+    if category and category != 'all':
+        category = sanitize_string(category)[:20]
+        base_query += " AND (category = ? OR category IS NULL)"
+        params.append(category)
+    
+    # Condition filter
+    condition = args.get('condition')
+    if condition and condition != 'all':
+        condition = sanitize_string(condition)[:20]
+        base_query += " AND condition = ?"
+        params.append(condition)
+    
+    # Transmission filter
+    transmission = args.get('transmission')
+    if transmission and transmission != 'all':
+        transmission = sanitize_string(transmission)[:20]
+        base_query += " AND transmission = ?"
+        params.append(transmission)
+    
+    # Fuel type filter
+    fuel_type = args.get('fuelType')
+    if fuel_type and fuel_type != 'all':
+        fuel_type = sanitize_string(fuel_type)[:20]
+        base_query += " AND fuel_type = ?"
+        params.append(fuel_type)
     
     # Sanitize search query
     search = args.get('search')
@@ -161,12 +200,25 @@ def create_car():
     if not isinstance(media_gallery, list):
         media_gallery = []
     
+    # Handle new optional fields
+    category = sanitize_string(data.get('category', 'car'))[:20]
+    condition = sanitize_string(data.get('condition', 'used'))[:20]
+    exterior_color = sanitize_string(data.get('exteriorColor', ''))[:50]
+    interior_color = sanitize_string(data.get('interiorColor', ''))[:50]
+    transmission = sanitize_string(data.get('transmission', ''))[:20]
+    fuel_type = sanitize_string(data.get('fuelType', ''))[:20]
+    regional_spec = sanitize_string(data.get('regionalSpec', ''))[:20]
+    payment_type = sanitize_string(data.get('paymentType', 'cash'))[:20]
+    city = sanitize_string(data.get('city', ''))[:100]
+    neighborhood = sanitize_string(data.get('neighborhood', ''))[:100]
+    trim = sanitize_string(data.get('trim', ''))[:50]
+    
     db = get_db()
     try:
         cursor = db.execute(
-            '''INSERT INTO cars (owner_id, make, model, year, price, currency, odometer_km, description, specs, image_url, video_url, gallery_images, media_gallery)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
-            (owner_id, make, model, year, price, currency, odometer_km, description, json.dumps(specs), image_url, video_url, json.dumps(gallery_images), json.dumps(media_gallery))
+            '''INSERT INTO cars (owner_id, make, model, year, price, currency, odometer_km, description, specs, image_url, video_url, gallery_images, media_gallery, category, condition, exterior_color, interior_color, transmission, fuel_type, regional_spec, payment_type, city, neighborhood, trim)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+            (owner_id, make, model, year, price, currency, odometer_km, description, json.dumps(specs), image_url, video_url, json.dumps(gallery_images), json.dumps(media_gallery), category, condition, exterior_color, interior_color, transmission, fuel_type, regional_spec, payment_type, city, neighborhood, trim)
         )
         db.commit()
         return jsonify({'success': True, 'id': cursor.lastrowid}), 201
@@ -282,6 +334,26 @@ def update_car(id):
             odometer_km = int(odometer_km)
         updates.append("odometer_km = ?")
         params.append(odometer_km)
+    
+    # Handle new optional fields in update
+    new_text_fields = [
+        ('category', 'category', 20),
+        ('condition', 'condition', 20),
+        ('exteriorColor', 'exterior_color', 50),
+        ('interiorColor', 'interior_color', 50),
+        ('transmission', 'transmission', 20),
+        ('fuelType', 'fuel_type', 20),
+        ('regionalSpec', 'regional_spec', 20),
+        ('paymentType', 'payment_type', 20),
+        ('city', 'city', 100),
+        ('neighborhood', 'neighborhood', 100),
+        ('trim', 'trim', 50),
+    ]
+    for frontend_key, db_key, max_len in new_text_fields:
+        if frontend_key in data:
+            value = sanitize_string(data[frontend_key] or '')[:max_len]
+            updates.append(f"{db_key} = ?")
+            params.append(value if value else None)
     
     if not updates:
         return jsonify({'success': False, 'error': 'No fields to update'}), 400

@@ -36,6 +36,7 @@ def get_car_reviews(car_id):
     
     try:
         # Get reviews with user info - use LEFT JOIN to handle missing users gracefully
+        print(f"[Reviews] Fetching reviews for car_id: {car_id}")
         cursor = db.execute('''
             SELECT r.id, r.car_id, r.user_id, r.rating, r.comment, r.created_at, r.updated_at,
                    COALESCE(u.username, 'Anonymous') as user_name
@@ -47,16 +48,18 @@ def get_car_reviews(car_id):
         
         reviews = []
         for row in cursor.fetchall():
-            reviews.append({
+            review_data = {
                 'id': row['id'],
                 'car_id': row['car_id'],
                 'user_id': row['user_id'],
                 'user_name': row['user_name'],
                 'rating': row['rating'],
                 'comment': row['comment'],
-                'created_at': row['created_at'],
-                'updated_at': row['updated_at']
-            })
+                'created_at': str(row['created_at']) if row['created_at'] else None,
+                'updated_at': str(row['updated_at']) if row['updated_at'] else None
+            }
+            print(f"[Reviews] Found review: {review_data}")
+            reviews.append(review_data)
         
         # Calculate average rating
         avg_cursor = db.execute('''
@@ -65,14 +68,16 @@ def get_car_reviews(car_id):
         ''', (car_id,))
         stats = avg_cursor.fetchone()
         
-        return jsonify({
+        result = {
             'success': True,
             'reviews': reviews,
             'stats': {
-                'average_rating': round(stats['avg_rating'], 1) if stats['avg_rating'] else 0,
-                'total_reviews': stats['count']
+                'average_rating': round(float(stats['avg_rating']), 1) if stats['avg_rating'] else 0,
+                'total_reviews': int(stats['count']) if stats['count'] else 0
             }
-        })
+        }
+        print(f"[Reviews] Returning: {result}")
+        return jsonify(result)
     except Exception as e:
         print(f"Get reviews error: {e}")
         # Return empty reviews rather than 500 error
