@@ -55,3 +55,30 @@ python -m venv .venv
 pip install -r requirements.txt
 python run.py
 ```
+
+## Environment Variables
+
+### Backend (Render)
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `DATABASE_URL` | Yes | PostgreSQL connection string (provided by Render) |
+| `GEMINI_API_KEY` | Yes | Google Gemini API key for AI features |
+| `BACKEND_URL` | Yes | Full backend URL (e.g., `https://intelliwheels.onrender.com`) |
+| `FRONTEND_ORIGIN` | Yes | Frontend URL for CORS (e.g., `https://intelliwheels.vercel.app`) |
+| `CLOUDINARY_CLOUD_NAME` | Recommended | Cloudinary cloud name for persistent image/video storage |
+| `CLOUDINARY_API_KEY` | Recommended | Cloudinary API key |
+| `CLOUDINARY_API_SECRET` | Recommended | Cloudinary API secret |
+
+### Cloudinary Setup (Recommended)
+Without Cloudinary, uploaded images/videos are stored locally and **will be lost on every redeploy** (Render uses ephemeral storage).
+
+To enable persistent storage:
+1. Create a free Cloudinary account at https://cloudinary.com
+2. Go to Dashboard → Settings → Access Keys
+3. Copy your Cloud Name, API Key, and API Secret
+4. Add them to your Render environment variables
+
+### Frontend (Vercel)
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `NEXT_PUBLIC_API_URL` | Yes | Backend API URL (e.g., `https://intelliwheels.onrender.com/api`) |

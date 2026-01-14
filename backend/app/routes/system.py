@@ -3,10 +3,39 @@ import os
 import uuid
 from werkzeug.utils import secure_filename
 
+# Try to import Cloudinary for cloud storage
+try:
+    import cloudinary
+    import cloudinary.uploader
+    HAS_CLOUDINARY = True
+except ImportError:
+    HAS_CLOUDINARY = False
+
 bp = Blueprint('system', __name__, url_prefix='/api')
 
 ALLOWED_IMAGE_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
 ALLOWED_VIDEO_EXTENSIONS = {'mp4', 'mov', 'avi', 'mkv', 'webm'}
+
+def is_cloudinary_configured():
+    \"\"\"Check if Cloudinary is configured via environment variables.\"\"\"
+    return (
+        HAS_CLOUDINARY and 
+        bool(os.environ.get('CLOUDINARY_CLOUD_NAME')) and
+        bool(os.environ.get('CLOUDINARY_API_KEY')) and
+        bool(os.environ.get('CLOUDINARY_API_SECRET'))
+    )
+
+def init_cloudinary():
+    \"\"\"Initialize Cloudinary with environment variables.\"\"\"
+    if not is_cloudinary_configured():
+        return False
+    cloudinary.config(
+        cloud_name=os.environ.get('CLOUDINARY_CLOUD_NAME'),
+        api_key=os.environ.get('CLOUDINARY_API_KEY'),
+        api_secret=os.environ.get('CLOUDINARY_API_SECRET'),
+        secure=True
+    )
+    return True
 
 def allowed_image_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_IMAGE_EXTENSIONS
@@ -30,6 +59,9 @@ def health_check():
     gemini_working = ai_service.gemini_model is not None
     init_error = getattr(ai_service, '_init_error', None)
     
+    # Check Cloudinary status
+    cloudinary_configured = is_cloudinary_configured()
+    
     return jsonify({
         'status': 'healthy',
         'version': '2.0.0',
@@ -39,7 +71,9 @@ def health_check():
         'ai_error': init_error if not gemini_working else None,
         'frontend_origin': os.environ.get('FRONTEND_ORIGIN', 'not set'),
         'database_type': 'postgresql' if os.environ.get('DATABASE_URL') else 'sqlite',
-        'database_url_set': bool(os.environ.get('DATABASE_URL'))
+        'database_url_set': bool(os.environ.get('DATABASE_URL')),
+        'cloudinary_enabled': cloudinary_configured,
+        'storage_type': 'cloudinary' if cloudinary_configured else 'local (ephemeral)'
     })
 
 @bp.route('/uploads/images/<path:filename>')
@@ -70,26 +104,41 @@ def upload_image():
     if not allowed_image_file(file.filename):
         return jsonify({'success': False, 'error': 'File type not allowed. Allowed: png, jpg, jpeg, gif, webp'}), 400
     
-    # Generate unique filename
+    # Try Cloudinary first for persistent cloud storage
+    if init_cloudinary():
+        try:
+            # Upload directly to Cloudinary
+            result = cloudinary.uploader.upload(
+                file,
+                folder="intelliwheels/images",
+                resource_type="image",
+                transformation=[{"quality": "auto:good", "fetch_format": "auto"}]
+            )
+            return jsonify({
+                'success': True,
+                'url': result['secure_url'],
+                'path': result['public_id'],
+                'filename': result['public_id'].split('/')[-1]
+            })
+        except Exception as e:
+            print(f"[Cloudinary] Image upload error: {e}")
+            # Fall back to local storage
+    
+    # Local storage fallback
     ext = file.filename.rsplit('.', 1)[1].lower()
     unique_filename = f"{uuid.uuid4().hex}.{ext}"
     safe_filename = secure_filename(unique_filename)
     
-    # Ensure upload directory exists
     upload_dir = current_app.config['UPLOAD_FOLDER']
     os.makedirs(upload_dir, exist_ok=True)
     
-    # Save file
     filepath = os.path.join(upload_dir, safe_filename)
     file.save(filepath)
     
-    # Return full backend URL (not relative path) so frontend can load images from backend
-    # On Render, the backend URL is intelliwheels.onrender.com
     backend_url = os.environ.get('BACKEND_URL', '')
     if backend_url:
         url = f"{backend_url}/api/uploads/images/{safe_filename}"
     else:
-        # Fallback to relative path for local development
         url = f"/api/uploads/images/{safe_filename}"
     
     return jsonify({
@@ -117,27 +166,46 @@ def upload_video():
     if not allowed_video_file(file.filename):
         return jsonify({'success': False, 'error': 'File type not allowed. Allowed: mp4, mov, avi, mkv, webm'}), 400
     
-    # Check file size (max 500MB for 4K videos)
+    # Check file size (max 500MB for 4K videos, but Cloudinary free tier limits to ~100MB)
     file.seek(0, 2)  # Seek to end
     file_size = file.tell()
     file.seek(0)  # Seek back to start
-    if file_size > 500 * 1024 * 1024:
-        return jsonify({'success': False, 'error': 'Video file too large. Maximum size is 500MB'}), 400
     
-    # Generate unique filename
+    max_size = 100 * 1024 * 1024 if is_cloudinary_configured() else 500 * 1024 * 1024
+    if file_size > max_size:
+        return jsonify({'success': False, 'error': f'Video file too large. Maximum size is {max_size // (1024*1024)}MB'}), 400
+    
+    # Try Cloudinary first for persistent cloud storage
+    if init_cloudinary():
+        try:
+            result = cloudinary.uploader.upload(
+                file,
+                folder="intelliwheels/videos",
+                resource_type="video",
+                eager=[{"format": "mp4", "quality": "auto"}],
+                eager_async=True
+            )
+            return jsonify({
+                'success': True,
+                'url': result['secure_url'],
+                'path': result['public_id'],
+                'filename': result['public_id'].split('/')[-1]
+            })
+        except Exception as e:
+            print(f"[Cloudinary] Video upload error: {e}")
+            # Fall back to local storage
+    
+    # Local storage fallback
     ext = file.filename.rsplit('.', 1)[1].lower()
     unique_filename = f"{uuid.uuid4().hex}.{ext}"
     safe_filename = secure_filename(unique_filename)
     
-    # Ensure upload directory exists
     upload_dir = current_app.config['UPLOAD_FOLDER']
     os.makedirs(upload_dir, exist_ok=True)
     
-    # Save file
     filepath = os.path.join(upload_dir, safe_filename)
     file.save(filepath)
     
-    # Return full backend URL
     backend_url = os.environ.get('BACKEND_URL', '')
     if backend_url:
         url = f"{backend_url}/api/uploads/videos/{safe_filename}"

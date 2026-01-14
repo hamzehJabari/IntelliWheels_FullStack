@@ -156,8 +156,10 @@ export function CarDetailView({ carId }: CarDetailViewProps) {
       const response = await submitReview(numericId, reviewRating, reviewComment, token);
       console.log('Review response:', response);
       if (response.success) {
-        // Refresh reviews
+        // Short delay to ensure DB consistency, then refresh reviews
+        await new Promise(resolve => setTimeout(resolve, 300));
         const refreshed = await fetchCarReviews(numericId);
+        console.log('Refreshed reviews:', refreshed);
         if (refreshed.success) {
           setReviews(refreshed.reviews || []);
           setReviewStats(refreshed.stats || { average_rating: 0, total_reviews: 0 });

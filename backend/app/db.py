@@ -38,21 +38,31 @@ class PostgresCursorWrapper:
         self.lastrowid = None
     
     def execute(self, sql, params=None):
-        # Convert SQLite-style ? placeholders to PostgreSQL %s
-        sql = sql.replace('?', '%s')
+        original_sql = sql
+        # Skip conversion if already using PostgreSQL placeholders (%s)
+        if '%s' not in sql:
+            # Convert SQLite-style ? placeholders to PostgreSQL %s
+            sql = sql.replace('?', '%s')
         # Handle AUTOINCREMENT -> SERIAL (already handled in CREATE)
         # Handle json_extract -> PostgreSQL JSON operators
         sql = self._convert_json_extract(sql)
         # Handle CURRENT_TIMESTAMP
         sql = sql.replace('CURRENT_TIMESTAMP', 'NOW()')
+        # Convert INSERT OR IGNORE to PostgreSQL ON CONFLICT (for any remaining cases)
+        if 'INSERT OR IGNORE' in sql.upper():
+            sql = sql.replace('INSERT OR IGNORE', 'INSERT')
+            sql = sql.replace('insert or ignore', 'INSERT')
+            # Add ON CONFLICT DO NOTHING if not already present
+            if 'ON CONFLICT' not in sql.upper():
+                sql = sql.rstrip(';').rstrip() + ' ON CONFLICT DO NOTHING'
         
         if params:
             self._cursor.execute(sql, params)
         else:
             self._cursor.execute(sql)
         
-        # Get lastrowid for INSERT statements
-        if sql.strip().upper().startswith('INSERT') and 'RETURNING' not in sql.upper():
+        # Get lastrowid for INSERT statements (only if not ON CONFLICT)
+        if sql.strip().upper().startswith('INSERT') and 'RETURNING' not in sql.upper() and 'ON CONFLICT' not in sql.upper():
             try:
                 # Try to get the last inserted id
                 self._cursor.execute("SELECT lastval()")
