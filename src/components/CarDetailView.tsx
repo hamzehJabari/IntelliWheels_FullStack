@@ -453,8 +453,6 @@ export function CarDetailView({ carId }: CarDetailViewProps) {
                   </button>
                 </div>
               </div>
-                </div>
-              </div>
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 <div className="rounded-2xl border border-slate-100 p-4">
                   <p className="text-xs uppercase text-slate-400">Rating</p>
