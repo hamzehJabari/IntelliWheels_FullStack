@@ -17,7 +17,7 @@ ALLOWED_IMAGE_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
 ALLOWED_VIDEO_EXTENSIONS = {'mp4', 'mov', 'avi', 'mkv', 'webm'}
 
 def is_cloudinary_configured():
-    \"\"\"Check if Cloudinary is configured via environment variables.\"\"\"
+    """Check if Cloudinary is configured via environment variables."""
     return (
         HAS_CLOUDINARY and 
         bool(os.environ.get('CLOUDINARY_CLOUD_NAME')) and
@@ -26,7 +26,7 @@ def is_cloudinary_configured():
     )
 
 def init_cloudinary():
-    \"\"\"Initialize Cloudinary with environment variables.\"\"\"
+    """Initialize Cloudinary with environment variables."""
     if not is_cloudinary_configured():
         return False
     cloudinary.config(
