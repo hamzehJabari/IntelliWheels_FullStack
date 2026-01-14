@@ -370,7 +370,7 @@ export async function fetchCarReviews(carId: number) {
 }
 
 export async function submitReview(carId: number, rating: number, comment: string, token: string | null) {
-  return apiRequest<{ success: boolean; message: string; review_id: number }>(`/reviews/car/${carId}`, {
+  return apiRequest<{ success: boolean; message: string; review_id: number; error?: string }>(`/reviews/car/${carId}`, {
     method: 'POST',
     token,
     body: { rating, comment },

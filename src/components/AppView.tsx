@@ -1490,7 +1490,10 @@ export function AppView() {
                  const response = await fetch(lastUserMsgWithImage.attachmentUrl);
                  const blob = await response.blob();
                  const file = new File([blob], "listing-image.jpg", { type: blob.type });
-                 imageUrl = await uploadListingImage(file);
+                 const uploadRes = await uploadListingImage(file, token);
+                 if (uploadRes.success) {
+                     imageUrl = uploadRes.url;
+                 }
              } catch (e) {
                  console.warn("Failed to upload image from chat:", e);
              }
@@ -1504,8 +1507,7 @@ export function AppView() {
             currency: listingData.currency || 'JOD',
             description: listingData.description,
             image: imageUrl, 
-            specs: listingData.specs,
-            listing_type: 'sale'
+            specs: listingData.specs
         };
         
         await createListing(payload, token);

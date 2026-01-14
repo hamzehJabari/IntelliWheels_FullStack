@@ -17,6 +17,7 @@ export interface CarSpecs {
   drivetrain?: string;
   seats?: number;
   torque?: string;
+  trim?: string;
 }
 
 export interface CarMedia {
