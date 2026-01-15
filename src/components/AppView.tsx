@@ -3104,8 +3104,8 @@ export function AppView() {
               onClick={() => setActivePage('listings')}
             >
               <img
-                src="/IntelliWheels.svg"
-                alt="IntelliWheels"
+                src="/IntelliWheels (3).png"
+                alt="IntelliWheels Logo"
                 className="h-20 w-auto object-contain object-center transition-transform group-hover:scale-105 drop-shadow-lg"
               />
             </div>
