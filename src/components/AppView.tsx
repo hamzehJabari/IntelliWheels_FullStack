@@ -846,7 +846,7 @@ export function AppView() {
 
   const resolveImageUrl = useCallback(
     (src?: string | null) => {
-      if (!src) return '/placeholder-car.png';
+      if (!src) return '/placeholder-car.svg';
       if (src.startsWith('http')) return src;
       if (src.startsWith('data:')) return src;
       if (!apiHost) return src;
@@ -870,7 +870,7 @@ export function AppView() {
       if (car.imageUrls?.length) {
         return resolveImageUrl(car.imageUrls[0]);
       }
-      return '/placeholder-car.png';
+      return '/placeholder-car.svg';
     },
     [resolveImageUrl]
   );
@@ -1840,8 +1840,8 @@ export function AppView() {
           loading="lazy"
           onError={(event) => {
             const img = event.currentTarget;
-            if (img.src.includes('placeholder-car.png')) return;
-            img.src = '/placeholder-car.png';
+            if (img.src.includes('placeholder-car.svg')) return;
+            img.src = '/placeholder-car.svg';
           }}
           className="h-48 w-full object-cover"
         />
@@ -1888,7 +1888,7 @@ export function AppView() {
     <div key={dealer.id} className="flex flex-col rounded-3xl border border-slate-100 bg-white/90 p-4 shadow hover:shadow-lg">
       <div className="h-40 overflow-hidden rounded-2xl bg-slate-100">
         <img
-          src={dealer.hero_image || '/placeholder-car.png'}
+          src={dealer.hero_image || '/placeholder-car.svg'}
           alt={dealer.name}
           className="h-full w-full object-cover"
         />
