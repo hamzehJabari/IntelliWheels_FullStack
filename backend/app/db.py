@@ -233,8 +233,8 @@ def _init_postgres_tables(db):
             created_at TIMESTAMP DEFAULT NOW()
         )
     ''')
-    
-        # Create Callbacks Table
+
+    # Create Callbacks Table
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS callbacks (
             id SERIAL PRIMARY KEY,
@@ -245,8 +245,8 @@ def _init_postgres_tables(db):
             message TEXT,
             preferred_time TEXT,
             created_at TIMESTAMP DEFAULT NOW()
-            )
-        ''')
+        )
+    ''')
     
     # Create Favorites Table
     cursor.execute('''
@@ -379,20 +379,20 @@ def _init_sqlite_tables(db):
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
-    
-        # Create Callbacks Table
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS callbacks (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                car_id INTEGER,
-                user_id INTEGER,
-                name TEXT,
-                phone TEXT,
-                message TEXT,
-                preferred_time TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        ''')
+
+    # Create Callbacks Table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS callbacks (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            car_id INTEGER,
+            user_id INTEGER,
+            name TEXT,
+            phone TEXT,
+            message TEXT,
+            preferred_time TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
     
     # Create Favorites Table
     cursor.execute('''
