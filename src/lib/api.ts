@@ -393,3 +393,15 @@ export async function fetchMyReviews(token: string | null) {
     token,
   });
 }
+
+export async function requestCallback(
+  carId: number,
+  payload: { name?: string; phone?: string; message?: string; preferred_time?: string },
+  token?: string | null
+) {
+  return apiRequest<{ success: boolean; error?: string }>(`/request-callback`, {
+    method: 'POST',
+    token,
+    body: { car_id: carId, ...payload },
+  });
+}
