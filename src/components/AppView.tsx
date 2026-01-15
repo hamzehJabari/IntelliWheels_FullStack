@@ -3095,18 +3095,18 @@ export function AppView() {
       <div className={`absolute inset-0 ${resolvedTheme === 'dark' ? 'bg-slate-950/85' : 'bg-white/80'}`} />
       <div className="relative z-10">
       {renderToast()}
-      <header className={`sticky top-0 z-50 border-b backdrop-blur-md transition-colors duration-300 overflow-hidden ${headerSurfaceClass} ${subtleBorderClass}`}>
-        <div className="mx-auto flex h-20 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+      <header className={`sticky top-0 z-50 border-b backdrop-blur-md transition-colors duration-300 ${headerSurfaceClass} ${subtleBorderClass}`}>
+        <div className="mx-auto flex h-24 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-8">
             {/* Logo */}
             <div
-              className="group flex cursor-pointer items-center gap-3 h-16 overflow-hidden"
+              className="group flex cursor-pointer items-center gap-3 h-20"
               onClick={() => setActivePage('listings')}
             >
               <img
                 src="/IntelliWheels.svg"
                 alt="IntelliWheels"
-                className="h-16 w-auto object-contain object-center transition-transform group-hover:scale-105 drop-shadow-lg"
+                className="h-20 w-auto object-contain object-center transition-transform group-hover:scale-105 drop-shadow-lg"
               />
             </div>
 
