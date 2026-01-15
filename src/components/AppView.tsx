@@ -3106,7 +3106,7 @@ export function AppView() {
               <img
                 src="/Intelli_Wheels.png"
                 alt="IntelliWheels"
-                className="h-20 w-auto object-contain object-center transition-transform group-hover:scale-105 drop-shadow-lg"
+                className="h-20 w-auto object-contain object-center transition-transform group-hover:scale-105"
               />
             </div>
 
