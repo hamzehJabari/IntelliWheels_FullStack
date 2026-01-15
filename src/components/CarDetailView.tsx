@@ -1,7 +1,7 @@
 'use client';
 
 import { useAuth } from '@/context/AuthContext';
-import { fetchCarById, fetchCarReviews, submitReview, deleteReview, fetchFavorites, addFavorite, removeFavorite } from '@/lib/api';
+import { fetchCarById, fetchCarReviews, submitReview, deleteReview, fetchFavorites, addFavorite, removeFavorite, requestCallback } from '@/lib/api';
 import { Car, Review, ReviewStats } from '@/lib/types';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -21,6 +21,14 @@ export function CarDetailView({ carId }: CarDetailViewProps) {
   // Favorites state
   const [isFavorited, setIsFavorited] = useState(false);
   const [favLoading, setFavLoading] = useState(false);
+  // Callback form state
+  const [showCallbackForm, setShowCallbackForm] = useState(false);
+  const [cbName, setCbName] = useState('');
+  const [cbPhone, setCbPhone] = useState('');
+  const [cbMessage, setCbMessage] = useState('');
+  const [cbPreferredTime, setCbPreferredTime] = useState('');
+  const [cbSubmitting, setCbSubmitting] = useState(false);
+  const [cbSuccess, setCbSuccess] = useState<string | null>(null);
   
   // Reviews state
   const [reviews, setReviews] = useState<Review[]>([]);
@@ -687,7 +695,61 @@ export function CarDetailView({ carId }: CarDetailViewProps) {
               <p className="text-sm font-semibold text-slate-900">Seller actions</p>
               <p className="mt-2 text-sm text-slate-600">Ready to discuss this car? Reach out to the IntelliWheels concierge team.</p>
               <div className="mt-4 space-y-2">
-                <button className="w-full rounded-2xl bg-sky-600 py-2 text-sm font-semibold text-white">Request callback</button>
+                <button
+                  className="w-full rounded-2xl bg-sky-600 py-2 text-sm font-semibold text-white"
+                  onClick={() => setShowCallbackForm(true)}
+                >
+                  Request callback
+                </button>
+                {showCallbackForm && (
+                  <div className="mt-4 rounded-2xl border border-slate-100 bg-white p-4">
+                    <h4 className="mb-2 text-sm font-semibold text-slate-900">Request a callback</h4>
+                    {cbSuccess ? (
+                      <p className="text-sm text-emerald-600">{cbSuccess}</p>
+                    ) : (
+                      <form
+                        onSubmit={async (e) => {
+                          e.preventDefault();
+                          setCbSubmitting(true);
+                          setCbSuccess(null);
+                          try {
+                            const payload = { name: cbName || user?.username, phone: cbPhone, message: cbMessage, preferred_time: cbPreferredTime };
+                            const resp = await requestCallback(numericId, payload, token);
+                            if (resp.success) {
+                              setCbSuccess('Callback request submitted — we will contact you shortly.');
+                              setCbName('');
+                              setCbPhone('');
+                              setCbMessage('');
+                              setCbPreferredTime('');
+                              setShowCallbackForm(false);
+                            } else {
+                              setCbSuccess('Failed to submit callback request.');
+                              console.error('Callback error', resp.error);
+                            }
+                          } catch (err) {
+                            console.error('Callback submission failed', err);
+                            setCbSuccess('Failed to submit callback request.');
+                          } finally {
+                            setCbSubmitting(false);
+                          }
+                        }}
+                      >
+                        <input value={cbName} onChange={(e) => setCbName(e.target.value)} placeholder="Your name" className="w-full mb-2 rounded-lg border px-3 py-2 text-sm" />
+                        <input value={cbPhone} onChange={(e) => setCbPhone(e.target.value)} placeholder="Phone number" className="w-full mb-2 rounded-lg border px-3 py-2 text-sm" />
+                        <input value={cbPreferredTime} onChange={(e) => setCbPreferredTime(e.target.value)} placeholder="Preferred time (optional)" className="w-full mb-2 rounded-lg border px-3 py-2 text-sm" />
+                        <textarea value={cbMessage} onChange={(e) => setCbMessage(e.target.value)} placeholder="Message (optional)" className="w-full mb-3 rounded-lg border px-3 py-2 text-sm" />
+                        <div className="flex items-center gap-2">
+                          <button type="submit" disabled={cbSubmitting} className="rounded-2xl bg-sky-600 px-4 py-2 text-sm font-semibold text-white">
+                            {cbSubmitting ? 'Submitting...' : 'Send request'}
+                          </button>
+                          <button type="button" onClick={() => setShowCallbackForm(false)} className="rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-900">
+                            Cancel
+                          </button>
+                        </div>
+                      </form>
+                    )}
+                  </div>
+                )}
                 <button className="w-full rounded-2xl border border-slate-200 py-2 text-sm font-semibold text-slate-900">Add to watchlist</button>
                 {car.owner_id ? (
                   <button

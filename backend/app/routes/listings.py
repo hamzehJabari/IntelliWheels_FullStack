@@ -223,3 +223,29 @@ def get_my_listings_analytics():
                 }
             }
         })
+
+
+@bp.route('/request-callback', methods=['POST'])
+def request_callback():
+    data = request.get_json() or {}
+    car_id = data.get('car_id')
+    name = data.get('name')
+    phone = data.get('phone')
+    message = data.get('message')
+    preferred_time = data.get('preferred_time')
+
+    token = request.headers.get('Authorization', '').replace('Bearer ', '')
+    user = get_user_from_token(token)
+    user_id = user['id'] if user else None
+
+    db = get_db()
+    try:
+        db.execute(
+            'INSERT INTO callbacks (car_id, user_id, name, phone, message, preferred_time) VALUES (?, ?, ?, ?, ?, ?)',
+            (car_id, user_id, name, phone, message, preferred_time)
+        )
+        db.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        print('Request callback error:', e)
+        return jsonify({'success': False, 'error': str(e)}), 500
