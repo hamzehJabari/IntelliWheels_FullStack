@@ -73,6 +73,19 @@ def get_user_from_token(token):
     # Use explicit UTC timestamp comparison to avoid timezone issues
     try:
         if is_postgres():
+            # First, check if session exists at all (debug)
+            session_check = db.execute(
+                'SELECT token, user_id, expires_at FROM user_sessions WHERE token = %s',
+                (token,)
+            ).fetchone()
+            if session_check:
+                print(f"[Auth Token] Session found: user_id={session_check['user_id']}, expires={session_check['expires_at']}")
+            else:
+                print(f"[Auth Token] NO session found for token {token[:10]}...")
+                # List all sessions for debugging
+                all_sessions = db.execute('SELECT token, user_id FROM user_sessions LIMIT 5').fetchall()
+                print(f"[Auth Token] All sessions in DB: {[(s['token'][:10] + '...', s['user_id']) for s in all_sessions]}")
+            
             # PostgreSQL: use NOW() AT TIME ZONE 'UTC' for UTC comparison
             row = db.execute('''
                 SELECT u.id, u.username, u.email, u.role, u.created_at
@@ -90,6 +103,8 @@ def get_user_from_token(token):
             ''', (token,)).fetchone()
     except Exception as e:
         print(f"[Auth] Error fetching user: {e}")
+        import traceback
+        traceback.print_exc()
         return None
     
     if row:
@@ -210,7 +225,18 @@ def login():
                 (token, user['id'], expires_at)
             )
             db.commit()
-            print(f"[Auth Login] Session committed successfully")
+            print(f"[Auth Login] Session committed, verifying...")
+            
+            # Immediately verify the session was saved
+            verify_row = db.execute(
+                'SELECT token, user_id, expires_at FROM user_sessions WHERE token = ?',
+                (token,)
+            ).fetchone()
+            if verify_row:
+                print(f"[Auth Login] VERIFIED: Session exists in DB - user_id={verify_row['user_id']}")
+            else:
+                print(f"[Auth Login] WARNING: Session NOT found after commit!")
+                
         except Exception as e:
             print(f"[Auth Login] ERROR creating session: {e}")
             import traceback
@@ -253,7 +279,9 @@ def logout():
 @rate_limit(max_requests=30, window_seconds=60)
 def verify_session():
     token = request.headers.get('Authorization', '').replace('Bearer ', '')
+    print(f"[Auth Verify] Checking token: {token[:10]}..." if token else "[Auth Verify] No token provided")
     user = get_user_from_token(token)
+    print(f"[Auth Verify] User lookup result: {user['username'] if user else 'None'}")
     
     if user:
         return jsonify({'success': True, 'authenticated': True, 'user': user})
