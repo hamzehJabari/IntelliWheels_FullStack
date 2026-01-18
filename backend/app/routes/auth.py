@@ -22,12 +22,23 @@ def get_user_from_token(token):
     
     db = get_db()
     # Check for valid session using parameterized query (already safe)
-    row = db.execute('''
-        SELECT u.id, u.username, u.email, u.role, u.is_admin, u.created_at
-        FROM users u
-        JOIN user_sessions s ON u.id = s.user_id
-        WHERE s.token = ? AND (s.expires_at IS NULL OR s.expires_at > CURRENT_TIMESTAMP)
-    ''', (token,)).fetchone()
+    # Use COALESCE to handle missing is_admin column gracefully
+    try:
+        row = db.execute('''
+            SELECT u.id, u.username, u.email, u.role, 
+                   COALESCE(u.is_admin, FALSE) as is_admin, u.created_at
+            FROM users u
+            JOIN user_sessions s ON u.id = s.user_id
+            WHERE s.token = ? AND (s.expires_at IS NULL OR s.expires_at > CURRENT_TIMESTAMP)
+        ''', (token,)).fetchone()
+    except Exception:
+        # Fallback if is_admin column doesn't exist
+        row = db.execute('''
+            SELECT u.id, u.username, u.email, u.role, u.created_at
+            FROM users u
+            JOIN user_sessions s ON u.id = s.user_id
+            WHERE s.token = ? AND (s.expires_at IS NULL OR s.expires_at > CURRENT_TIMESTAMP)
+        ''', (token,)).fetchone()
     
     if row:
         return {
@@ -35,7 +46,7 @@ def get_user_from_token(token):
             'username': row['username'],
             'email': row['email'],
             'role': row['role'],
-            'is_admin': bool(row['is_admin']) if row['is_admin'] is not None else False,
+            'is_admin': bool(row.get('is_admin', False)) if row.get('is_admin') is not None else False,
             'created_at': row['created_at']
         }
     return None
@@ -151,7 +162,7 @@ def login():
                 'username': user['username'],
                 'email': user['email'],
                 'role': user['role'],
-                'is_admin': bool(user['is_admin']) if user.get('is_admin') is not None else False
+                'is_admin': bool(user.get('is_admin', False)) if user.get('is_admin') is not None else False
             }
         })
     

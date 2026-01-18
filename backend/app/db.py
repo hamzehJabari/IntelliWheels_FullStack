@@ -306,6 +306,8 @@ def _init_postgres_tables(db):
         "ALTER TABLE cars ADD COLUMN IF NOT EXISTS city TEXT",
         "ALTER TABLE cars ADD COLUMN IF NOT EXISTS neighborhood TEXT",
         "ALTER TABLE cars ADD COLUMN IF NOT EXISTS trim TEXT",
+        # User admin column
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin BOOLEAN DEFAULT FALSE",
     ]
     for migration in migrations:
         try:
