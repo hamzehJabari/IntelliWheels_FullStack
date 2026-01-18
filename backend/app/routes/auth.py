@@ -70,7 +70,6 @@ def get_user_from_token(token):
     
     db = get_db()
     # Check for valid session
-    # Use explicit UTC timestamp comparison to avoid timezone issues
     try:
         if is_postgres():
             # First, check if session exists at all (debug)
@@ -86,12 +85,12 @@ def get_user_from_token(token):
                 all_sessions = db.execute('SELECT token, user_id FROM user_sessions LIMIT 5').fetchall()
                 print(f"[Auth Token] All sessions in DB: {[(s['token'][:10] + '...', s['user_id']) for s in all_sessions]}")
             
-            # PostgreSQL: use NOW() AT TIME ZONE 'UTC' for UTC comparison
+            # PostgreSQL: use NOW() for UTC comparison (simpler)
             row = db.execute('''
                 SELECT u.id, u.username, u.email, u.role, u.created_at
                 FROM users u
                 JOIN user_sessions s ON u.id = s.user_id
-                WHERE s.token = %s AND (s.expires_at IS NULL OR s.expires_at > (NOW() AT TIME ZONE 'UTC'))
+                WHERE s.token = %s AND (s.expires_at IS NULL OR s.expires_at > NOW())
             ''', (token,)).fetchone()
         else:
             # SQLite: use CURRENT_TIMESTAMP (already UTC)
@@ -378,7 +377,7 @@ def reset_password():
         if is_postgres():
             reset_row = db.execute('''
                 SELECT user_id FROM password_resets 
-                WHERE token = %s AND expires_at > (NOW() AT TIME ZONE 'UTC')
+                WHERE token = %s AND expires_at > NOW()
             ''', (reset_token,)).fetchone()
         else:
             reset_row = db.execute('''

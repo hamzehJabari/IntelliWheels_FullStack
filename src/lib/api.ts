@@ -228,7 +228,7 @@ export async function verifySession(token: string | null) {
   }
   return apiRequest<{ success: boolean; authenticated: boolean; user?: UserProfile }>(`/auth/verify`, {
     token,
-    fallback: async () => ({ success: true, authenticated: true }),
+    // No fallback - verification should fail properly if the server is unreachable
   });
 }
 

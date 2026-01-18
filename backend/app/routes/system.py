@@ -85,15 +85,15 @@ def debug_sessions():
     db = get_db()
     
     try:
-        sessions = db.execute('SELECT id, token, user_id, expires_at FROM user_sessions ORDER BY id DESC LIMIT 10').fetchall()
+        sessions = db.execute('SELECT token, user_id, created_at, expires_at FROM user_sessions ORDER BY created_at DESC LIMIT 10').fetchall()
         return jsonify({
             'is_postgres': is_postgres(),
             'session_count': len(sessions),
             'sessions': [
                 {
-                    'id': s['id'],
                     'token_preview': s['token'][:15] + '...' if s['token'] else None,
                     'user_id': s['user_id'],
+                    'created_at': str(s['created_at']) if s['created_at'] else None,
                     'expires_at': str(s['expires_at']) if s['expires_at'] else None
                 }
                 for s in sessions
@@ -190,21 +190,17 @@ def admin_setup_sessions():
     from ..db import is_postgres
     
     try:
-        if is_postgres():
-            sessions = db.execute('SELECT id, token, user_id, created_at, expires_at FROM user_sessions ORDER BY created_at DESC LIMIT 20').fetchall()
-        else:
-            sessions = db.execute('SELECT id, token, user_id, created_at, expires_at FROM user_sessions ORDER BY created_at DESC LIMIT 20').fetchall()
+        sessions = db.execute('SELECT token, user_id, created_at, expires_at FROM user_sessions ORDER BY created_at DESC LIMIT 20').fetchall()
         
         return jsonify({
             'is_postgres': is_postgres(),
             'session_count': len(sessions),
             'sessions': [
                 {
-                    'id': s['id'],
-                    'token': s['token'],
+                    'token_preview': s['token'][:15] + '...' if s['token'] else None,
                     'user_id': s['user_id'],
-                    'created_at': str(s['created_at']),
-                    'expires_at': str(s['expires_at']),
+                    'created_at': str(s['created_at']) if s['created_at'] else None,
+                    'expires_at': str(s['expires_at']) if s['expires_at'] else None,
                 }
                 for s in sessions
             ]
