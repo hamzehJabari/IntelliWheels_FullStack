@@ -21,32 +21,34 @@ def get_user_from_token(token):
     token = sanitize_string(token)[:64]  # Tokens shouldn't be longer than this
     
     db = get_db()
-    # Check for valid session using parameterized query (already safe)
-    # Use COALESCE to handle missing is_admin column gracefully
+    # Check for valid session - first try without is_admin, then check if column exists
     try:
-        row = db.execute('''
-            SELECT u.id, u.username, u.email, u.role, 
-                   COALESCE(u.is_admin, FALSE) as is_admin, u.created_at
-            FROM users u
-            JOIN user_sessions s ON u.id = s.user_id
-            WHERE s.token = ? AND (s.expires_at IS NULL OR s.expires_at > CURRENT_TIMESTAMP)
-        ''', (token,)).fetchone()
-    except Exception:
-        # Fallback if is_admin column doesn't exist
         row = db.execute('''
             SELECT u.id, u.username, u.email, u.role, u.created_at
             FROM users u
             JOIN user_sessions s ON u.id = s.user_id
             WHERE s.token = ? AND (s.expires_at IS NULL OR s.expires_at > CURRENT_TIMESTAMP)
         ''', (token,)).fetchone()
+    except Exception as e:
+        print(f"[Auth] Error fetching user: {e}")
+        return None
     
     if row:
+        # Check if is_admin column exists by trying to access it
+        is_admin = False
+        try:
+            admin_row = db.execute('SELECT is_admin FROM users WHERE id = ?', (row['id'],)).fetchone()
+            if admin_row:
+                is_admin = bool(admin_row['is_admin']) if admin_row['is_admin'] else False
+        except Exception:
+            pass  # Column doesn't exist yet, default to False
+        
         return {
             'id': row['id'],
             'username': row['username'],
             'email': row['email'],
             'role': row['role'],
-            'is_admin': bool(row.get('is_admin', False)) if row.get('is_admin') is not None else False,
+            'is_admin': is_admin,
             'created_at': row['created_at']
         }
     return None
@@ -154,6 +156,13 @@ def login():
         )
         db.commit()
 
+        # Safely check is_admin column
+        is_admin = False
+        try:
+            is_admin = bool(user['is_admin']) if user['is_admin'] else False
+        except (KeyError, TypeError):
+            pass  # Column doesn't exist
+
         return jsonify({
             'success': True,
             'token': token,
@@ -162,7 +171,7 @@ def login():
                 'username': user['username'],
                 'email': user['email'],
                 'role': user['role'],
-                'is_admin': bool(user.get('is_admin', False)) if user.get('is_admin') is not None else False
+                'is_admin': is_admin
             }
         })
     
