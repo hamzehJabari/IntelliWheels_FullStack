@@ -241,6 +241,35 @@ export async function logoutUser(token: string | null) {
   });
 }
 
+// Password Reset
+export async function forgotPassword(email: string) {
+  return apiRequest<{ success: boolean; message: string; error?: string }>(`/auth/forgot-password`, {
+    method: 'POST',
+    body: { email },
+  });
+}
+
+export async function resetPassword(token: string, password: string) {
+  return apiRequest<{ success: boolean; message: string; error?: string }>(`/auth/reset-password`, {
+    method: 'POST',
+    body: { token, password },
+  });
+}
+
+// Google OAuth
+export async function googleAuth(credential: string) {
+  return apiRequest<{ success: boolean; token: string; user: UserProfile; error?: string }>(`/auth/google`, {
+    method: 'POST',
+    body: { credential },
+  });
+}
+
+export async function getOAuthConfig() {
+  return apiRequest<{ google: { enabled: boolean; client_id: string | null } }>(`/auth/oauth-config`, {
+    fallback: async () => ({ google: { enabled: false, client_id: null } }),
+  });
+}
+
 export async function getProfile(token: string | null) {
   return apiRequest<{ success: boolean; user: UserProfile }>(`/profile`, { token });
 }

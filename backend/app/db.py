@@ -306,14 +306,27 @@ def _init_postgres_tables(db):
         "ALTER TABLE cars ADD COLUMN IF NOT EXISTS city TEXT",
         "ALTER TABLE cars ADD COLUMN IF NOT EXISTS neighborhood TEXT",
         "ALTER TABLE cars ADD COLUMN IF NOT EXISTS trim TEXT",
-        # User admin column
+        # User columns
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin BOOLEAN DEFAULT FALSE",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS google_id TEXT",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT",
     ]
     for migration in migrations:
         try:
             cursor.execute(migration)
         except Exception as e:
             print(f"[DB] Migration note: {e}")
+    
+    # Create Password Resets Table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS password_resets (
+            id SERIAL PRIMARY KEY,
+            token TEXT UNIQUE NOT NULL,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            expires_at TIMESTAMP NOT NULL,
+            created_at TIMESTAMP DEFAULT NOW()
+        )
+    ''')
     
     db._connection.commit()
     print("[DB] PostgreSQL tables initialized")
@@ -464,12 +477,29 @@ def _init_sqlite_tables(db):
         )
     ''')
     
-    # Migration: Add odometer_km column if it doesn't exist (SQLite doesn't support IF NOT EXISTS for ALTER)
-    try:
-        cursor.execute("ALTER TABLE cars ADD COLUMN odometer_km INTEGER")
-    except Exception as e:
-        # Column likely already exists
-        pass
+    # Create Password Resets Table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS password_resets (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            token TEXT UNIQUE NOT NULL,
+            user_id INTEGER NOT NULL,
+            expires_at TIMESTAMP NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+        )
+    ''')
+    
+    # Migrations for SQLite (doesn't support IF NOT EXISTS for ALTER)
+    sqlite_migrations = [
+        "ALTER TABLE cars ADD COLUMN odometer_km INTEGER",
+        "ALTER TABLE users ADD COLUMN google_id TEXT",
+        "ALTER TABLE users ADD COLUMN avatar_url TEXT",
+    ]
+    for migration in sqlite_migrations:
+        try:
+            cursor.execute(migration)
+        except Exception:
+            pass  # Column likely already exists
     
     db.commit()
     print("[DB] SQLite tables initialized")

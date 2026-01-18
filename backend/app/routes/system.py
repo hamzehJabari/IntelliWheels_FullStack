@@ -98,25 +98,6 @@ def platform_stats():
     
     # Count registered users
     users_count = db.execute('SELECT COUNT(*) as count FROM users').fetchone()['count']
-
-@bp.route('/debug/users')
-def debug_users():
-    """TEMPORARY: List all users for debugging. Remove after fixing login issues."""
-    db = get_db()
-    users = db.execute('SELECT id, username, email, role, created_at FROM users ORDER BY id').fetchall()
-    return jsonify({
-        'users': [
-            {
-                'id': u['id'],
-                'username': u['username'],
-                'email': u['email'],
-                'role': u['role'],
-                'created_at': str(u['created_at']) if u['created_at'] else None
-            }
-            for u in users
-        ],
-        'total': len(users)
-    })
     
     # Count AI interactions (we'll track this via a simple counter)
     # For now, estimate based on users * average interactions, or use reviews as proxy

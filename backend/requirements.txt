@@ -11,6 +11,7 @@ numpy==1.26.4
 gunicorn==21.2.0
 python-dotenv==1.0.0
 google-generativeai==0.8.0
+google-auth==2.27.0
 psycopg2-binary==2.9.9
 cloudinary==1.36.0
 

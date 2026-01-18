@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { STORAGE_KEYS, CurrencyCode, CURRENCY_RATES, convertCurrency as convertCurrencyUtil, formatCurrency as formatCurrencyUtil, formatPrice as formatPriceUtil } from '@/lib/config';
-import { getProfile, loginUser, logoutUser, signupUser, updateProfile, verifySession } from '@/lib/api';
+import { getProfile, loginUser, logoutUser, signupUser, updateProfile, verifySession, googleAuth, forgotPassword, resetPassword } from '@/lib/api';
 import { UserProfile } from '@/lib/types';
 
 interface AuthContextValue {
@@ -12,6 +12,9 @@ interface AuthContextValue {
   error: string | null;
   login: (username: string, password: string) => Promise<boolean>;
   signup: (username: string, email: string, password: string) => Promise<boolean>;
+  loginWithGoogle: (credential: string) => Promise<boolean>;
+  requestPasswordReset: (email: string) => Promise<{ success: boolean; message?: string }>;
+  resetUserPassword: (token: string, password: string) => Promise<{ success: boolean; message?: string }>;
   logout: () => Promise<void>;
   refreshProfile: () => Promise<UserProfile | null>;
   updateMyProfile: (payload: Partial<UserProfile> & { password?: string; current_password?: string }) => Promise<boolean>;
@@ -172,6 +175,58 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   }, [persistAuth, fetchProfileForToken]);
 
+  const handleGoogleLogin = useCallback(async (credential: string) => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await googleAuth(credential);
+      if (response.success && response.token) {
+        const profile = await fetchProfileForToken(response.token, response.user);
+        if (!profile) {
+          setError('Unable to load profile details');
+          return false;
+        }
+        persistAuth(response.token, profile);
+        return true;
+      }
+      setError(response.error || 'Google sign-in failed');
+      return false;
+    } catch (err: any) {
+      setError(err.message || 'Google sign-in failed');
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  }, [persistAuth, fetchProfileForToken]);
+
+  const handleForgotPassword = useCallback(async (email: string) => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await forgotPassword(email);
+      return { success: response.success, message: response.message };
+    } catch (err: any) {
+      setError(err.message || 'Failed to send reset email');
+      return { success: false, message: err.message || 'Failed to send reset email' };
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const handleResetPassword = useCallback(async (resetToken: string, newPassword: string) => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await resetPassword(resetToken, newPassword);
+      return { success: response.success, message: response.message };
+    } catch (err: any) {
+      setError(err.message || 'Failed to reset password');
+      return { success: false, message: err.message || 'Failed to reset password' };
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   const handleLogout = useCallback(async () => {
     try {
       if (token) {
@@ -228,6 +283,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     error,
     login: handleLogin,
     signup: handleSignup,
+    loginWithGoogle: handleGoogleLogin,
+    requestPasswordReset: handleForgotPassword,
+    resetUserPassword: handleResetPassword,
     logout: handleLogout,
     refreshProfile,
     updateMyProfile,
@@ -237,7 +295,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setCurrency,
     formatPrice,
     convertCurrency,
-  }), [user, token, loading, error, handleLogin, handleSignup, handleLogout, refreshProfile, updateMyProfile, currency, setCurrency, formatPrice, convertCurrency]);
+  }), [user, token, loading, error, handleLogin, handleSignup, handleGoogleLogin, handleForgotPassword, handleResetPassword, handleLogout, refreshProfile, updateMyProfile, currency, setCurrency, formatPrice, convertCurrency]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

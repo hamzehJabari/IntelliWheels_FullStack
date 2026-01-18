@@ -18,6 +18,7 @@ import {
   fetchMyListingsAnalytics,
   fetchPlatformStats,
   getAnalytics,
+  getOAuthConfig,
   getPriceEstimate,
   handleChatbotMessage,
   handleListingAssistantMessage,
@@ -633,7 +634,7 @@ interface VisionSuggestion extends VisionAttributes {
 }
 
 export function AppView() {
-  const { user, token, loading: authLoading, login, signup, logout, updateMyProfile, refreshProfile, error: authError, clearError, currency, setCurrency, formatPrice, convertCurrency } = useAuth();
+  const { user, token, loading: authLoading, login, signup, loginWithGoogle, requestPasswordReset, resetUserPassword, logout, updateMyProfile, refreshProfile, error: authError, clearError, currency, setCurrency, formatPrice, convertCurrency } = useAuth();
   const [mounted, setMounted] = useState(false);
   const [activePage, setActivePage] = useState<PageKey>('home');
   const [serviceMode, setServiceMode] = useState<ServiceMode>('marketplace');
@@ -657,6 +658,9 @@ export function AppView() {
   const [serviceMenuOpen, setServiceMenuOpen] = useState(false);
   const [navMenuOpen, setNavMenuOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [authMode, setAuthMode] = useState<'login' | 'signup' | 'forgot' | 'reset'>('login');
+  const [resetToken, setResetToken] = useState<string | null>(null);
+  const [googleClientId, setGoogleClientId] = useState<string | null>(null);
   const [isSubmittingListing, setIsSubmittingListing] = useState(false);
   const [editingListing, setEditingListing] = useState<Car | null>(null);
   const [editForm, setEditForm] = useState<ListingFormState>({
@@ -858,6 +862,26 @@ export function AppView() {
 
   useEffect(() => {
     setMounted(true);
+    
+    // Load OAuth config
+    getOAuthConfig().then(config => {
+      if (config.google?.enabled && config.google?.client_id) {
+        setGoogleClientId(config.google.client_id);
+      }
+    }).catch(() => {});
+    
+    // Check for password reset token in URL
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const resetTokenParam = params.get('reset_token');
+      if (resetTokenParam) {
+        setResetToken(resetTokenParam);
+        setAuthMode('reset');
+        setActivePage('profile');
+        // Clean up URL
+        window.history.replaceState({}, '', window.location.pathname);
+      }
+    }
   }, []);
 
   // Fetch platform stats for home page
@@ -2155,64 +2179,255 @@ export function AppView() {
     </div>
   );
 
+  // Google Sign-In handler
+  const handleGoogleSignIn = useCallback(async () => {
+    if (!googleClientId || typeof window === 'undefined') return;
+    
+    // Load Google Identity Services script if not already loaded
+    if (!window.google?.accounts?.id) {
+      const script = document.createElement('script');
+      script.src = 'https://accounts.google.com/gsi/client';
+      script.async = true;
+      script.defer = true;
+      document.head.appendChild(script);
+      
+      await new Promise<void>((resolve) => {
+        script.onload = () => resolve();
+      });
+    }
+    
+    // Initialize and prompt (with null check)
+    if (!window.google?.accounts?.id) {
+      showToast('Failed to load Google Sign-In', 'error');
+      return;
+    }
+    
+    window.google.accounts.id.initialize({
+      client_id: googleClientId,
+      callback: async (response: { credential: string }) => {
+        const success = await loginWithGoogle(response.credential);
+        if (success) {
+          showToast('Signed in with Google!');
+          setAuthMode('login');
+        } else {
+          showToast('Google sign-in failed', 'error');
+        }
+      },
+    });
+    
+    window.google.accounts.id.prompt();
+  }, [googleClientId, loginWithGoogle, showToast]);
 
-  const renderAuthPanel = () => (
-    <div className="grid gap-6 md:grid-cols-2">
-      <div className={`rounded-3xl border p-6 shadow-sm ${resolvedTheme === 'dark' ? 'border-slate-700 bg-slate-800' : 'border-slate-100 bg-white'}`}>
-        <h3 className={`text-xl font-semibold ${resolvedTheme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{copy.authSignIn}</h3>
-        {authError && (
-          <p className={`mt-3 rounded-2xl px-4 py-2 text-sm font-semibold ${resolvedTheme === 'dark' ? 'bg-rose-900/30 text-rose-400' : 'bg-rose-50 text-rose-600'}`}>{authError}</p>
-        )}
-        <form
-          className="mt-4 space-y-4"
-          onSubmit={async (event: React.FormEvent<HTMLFormElement>) => {
-            event.preventDefault();
-            const formData = new FormData(event.currentTarget);
-            const username = String(formData.get('login-username'));
-            const password = String(formData.get('login-password'));
-            clearError();
-            const success = await login(username, password);
-            if (success) {
-              showToast(`${copy.authWelcomeBack}, ${username}!`);
-            } else {
-              showToast('Unable to sign in. Please check your details.', 'error');
-            }
-          }}
-        >
-          <input name="login-username" placeholder={copy.authUsername} className={`w-full ${inputFieldClass}`} required />
-          <input name="login-password" type="password" placeholder={copy.authPassword} className={`w-full ${inputFieldClass}`} required />
-          <button className="w-full rounded-2xl bg-sky-600 py-3 font-semibold text-white hover:bg-sky-700">{copy.authSignIn}</button>
-        </form>
+  const renderAuthPanel = () => {
+    // Password Reset Form
+    if (authMode === 'reset' && resetToken) {
+      return (
+        <div className="mx-auto max-w-md">
+          <div className={`rounded-3xl border p-6 shadow-sm ${resolvedTheme === 'dark' ? 'border-slate-700 bg-slate-800' : 'border-slate-100 bg-white'}`}>
+            <h3 className={`text-xl font-semibold ${resolvedTheme === 'dark' ? 'text-white' : 'text-slate-900'}`}>Reset Your Password</h3>
+            <p className={`mt-2 text-sm ${resolvedTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Enter your new password below.</p>
+            {authError && (
+              <p className={`mt-3 rounded-2xl px-4 py-2 text-sm font-semibold ${resolvedTheme === 'dark' ? 'bg-rose-900/30 text-rose-400' : 'bg-rose-50 text-rose-600'}`}>{authError}</p>
+            )}
+            <form
+              className="mt-4 space-y-4"
+              onSubmit={async (event: React.FormEvent<HTMLFormElement>) => {
+                event.preventDefault();
+                const formData = new FormData(event.currentTarget);
+                const password = String(formData.get('new-password'));
+                const confirmPassword = String(formData.get('confirm-password'));
+                
+                if (password !== confirmPassword) {
+                  showToast('Passwords do not match', 'error');
+                  return;
+                }
+                
+                clearError();
+                const result = await resetUserPassword(resetToken, password);
+                if (result.success) {
+                  showToast('Password reset successfully! Please sign in.');
+                  setResetToken(null);
+                  setAuthMode('login');
+                } else {
+                  showToast(result.message || 'Failed to reset password', 'error');
+                }
+              }}
+            >
+              <input name="new-password" type="password" placeholder="New Password" className={`w-full ${inputFieldClass}`} required minLength={8} />
+              <input name="confirm-password" type="password" placeholder="Confirm Password" className={`w-full ${inputFieldClass}`} required minLength={8} />
+              <button className="w-full rounded-2xl bg-sky-600 py-3 font-semibold text-white hover:bg-sky-700">Reset Password</button>
+            </form>
+            <button 
+              onClick={() => { setAuthMode('login'); setResetToken(null); }} 
+              className={`mt-4 text-sm ${resolvedTheme === 'dark' ? 'text-sky-400 hover:text-sky-300' : 'text-sky-600 hover:text-sky-700'}`}
+            >
+              ← Back to Sign In
+            </button>
+          </div>
+        </div>
+      );
+    }
+    
+    // Forgot Password Form
+    if (authMode === 'forgot') {
+      return (
+        <div className="mx-auto max-w-md">
+          <div className={`rounded-3xl border p-6 shadow-sm ${resolvedTheme === 'dark' ? 'border-slate-700 bg-slate-800' : 'border-slate-100 bg-white'}`}>
+            <h3 className={`text-xl font-semibold ${resolvedTheme === 'dark' ? 'text-white' : 'text-slate-900'}`}>Forgot Password?</h3>
+            <p className={`mt-2 text-sm ${resolvedTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Enter your email and we&apos;ll send you a reset link.</p>
+            {authError && (
+              <p className={`mt-3 rounded-2xl px-4 py-2 text-sm font-semibold ${resolvedTheme === 'dark' ? 'bg-rose-900/30 text-rose-400' : 'bg-rose-50 text-rose-600'}`}>{authError}</p>
+            )}
+            <form
+              className="mt-4 space-y-4"
+              onSubmit={async (event: React.FormEvent<HTMLFormElement>) => {
+                event.preventDefault();
+                const formData = new FormData(event.currentTarget);
+                const email = String(formData.get('reset-email'));
+                clearError();
+                const result = await requestPasswordReset(email);
+                if (result.success) {
+                  showToast('If an account exists, a reset link has been sent to your email.');
+                  setAuthMode('login');
+                } else {
+                  showToast(result.message || 'Failed to send reset email', 'error');
+                }
+              }}
+            >
+              <input name="reset-email" type="email" placeholder={copy.authEmail} className={`w-full ${inputFieldClass}`} required />
+              <button className="w-full rounded-2xl bg-sky-600 py-3 font-semibold text-white hover:bg-sky-700">Send Reset Link</button>
+            </form>
+            <button 
+              onClick={() => setAuthMode('login')} 
+              className={`mt-4 text-sm ${resolvedTheme === 'dark' ? 'text-sky-400 hover:text-sky-300' : 'text-sky-600 hover:text-sky-700'}`}
+            >
+              ← Back to Sign In
+            </button>
+          </div>
+        </div>
+      );
+    }
+    
+    // Login / Signup Forms
+    return (
+      <div className="grid gap-6 md:grid-cols-2">
+        <div className={`rounded-3xl border p-6 shadow-sm ${resolvedTheme === 'dark' ? 'border-slate-700 bg-slate-800' : 'border-slate-100 bg-white'}`}>
+          <h3 className={`text-xl font-semibold ${resolvedTheme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{copy.authSignIn}</h3>
+          {authError && (
+            <p className={`mt-3 rounded-2xl px-4 py-2 text-sm font-semibold ${resolvedTheme === 'dark' ? 'bg-rose-900/30 text-rose-400' : 'bg-rose-50 text-rose-600'}`}>{authError}</p>
+          )}
+          <form
+            className="mt-4 space-y-4"
+            onSubmit={async (event: React.FormEvent<HTMLFormElement>) => {
+              event.preventDefault();
+              const formData = new FormData(event.currentTarget);
+              const username = String(formData.get('login-username'));
+              const password = String(formData.get('login-password'));
+              clearError();
+              const success = await login(username, password);
+              if (success) {
+                showToast(`${copy.authWelcomeBack}, ${username}!`);
+              } else {
+                showToast('Unable to sign in. Please check your details.', 'error');
+              }
+            }}
+          >
+            <input name="login-username" placeholder={copy.authUsername} className={`w-full ${inputFieldClass}`} required />
+            <input name="login-password" type="password" placeholder={copy.authPassword} className={`w-full ${inputFieldClass}`} required />
+            <button className="w-full rounded-2xl bg-sky-600 py-3 font-semibold text-white hover:bg-sky-700">{copy.authSignIn}</button>
+          </form>
+          
+          <button 
+            onClick={() => setAuthMode('forgot')} 
+            className={`mt-3 text-sm ${resolvedTheme === 'dark' ? 'text-sky-400 hover:text-sky-300' : 'text-sky-600 hover:text-sky-700'}`}
+          >
+            Forgot password?
+          </button>
+          
+          {/* Google Sign-In */}
+          {googleClientId && (
+            <div className="mt-4">
+              <div className={`flex items-center gap-3 ${resolvedTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                <div className="h-px flex-1 bg-current opacity-20"></div>
+                <span className="text-xs uppercase">or</span>
+                <div className="h-px flex-1 bg-current opacity-20"></div>
+              </div>
+              <button
+                onClick={handleGoogleSignIn}
+                className={`mt-3 flex w-full items-center justify-center gap-3 rounded-2xl border py-3 font-medium transition-colors ${
+                  resolvedTheme === 'dark' 
+                    ? 'border-slate-600 bg-slate-700 text-white hover:bg-slate-600' 
+                    : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                }`}
+              >
+                <svg className="h-5 w-5" viewBox="0 0 24 24">
+                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                  <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                </svg>
+                Continue with Google
+              </button>
+            </div>
+          )}
+        </div>
+        <div className={`rounded-3xl border p-6 shadow-sm ${resolvedTheme === 'dark' ? 'border-slate-700 bg-slate-800' : 'border-slate-100 bg-white'}`}>
+          <h3 className={`text-xl font-semibold ${resolvedTheme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{copy.authCreateAccount}</h3>
+          <form
+            className="mt-4 space-y-4"
+            onSubmit={async (event: React.FormEvent<HTMLFormElement>) => {
+              event.preventDefault();
+              const formElement = event.currentTarget;
+              const formData = new FormData(formElement);
+              const username = String(formData.get('signup-username'));
+              const email = String(formData.get('signup-email'));
+              const password = String(formData.get('signup-password'));
+              clearError();
+              const success = await signup(username, email, password);
+              if (success) {
+                showToast('Account created! You are now signed in.');
+                formElement.reset();
+              } else {
+                showToast('Unable to sign up. Please try again.', 'error');
+              }
+            }}
+          >
+            <input name="signup-username" placeholder={copy.authUsername} className={`w-full ${inputFieldClass}`} required />
+            <input name="signup-email" type="email" placeholder={copy.authEmail} className={`w-full ${inputFieldClass}`} required />
+            <input name="signup-password" type="password" placeholder={copy.authPassword} className={`w-full ${inputFieldClass}`} required />
+            <button className="w-full rounded-2xl bg-emerald-500 py-3 font-semibold text-white hover:bg-emerald-600">{copy.authSignUp}</button>
+          </form>
+          
+          {/* Google Sign-Up */}
+          {googleClientId && (
+            <div className="mt-4">
+              <div className={`flex items-center gap-3 ${resolvedTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                <div className="h-px flex-1 bg-current opacity-20"></div>
+                <span className="text-xs uppercase">or</span>
+                <div className="h-px flex-1 bg-current opacity-20"></div>
+              </div>
+              <button
+                onClick={handleGoogleSignIn}
+                className={`mt-3 flex w-full items-center justify-center gap-3 rounded-2xl border py-3 font-medium transition-colors ${
+                  resolvedTheme === 'dark' 
+                    ? 'border-slate-600 bg-slate-700 text-white hover:bg-slate-600' 
+                    : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                }`}
+              >
+                <svg className="h-5 w-5" viewBox="0 0 24 24">
+                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                  <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                </svg>
+                Sign up with Google
+              </button>
+            </div>
+          )}
+        </div>
       </div>
-      <div className={`rounded-3xl border p-6 shadow-sm ${resolvedTheme === 'dark' ? 'border-slate-700 bg-slate-800' : 'border-slate-100 bg-white'}`}>
-        <h3 className={`text-xl font-semibold ${resolvedTheme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{copy.authCreateAccount}</h3>
-        <form
-          className="mt-4 space-y-4"
-          onSubmit={async (event: React.FormEvent<HTMLFormElement>) => {
-            event.preventDefault();
-            const formElement = event.currentTarget;
-            const formData = new FormData(formElement);
-            const username = String(formData.get('signup-username'));
-            const email = String(formData.get('signup-email'));
-            const password = String(formData.get('signup-password'));
-            clearError();
-            const success = await signup(username, email, password);
-            if (success) {
-              showToast('Account created! You are now signed in.');
-              formElement.reset();
-            } else {
-              showToast('Unable to sign up. Please try again.', 'error');
-            }
-          }}
-        >
-          <input name="signup-username" placeholder={copy.authUsername} className={`w-full ${inputFieldClass}`} required />
-          <input name="signup-email" type="email" placeholder={copy.authEmail} className={`w-full ${inputFieldClass}`} required />
-          <input name="signup-password" type="password" placeholder={copy.authPassword} className={`w-full ${inputFieldClass}`} required />
-          <button className="w-full rounded-2xl bg-emerald-500 py-3 font-semibold text-white hover:bg-emerald-600">{copy.authSignUp}</button>
-        </form>
-      </div>
-    </div>
-  );
+    );
+  };
 
   const renderProfilePanel = () => {
     if (!user) {
