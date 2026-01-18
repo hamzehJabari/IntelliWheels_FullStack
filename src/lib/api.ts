@@ -405,3 +405,64 @@ export async function requestCallback(
     body: { car_id: carId, ...payload },
   });
 }
+
+// ============ DEALER APPLICATIONS API ============
+import { DealerApplication } from './types';
+
+export async function submitDealerApplication(
+  payload: { name: string; email: string; phone: string; city: string; address?: string; website?: string; description?: string }
+) {
+  return apiRequest<{ success: boolean; message: string; application_id?: number; error?: string }>(
+    `/dealers/applications`,
+    {
+      method: 'POST',
+      body: payload,
+    }
+  );
+}
+
+export async function fetchDealerApplications(token: string | null, status?: string) {
+  const params = status ? `?status=${status}` : '';
+  return apiRequest<{ success: boolean; applications: DealerApplication[] }>(
+    `/dealers/applications${params}`,
+    { token }
+  );
+}
+
+export async function approveDealerApplication(id: number, notes: string, token: string | null) {
+  return apiRequest<{ success: boolean; message: string; error?: string }>(
+    `/dealers/applications/${id}/approve`,
+    {
+      method: 'PUT',
+      token,
+      body: { notes },
+    }
+  );
+}
+
+export async function rejectDealerApplication(id: number, reason: string, notes: string, token: string | null) {
+  return apiRequest<{ success: boolean; message: string; error?: string }>(
+    `/dealers/applications/${id}/reject`,
+    {
+      method: 'PUT',
+      token,
+      body: { reason, notes },
+    }
+  );
+}
+
+// ============ PLATFORM STATS API ============
+export interface PlatformStats {
+  active_listings: number;
+  verified_dealers: number;
+  registered_users: number;
+  ai_interactions: number;
+}
+
+export async function fetchPlatformStats() {
+  return apiRequest<{ 
+    success: boolean; 
+    stats: PlatformStats;
+    definitions: Record<string, string>;
+  }>(`/stats`);
+}

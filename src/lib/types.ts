@@ -90,6 +90,24 @@ export interface UserProfile extends AuthPayload {
   id: number;
   currency?: CurrencyCode;
   created_at?: string;
+  is_admin?: boolean;
+}
+
+// Dealer application type
+export interface DealerApplication {
+  id: number;
+  name: string;
+  email: string;
+  phone: string;
+  city: string;
+  address?: string;
+  website?: string;
+  description?: string;
+  status: 'pending' | 'approved' | 'rejected';
+  admin_notes?: string;
+  reviewed_by?: number;
+  reviewed_at?: string;
+  created_at: string;
 }
 
 export interface ListingDraft {

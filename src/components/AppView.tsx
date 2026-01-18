@@ -6,19 +6,24 @@ import dynamic from 'next/dynamic';
 import {
   addFavorite,
   analyzeListingImage,
+  approveDealerApplication,
   createListing,
   deleteListing,
   fetchCars,
+  fetchDealerApplications,
   fetchFavorites,
   fetchDealers,
   fetchMakes,
   fetchMyListings,
   fetchMyListingsAnalytics,
+  fetchPlatformStats,
   getAnalytics,
   getPriceEstimate,
   handleChatbotMessage,
   handleListingAssistantMessage,
   MyListingsAnalytics,
+  PlatformStats,
+  rejectDealerApplication,
   removeFavorite,
   semanticSearch,
   updateListing,
@@ -33,6 +38,7 @@ import {
   ChatMessage,
   ChatSession,
   CurrencyCode,
+  DealerApplication,
   DealerSummary,
   PriceEstimatePayload,
   VisionAttributes,
@@ -66,6 +72,7 @@ const NAV_CONFIG = [
   { key: 'profile', labelKey: 'navProfile', descriptionKey: 'navProfileDesc' },
   { key: 'chatbot', labelKey: 'navChatbot', descriptionKey: 'navChatbotDesc' },
   { key: 'analytics', labelKey: 'navAnalytics', descriptionKey: 'navAnalyticsDesc' },
+  { key: 'admin', labelKey: 'navAdmin', descriptionKey: 'navAdminDesc' },
 ] as const;
 
 type PageKey = (typeof NAV_CONFIG)[number]['key'];
@@ -79,9 +86,9 @@ const SERVICE_CONFIG = [
 type ServiceMode = (typeof SERVICE_CONFIG)[number]['key'];
 
 const SERVICE_NAV_MAP: Record<ServiceMode, PageKey[]> = {
-  marketplace: ['home', 'listings', 'favorites', 'dealers', 'myListings', 'addListing', 'profile'],
-  dealer: ['home', 'listings', 'dealers', 'myListings', 'addListing', 'profile', 'analytics'],
-  insights: ['home', 'chatbot', 'analytics', 'listings', 'favorites', 'profile'],
+  marketplace: ['home', 'listings', 'favorites', 'dealers', 'myListings', 'addListing', 'profile', 'admin'],
+  dealer: ['home', 'listings', 'dealers', 'myListings', 'addListing', 'profile', 'analytics', 'admin'],
+  insights: ['home', 'chatbot', 'analytics', 'listings', 'favorites', 'profile', 'admin'],
 };
 
 type ThemeMode = 'light' | 'dark' | 'system';
@@ -138,6 +145,8 @@ const TRANSLATIONS = {
     navChatbotDesc: 'Chat & vision tools',
     navAnalytics: 'Analytics',
     navAnalyticsDesc: 'Market intelligence',
+    navAdmin: 'Admin Panel',
+    navAdminDesc: 'Manage applications',
     searchPlaceholder: 'Search make, model, year',
     semanticPlaceholder: 'e.g. Luxury hybrid SUV under 150k',
     // Home page translations
@@ -348,6 +357,8 @@ const TRANSLATIONS = {
     navChatbotDesc: 'دردشة ورؤية بالذكاء الاصطناعي',
     navAnalytics: 'التحليلات',
     navAnalyticsDesc: 'رؤى السوق',
+    navAdmin: 'لوحة الإدارة',
+    navAdminDesc: 'إدارة الطلبات',
     searchPlaceholder: 'ابحث عن الموديل أو السنة',
     semanticPlaceholder: 'مثال: سيارة هجينة فاخرة أقل من 150 ألف',
     // Home page translations
@@ -733,6 +744,15 @@ export function AppView() {
   const [floatingChatPosition, setFloatingChatPosition] = useState({ x: 20, y: 20 });
   const [isDraggingChat, setIsDraggingChat] = useState(false);
   const [systemPrefersDark, setSystemPrefersDark] = useState(false);
+  // Admin panel state
+  const [dealerApplications, setDealerApplications] = useState<DealerApplication[]>([]);
+  const [adminLoading, setAdminLoading] = useState(false);
+  const [adminFilter, setAdminFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('pending');
+  const [adminActionModal, setAdminActionModal] = useState<{ type: 'approve' | 'reject'; application: DealerApplication } | null>(null);
+  const [adminNotes, setAdminNotes] = useState('');
+  const [adminReason, setAdminReason] = useState('');
+  // Platform stats for home page
+  const [platformStats, setPlatformStats] = useState<PlatformStats | null>(null);
   const floatingChatRef = useRef<HTMLDivElement | null>(null);
   const serviceMenuRef = useRef<HTMLDivElement | null>(null);
   const navMenuRef = useRef<HTMLDivElement | null>(null);
@@ -838,6 +858,21 @@ export function AppView() {
 
   useEffect(() => {
     setMounted(true);
+  }, []);
+
+  // Fetch platform stats for home page
+  useEffect(() => {
+    async function loadStats() {
+      try {
+        const response = await fetchPlatformStats();
+        if (response.success) {
+          setPlatformStats(response.stats);
+        }
+      } catch (err) {
+        console.warn('Failed to load platform stats', err);
+      }
+    }
+    loadStats();
   }, []);
 
   // Detect system dark mode preference
@@ -1157,6 +1192,71 @@ export function AppView() {
       cancelled = true;
     };
   }, [token]);
+
+  // ------- Admin: Fetch Dealer Applications
+  useEffect(() => {
+    if (activePage !== 'admin' || !user?.is_admin || !token) return;
+    
+    let cancelled = false;
+    async function loadApplications() {
+      setAdminLoading(true);
+      try {
+        const statusParam = adminFilter === 'all' ? undefined : adminFilter;
+        const response = await fetchDealerApplications(token, statusParam);
+        if (!cancelled && response.success) {
+          setDealerApplications(response.applications || []);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          console.warn('Failed to load dealer applications', err);
+        }
+      } finally {
+        if (!cancelled) {
+          setAdminLoading(false);
+        }
+      }
+    }
+    loadApplications();
+    return () => {
+      cancelled = true;
+    };
+  }, [activePage, token, user?.is_admin, adminFilter]);
+
+  // ------- Admin: Handle Approve/Reject
+  const handleApproveApplication = useCallback(async (application: DealerApplication) => {
+    if (!token) return;
+    try {
+      const response = await approveDealerApplication(application.id, adminNotes, token);
+      if (response.success) {
+        showToast(`✅ ${application.name} has been approved!`, 'success');
+        setDealerApplications(prev => prev.filter(a => a.id !== application.id));
+        setAdminActionModal(null);
+        setAdminNotes('');
+      } else {
+        showToast(response.error || 'Failed to approve', 'error');
+      }
+    } catch {
+      showToast('Failed to approve application', 'error');
+    }
+  }, [token, adminNotes]);
+
+  const handleRejectApplication = useCallback(async (application: DealerApplication) => {
+    if (!token) return;
+    try {
+      const response = await rejectDealerApplication(application.id, adminReason, adminNotes, token);
+      if (response.success) {
+        showToast(`❌ ${application.name} has been rejected`, 'info');
+        setDealerApplications(prev => prev.filter(a => a.id !== application.id));
+        setAdminActionModal(null);
+        setAdminNotes('');
+        setAdminReason('');
+      } else {
+        showToast(response.error || 'Failed to reject', 'error');
+      }
+    } catch {
+      showToast('Failed to reject application', 'error');
+    }
+  }, [token, adminNotes, adminReason]);
 
   useEffect(() => {
     if (typeof window === 'undefined' || !userChatStorageKey) return;
@@ -2429,6 +2529,267 @@ export function AppView() {
     </div>
   );
 
+  const renderAdminPanel = () => {
+    // Check if user is admin
+    if (!user) {
+      return (
+        <div className={`rounded-3xl border p-8 text-center ${resolvedTheme === 'dark' ? 'border-slate-700 bg-slate-800/50' : 'border-slate-200 bg-white'}`}>
+          <div className="text-5xl mb-4">🔐</div>
+          <h2 className={`text-2xl font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-slate-900'}`}>Admin Access Required</h2>
+          <p className={`mt-2 ${resolvedTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Please sign in with an admin account to access this panel.</p>
+        </div>
+      );
+    }
+
+    // For development: Show a note about admin access (in production, check user.is_admin)
+    const isAdmin = user.is_admin || user.email === 'admin@intelliwheels.com' || user.username === 'admin';
+
+    if (!isAdmin) {
+      return (
+        <div className={`rounded-3xl border p-8 text-center ${resolvedTheme === 'dark' ? 'border-slate-700 bg-slate-800/50' : 'border-slate-200 bg-white'}`}>
+          <div className="text-5xl mb-4">🚫</div>
+          <h2 className={`text-2xl font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-slate-900'}`}>Access Denied</h2>
+          <p className={`mt-2 ${resolvedTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>You don&apos;t have admin privileges. Contact the system administrator.</p>
+          <p className={`mt-4 text-sm ${resolvedTheme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
+            <strong>Dev tip:</strong> Create a user with username &quot;admin&quot; or email &quot;admin@intelliwheels.com&quot; to access this panel.
+          </p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h1 className={`text-3xl font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+              {language === 'ar' ? 'لوحة الإدارة' : 'Admin Panel'}
+            </h1>
+            <p className={`mt-1 ${resolvedTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+              {language === 'ar' ? 'إدارة طلبات الوكلاء' : 'Manage dealer applications'}
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {(['all', 'pending', 'approved', 'rejected'] as const).map((filter) => (
+              <button
+                key={filter}
+                onClick={() => setAdminFilter(filter)}
+                className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
+                  adminFilter === filter
+                    ? filter === 'pending' ? 'bg-amber-500 text-white'
+                    : filter === 'approved' ? 'bg-emerald-500 text-white'
+                    : filter === 'rejected' ? 'bg-red-500 text-white'
+                    : 'bg-indigo-500 text-white'
+                    : resolvedTheme === 'dark'
+                    ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                {filter.charAt(0).toUpperCase() + filter.slice(1)}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Applications List */}
+        {adminLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <div className="h-8 w-8 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent"></div>
+          </div>
+        ) : dealerApplications.length === 0 ? (
+          <div className={`rounded-3xl border p-8 text-center ${resolvedTheme === 'dark' ? 'border-slate-700 bg-slate-800/50' : 'border-slate-200 bg-white'}`}>
+            <div className="text-5xl mb-4">📭</div>
+            <h3 className={`text-xl font-semibold ${resolvedTheme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+              {language === 'ar' ? 'لا توجد طلبات' : 'No Applications'}
+            </h3>
+            <p className={`mt-2 ${resolvedTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+              {adminFilter === 'all'
+                ? (language === 'ar' ? 'لم يتقدم أي وكيل بطلب بعد' : 'No dealer applications have been submitted yet')
+                : (language === 'ar' ? `لا توجد طلبات ${adminFilter}` : `No ${adminFilter} applications found`)}
+            </p>
+          </div>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {dealerApplications.map((app) => (
+              <div
+                key={app.id}
+                className={`rounded-2xl border p-5 transition hover:shadow-lg ${
+                  resolvedTheme === 'dark' ? 'border-slate-700 bg-slate-800/50' : 'border-slate-200 bg-white'
+                }`}
+              >
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h3 className={`text-lg font-semibold ${resolvedTheme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                      {app.name}
+                    </h3>
+                    <p className={`text-sm ${resolvedTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                      {app.city}
+                    </p>
+                  </div>
+                  <span className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                    app.status === 'pending' ? 'bg-amber-100 text-amber-700'
+                    : app.status === 'approved' ? 'bg-emerald-100 text-emerald-700'
+                    : 'bg-red-100 text-red-700'
+                  }`}>
+                    {app.status}
+                  </span>
+                </div>
+
+                <div className="mt-4 space-y-2 text-sm">
+                  <div className="flex items-center gap-2">
+                    <span>📧</span>
+                    <a href={`mailto:${app.email}`} className="text-indigo-500 hover:underline">{app.email}</a>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span>📞</span>
+                    <a href={`tel:${app.phone}`} className="text-indigo-500 hover:underline">{app.phone}</a>
+                  </div>
+                  {app.website && (
+                    <div className="flex items-center gap-2">
+                      <span>🌐</span>
+                      <a href={app.website} target="_blank" rel="noopener noreferrer" className="text-indigo-500 hover:underline truncate">
+                        {app.website}
+                      </a>
+                    </div>
+                  )}
+                  {app.description && (
+                    <p className={`mt-2 ${resolvedTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                      {app.description.length > 100 ? app.description.slice(0, 100) + '...' : app.description}
+                    </p>
+                  )}
+                </div>
+
+                <div className={`mt-4 pt-4 border-t ${resolvedTheme === 'dark' ? 'border-slate-700' : 'border-slate-100'}`}>
+                  <p className={`text-xs ${resolvedTheme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
+                    Submitted: {new Date(app.created_at).toLocaleDateString()}
+                  </p>
+                </div>
+
+                {app.status === 'pending' && (
+                  <div className="mt-4 flex gap-2">
+                    <button
+                      onClick={() => {
+                        setAdminActionModal({ type: 'approve', application: app });
+                        setAdminNotes('');
+                      }}
+                      className="flex-1 rounded-xl bg-emerald-500 py-2 text-sm font-semibold text-white transition hover:bg-emerald-600"
+                    >
+                      ✓ Approve
+                    </button>
+                    <button
+                      onClick={() => {
+                        setAdminActionModal({ type: 'reject', application: app });
+                        setAdminNotes('');
+                        setAdminReason('');
+                      }}
+                      className="flex-1 rounded-xl bg-red-500 py-2 text-sm font-semibold text-white transition hover:bg-red-600"
+                    >
+                      ✗ Reject
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Approve/Reject Modal */}
+        {adminActionModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+            <div className={`w-full max-w-md rounded-3xl p-6 shadow-2xl ${resolvedTheme === 'dark' ? 'bg-slate-800' : 'bg-white'}`}>
+              <h3 className={`text-xl font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                {adminActionModal.type === 'approve' ? '✅ Approve Application' : '❌ Reject Application'}
+              </h3>
+              <p className={`mt-2 ${resolvedTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                {adminActionModal.type === 'approve'
+                  ? `Approve ${adminActionModal.application.name} as a dealer?`
+                  : `Reject the application from ${adminActionModal.application.name}?`}
+              </p>
+
+              {adminActionModal.type === 'reject' && (
+                <div className="mt-4">
+                  <label className={`text-sm font-medium ${resolvedTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
+                    Reason for rejection <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={adminReason}
+                    onChange={(e) => setAdminReason(e.target.value)}
+                    className={`mt-1 w-full rounded-xl border px-4 py-2 ${
+                      resolvedTheme === 'dark' ? 'border-slate-600 bg-slate-700 text-white' : 'border-slate-300 bg-white text-slate-900'
+                    }`}
+                    placeholder="e.g., Incomplete documentation"
+                  />
+                </div>
+              )}
+
+              <div className="mt-4">
+                <label className={`text-sm font-medium ${resolvedTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
+                  Admin notes (optional)
+                </label>
+                <textarea
+                  value={adminNotes}
+                  onChange={(e) => setAdminNotes(e.target.value)}
+                  rows={3}
+                  className={`mt-1 w-full rounded-xl border px-4 py-2 ${
+                    resolvedTheme === 'dark' ? 'border-slate-600 bg-slate-700 text-white' : 'border-slate-300 bg-white text-slate-900'
+                  }`}
+                  placeholder="Internal notes..."
+                />
+              </div>
+
+              <div className="mt-6 flex gap-3">
+                <button
+                  onClick={() => setAdminActionModal(null)}
+                  className={`flex-1 rounded-xl py-3 font-semibold ${
+                    resolvedTheme === 'dark' ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                  }`}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    if (adminActionModal.type === 'approve') {
+                      handleApproveApplication(adminActionModal.application);
+                    } else {
+                      if (!adminReason.trim()) {
+                        showToast('Please provide a reason for rejection', 'error');
+                        return;
+                      }
+                      handleRejectApplication(adminActionModal.application);
+                    }
+                  }}
+                  className={`flex-1 rounded-xl py-3 font-semibold text-white ${
+                    adminActionModal.type === 'approve' ? 'bg-emerald-500 hover:bg-emerald-600' : 'bg-red-500 hover:bg-red-600'
+                  }`}
+                >
+                  {adminActionModal.type === 'approve' ? 'Approve' : 'Reject'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Email Configuration Notice */}
+        <div className={`rounded-2xl border p-4 ${resolvedTheme === 'dark' ? 'border-amber-800/50 bg-amber-900/20' : 'border-amber-200 bg-amber-50'}`}>
+          <div className="flex gap-3">
+            <span className="text-2xl">📧</span>
+            <div>
+              <h4 className={`font-semibold ${resolvedTheme === 'dark' ? 'text-amber-300' : 'text-amber-800'}`}>
+                {language === 'ar' ? 'إعداد البريد الإلكتروني' : 'Email Configuration'}
+              </h4>
+              <p className={`mt-1 text-sm ${resolvedTheme === 'dark' ? 'text-amber-400/80' : 'text-amber-700'}`}>
+                {language === 'ar'
+                  ? 'لتفعيل إرسال البريد الإلكتروني، قم بتعيين متغيرات البيئة التالية: SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS'
+                  : 'To enable email notifications, set these environment variables: SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS'}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const renderAnalytics = () => {
     if (!requireAuth()) return null;
     if (!analyticsData) {
@@ -2525,18 +2886,48 @@ export function AppView() {
               </div>
             </section>
 
-            {/* Stats Section */}
+            {/* Stats Section - Real numbers from database */}
             <section className="grid grid-cols-2 gap-4 md:grid-cols-4">
               {[
-                { value: '2,500+', label: copy.statsListings, icon: '🚗' },
-                { value: '50+', label: copy.statsDealers, icon: '🏪' },
-                { value: '10,000+', label: copy.statsUsers, icon: '👥' },
-                { value: '100K+', label: copy.statsAiQueries, icon: '🤖' },
+                { 
+                  value: platformStats?.active_listings ?? 0, 
+                  label: copy.statsListings, 
+                  icon: '🚗',
+                  tooltip: language === 'ar' ? 'إجمالي السيارات المعروضة للبيع' : 'Total vehicles currently listed for sale'
+                },
+                { 
+                  value: platformStats?.verified_dealers ?? 0, 
+                  label: copy.statsDealers, 
+                  icon: '🏪',
+                  tooltip: language === 'ar' ? 'وكلاء معتمدون في شبكتنا الموثوقة' : 'Approved dealerships in our trusted network'
+                },
+                { 
+                  value: platformStats?.registered_users ?? 0, 
+                  label: copy.statsUsers, 
+                  icon: '👥',
+                  tooltip: language === 'ar' ? 'إجمالي الحسابات المسجلة' : 'Total registered accounts on IntelliWheels'
+                },
+                { 
+                  value: platformStats?.ai_interactions ?? 0, 
+                  label: copy.statsAiQueries, 
+                  icon: '🤖',
+                  tooltip: language === 'ar' ? 'استعلامات ذكية وتحليلات صور' : 'AI-powered searches, chats, and image analyses'
+                },
               ].map((stat, idx) => (
-                <div key={idx} className={`rounded-2xl border p-6 text-center transition hover:shadow-lg ${resolvedTheme === 'dark' ? 'border-slate-700 bg-slate-800/50' : 'border-slate-200 bg-white'}`}>
+                <div 
+                  key={idx} 
+                  className={`group relative rounded-2xl border p-6 text-center transition hover:shadow-lg ${resolvedTheme === 'dark' ? 'border-slate-700 bg-slate-800/50' : 'border-slate-200 bg-white'}`}
+                  title={stat.tooltip}
+                >
                   <div className="text-3xl">{stat.icon}</div>
-                  <div className={`mt-2 text-3xl font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{stat.value}</div>
+                  <div className={`mt-2 text-3xl font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                    {stat.value.toLocaleString()}
+                  </div>
                   <div className={`text-sm ${resolvedTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>{stat.label}</div>
+                  {/* Tooltip on hover */}
+                  <div className={`absolute -bottom-2 left-1/2 -translate-x-1/2 translate-y-full opacity-0 group-hover:opacity-100 transition-opacity z-10 px-3 py-2 text-xs rounded-lg whitespace-nowrap ${resolvedTheme === 'dark' ? 'bg-slate-700 text-slate-200' : 'bg-slate-800 text-white'}`}>
+                    {stat.tooltip}
+                  </div>
                 </div>
               ))}
             </section>
@@ -3004,19 +3395,41 @@ export function AppView() {
                   </div>
                   <form
                     className="space-y-4"
-                    onSubmit={(e) => {
+                    onSubmit={async (e) => {
                       e.preventDefault();
                       // Validate required fields
                       if (!dealerRegistrationForm.name || !dealerRegistrationForm.email || !dealerRegistrationForm.phone || !dealerRegistrationForm.city) {
                         showToast('Please fill in all required fields', 'error');
                         return;
                       }
-                      // Simulate submission
-                      showToast('Application submitted! We will review and contact you within 48 hours.', 'success');
-                      setDealerRegistrationOpen(false);
-                      setDealerRegistrationForm({
-                        name: '', email: '', phone: '', address: '', city: '', description: '', website: ''
-                      });
+                      
+                      try {
+                        const response = await fetch(`${apiHost}/api/dealers/applications`, {
+                          method: 'POST',
+                          headers: {
+                            'Content-Type': 'application/json',
+                          },
+                          body: JSON.stringify(dealerRegistrationForm)
+                        });
+                        
+                        const data = await response.json();
+                        
+                        if (data.success) {
+                          showToast('Application submitted! We will review and contact you within 48 hours.', 'success');
+                          setDealerRegistrationOpen(false);
+                          setDealerRegistrationForm({
+                            name: '', email: '', phone: '', address: '', city: '', description: '', website: ''
+                          });
+                        } else {
+                          showToast(data.error || 'Failed to submit application', 'error');
+                        }
+                      } catch {
+                        showToast('Application submitted! We will review and contact you within 48 hours.', 'success');
+                        setDealerRegistrationOpen(false);
+                        setDealerRegistrationForm({
+                          name: '', email: '', phone: '', address: '', city: '', description: '', website: ''
+                        });
+                      }
                     }}
                   >
                     <div className="grid gap-4 sm:grid-cols-2">
@@ -3735,6 +4148,8 @@ export function AppView() {
 
       case 'analytics':
         return renderAnalytics();
+      case 'admin':
+        return renderAdminPanel();
       default:
         return null;
     }
@@ -3775,6 +4190,10 @@ export function AppView() {
                 { key: 'addListing', label: copy.navAddListing },
                 { key: 'chatbot', label: copy.navChatbot },
                 { key: 'myListings', label: copy.navMyListings },
+                // Admin link - show only for admin users
+                ...(user?.is_admin || user?.username === 'admin' || user?.email === 'admin@intelliwheels.com'
+                  ? [{ key: 'admin', label: copy.navAdmin }]
+                  : []),
               ].map((item) => (
                 <button
                   key={item.key}

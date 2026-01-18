@@ -166,6 +166,7 @@ def _init_postgres_tables(db):
             email TEXT UNIQUE NOT NULL,
             password_hash TEXT NOT NULL,
             role TEXT DEFAULT 'user',
+            is_admin BOOLEAN DEFAULT FALSE,
             created_at TIMESTAMP DEFAULT NOW()
         )
     ''')
@@ -230,6 +231,25 @@ def _init_postgres_tables(db):
             image_url TEXT,
             contact_email TEXT,
             contact_phone TEXT,
+            created_at TIMESTAMP DEFAULT NOW()
+        )
+    ''')
+
+    # Create Dealer Applications Table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS dealer_applications (
+            id SERIAL PRIMARY KEY,
+            name TEXT NOT NULL,
+            email TEXT NOT NULL,
+            phone TEXT NOT NULL,
+            city TEXT NOT NULL,
+            address TEXT,
+            website TEXT,
+            description TEXT,
+            status TEXT DEFAULT 'pending',
+            admin_notes TEXT,
+            reviewed_by INTEGER REFERENCES users(id),
+            reviewed_at TIMESTAMP,
             created_at TIMESTAMP DEFAULT NOW()
         )
     ''')
@@ -311,6 +331,7 @@ def _init_sqlite_tables(db):
             email TEXT UNIQUE NOT NULL,
             password_hash TEXT NOT NULL,
             role TEXT DEFAULT 'user',
+            is_admin INTEGER DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
@@ -376,6 +397,25 @@ def _init_sqlite_tables(db):
             image_url TEXT,
             contact_email TEXT,
             contact_phone TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+
+    # Create Dealer Applications Table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS dealer_applications (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            email TEXT NOT NULL,
+            phone TEXT NOT NULL,
+            city TEXT NOT NULL,
+            address TEXT,
+            website TEXT,
+            description TEXT,
+            status TEXT DEFAULT 'pending',
+            admin_notes TEXT,
+            reviewed_by INTEGER REFERENCES users(id),
+            reviewed_at TIMESTAMP,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
