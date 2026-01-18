@@ -1,12 +1,12 @@
 from flask import Blueprint, request, jsonify, g
 from werkzeug.security import generate_password_hash, check_password_hash
-from ..db import get_db
+from ..db import get_db, is_postgres
 from ..security import (
     validate_username, validate_email, validate_password,
     sanitize_string, rate_limit, validate_json_request
 )
 import secrets
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 bp = Blueprint('auth', __name__, url_prefix='/api/auth')
 
@@ -21,14 +21,25 @@ def get_user_from_token(token):
     token = sanitize_string(token)[:64]  # Tokens shouldn't be longer than this
     
     db = get_db()
-    # Check for valid session - first try without is_admin, then check if column exists
+    # Check for valid session
+    # Use explicit UTC timestamp comparison to avoid timezone issues
     try:
-        row = db.execute('''
-            SELECT u.id, u.username, u.email, u.role, u.created_at
-            FROM users u
-            JOIN user_sessions s ON u.id = s.user_id
-            WHERE s.token = ? AND (s.expires_at IS NULL OR s.expires_at > CURRENT_TIMESTAMP)
-        ''', (token,)).fetchone()
+        if is_postgres():
+            # PostgreSQL: use NOW() AT TIME ZONE 'UTC' for UTC comparison
+            row = db.execute('''
+                SELECT u.id, u.username, u.email, u.role, u.created_at
+                FROM users u
+                JOIN user_sessions s ON u.id = s.user_id
+                WHERE s.token = %s AND (s.expires_at IS NULL OR s.expires_at > (NOW() AT TIME ZONE 'UTC'))
+            ''', (token,)).fetchone()
+        else:
+            # SQLite: use CURRENT_TIMESTAMP (already UTC)
+            row = db.execute('''
+                SELECT u.id, u.username, u.email, u.role, u.created_at
+                FROM users u
+                JOIN user_sessions s ON u.id = s.user_id
+                WHERE s.token = ? AND (s.expires_at IS NULL OR s.expires_at > CURRENT_TIMESTAMP)
+            ''', (token,)).fetchone()
     except Exception as e:
         print(f"[Auth] Error fetching user: {e}")
         return None
@@ -37,7 +48,10 @@ def get_user_from_token(token):
         # Check if is_admin column exists by trying to access it
         is_admin = False
         try:
-            admin_row = db.execute('SELECT is_admin FROM users WHERE id = ?', (row['id'],)).fetchone()
+            if is_postgres():
+                admin_row = db.execute('SELECT is_admin FROM users WHERE id = %s', (row['id'],)).fetchone()
+            else:
+                admin_row = db.execute('SELECT is_admin FROM users WHERE id = ?', (row['id'],)).fetchone()
             if admin_row:
                 is_admin = bool(admin_row['is_admin']) if admin_row['is_admin'] else False
         except Exception:
@@ -87,9 +101,9 @@ def signup():
         )
         user_id = cursor.lastrowid
         
-        # Create session
+        # Create session with UTC timestamp
         token = generate_token()
-        expires_at = datetime.utcnow() + timedelta(days=7)
+        expires_at = datetime.now(timezone.utc) + timedelta(days=7)
         db.execute(
             'INSERT INTO user_sessions (token, user_id, expires_at) VALUES (?, ?, ?)',
             (token, user_id, expires_at)
@@ -138,7 +152,7 @@ def login():
     # Use constant-time comparison via check_password_hash
     if user and check_password_hash(user['password_hash'], password):
         token = generate_token()
-        expires_at = datetime.utcnow() + timedelta(days=7)
+        expires_at = datetime.now(timezone.utc) + timedelta(days=7)
         
         # Clean up old sessions for this user (keep last 5)
         db.execute('''
