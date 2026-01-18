@@ -203,19 +203,44 @@ def login():
         expires_at = datetime.now(timezone.utc) + timedelta(days=7)
         
         # Clean up old sessions for this user (keep last 5)
-        db.execute('''
-            DELETE FROM user_sessions 
-            WHERE user_id = ? AND token NOT IN (
-                SELECT token FROM user_sessions 
-                WHERE user_id = ? 
-                ORDER BY created_at DESC LIMIT 5
-            )
-        ''', (user['id'], user['id']))
+        # Note: Using simple delete instead of complex subquery for PostgreSQL compatibility
+        try:
+            from ..db import is_postgres
+            if is_postgres():
+                # PostgreSQL: delete sessions older than the 5 most recent
+                db.execute('''
+                    DELETE FROM user_sessions 
+                    WHERE user_id = %s AND id NOT IN (
+                        SELECT id FROM user_sessions 
+                        WHERE user_id = %s 
+                        ORDER BY created_at DESC LIMIT 5
+                    )
+                ''', (user['id'], user['id']))
+            else:
+                db.execute('''
+                    DELETE FROM user_sessions 
+                    WHERE user_id = ? AND token NOT IN (
+                        SELECT token FROM user_sessions 
+                        WHERE user_id = ? 
+                        ORDER BY created_at DESC LIMIT 5
+                    )
+                ''', (user['id'], user['id']))
+        except Exception as e:
+            print(f"[Auth] Session cleanup warning: {e}")
+            # Don't fail login if cleanup fails
         
-        db.execute(
-            'INSERT INTO user_sessions (token, user_id, expires_at) VALUES (?, ?, ?)',
-            (token, user['id'], expires_at)
-        )
+        # Insert new session
+        from ..db import is_postgres
+        if is_postgres():
+            db.execute(
+                'INSERT INTO user_sessions (token, user_id, expires_at) VALUES (%s, %s, %s)',
+                (token, user['id'], expires_at)
+            )
+        else:
+            db.execute(
+                'INSERT INTO user_sessions (token, user_id, expires_at) VALUES (?, ?, ?)',
+                (token, user['id'], expires_at)
+            )
         db.commit()
 
         # Safely check is_admin column
