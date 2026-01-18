@@ -1119,6 +1119,11 @@ export function AppView() {
   }, [token, requireAuth]);
 
   useEffect(() => {
+    // Wait until auth loading completes before fetching protected data
+    // This prevents 401 errors from stale tokens that haven't been validated yet
+    if (authLoading) {
+      return;
+    }
     if (!token) {
       setFavorites([]);
       setFavoriteCars([]);
@@ -1146,11 +1151,11 @@ export function AppView() {
       }
     }
     hydrateAuthorizedData();
-  }, [token]);
+  }, [token, authLoading]);
 
   // Load my listings analytics when on myListings page
   useEffect(() => {
-    if (!token || activePage !== 'myListings') {
+    if (authLoading || !token || activePage !== 'myListings') {
       return;
     }
     async function loadMyListingsAnalytics() {
@@ -1167,10 +1172,10 @@ export function AppView() {
       }
     }
     loadMyListingsAnalytics();
-  }, [token, activePage]);
+  }, [token, activePage, authLoading]);
 
   useEffect(() => {
-    if (!token) {
+    if (authLoading || !token) {
       setAnalyticsData(null);
       return;
     }
@@ -1185,10 +1190,10 @@ export function AppView() {
       }
     }
     loadAnalytics();
-  }, [token, analyticsFilter]);
+  }, [token, analyticsFilter, authLoading]);
 
   useEffect(() => {
-    if (!token) {
+    if (authLoading || !token) {
       setDealers([]);
       setDealersLoading(false);
       return;
@@ -1215,11 +1220,11 @@ export function AppView() {
     return () => {
       cancelled = true;
     };
-  }, [token]);
+  }, [token, authLoading]);
 
   // ------- Admin: Fetch Dealer Applications
   useEffect(() => {
-    if (activePage !== 'admin' || !user?.is_admin || !token) return;
+    if (authLoading || activePage !== 'admin' || !user?.is_admin || !token) return;
     
     let cancelled = false;
     async function loadApplications() {
@@ -1244,7 +1249,7 @@ export function AppView() {
     return () => {
       cancelled = true;
     };
-  }, [activePage, token, user?.is_admin, adminFilter]);
+  }, [activePage, token, user?.is_admin, adminFilter, authLoading]);
 
   // ------- Admin: Handle Approve/Reject
   const handleApproveApplication = useCallback(async (application: DealerApplication) => {
