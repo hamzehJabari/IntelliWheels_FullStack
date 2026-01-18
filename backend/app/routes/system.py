@@ -150,6 +150,48 @@ def admin_setup_make_admin():
     
     return jsonify({'success': True, 'message': f'User {user_id} is now an admin'})
 
+@bp.route('/admin-setup/sessions', methods=['GET'])
+def admin_setup_sessions():
+    """TEMPORARY: Debug sessions for a user."""
+    secret = request.args.get('secret')
+    if secret != os.environ.get('SECRET_KEY', '')[:16]:
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    user_id = request.args.get('user_id')
+    token_prefix = request.args.get('token', '')[:10] if request.args.get('token') else None
+    
+    db = get_db()
+    from ..db import is_postgres
+    from datetime import datetime, timezone
+    
+    # Get current server time
+    if is_postgres():
+        now_row = db.execute("SELECT NOW() AT TIME ZONE 'UTC' as now").fetchone()
+    else:
+        now_row = db.execute("SELECT datetime('now') as now").fetchone()
+    
+    server_now = now_row['now'] if now_row else 'unknown'
+    
+    # Get sessions
+    if user_id:
+        sessions = db.execute('SELECT id, token, user_id, created_at, expires_at FROM user_sessions WHERE user_id = ? ORDER BY created_at DESC LIMIT 10', (user_id,)).fetchall()
+    else:
+        sessions = db.execute('SELECT id, token, user_id, created_at, expires_at FROM user_sessions ORDER BY created_at DESC LIMIT 20').fetchall()
+    
+    return jsonify({
+        'server_time_utc': str(server_now),
+        'sessions': [
+            {
+                'id': s['id'],
+                'token_preview': s['token'][:15] + '...' if s['token'] else None,
+                'user_id': s['user_id'],
+                'created_at': str(s['created_at']),
+                'expires_at': str(s['expires_at']),
+            }
+            for s in sessions
+        ]
+    })
+
 
 @bp.route('/stats')
 def platform_stats():
