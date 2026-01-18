@@ -56,21 +56,36 @@ class PostgresCursorWrapper:
             if 'ON CONFLICT' not in sql.upper():
                 sql = sql.rstrip(';').rstrip() + ' ON CONFLICT DO NOTHING'
         
+        # For INSERT statements to tables with SERIAL id, add RETURNING id to get the lastrowid.
+        # Exclude tables that don't have SERIAL id:
+        # - user_sessions: uses TEXT PRIMARY KEY (token)
+        # - favorites: uses composite PRIMARY KEY (user_id, car_id)
+        sql_lower = sql.lower()
+        tables_without_serial_id = ['user_sessions', 'favorites']
+        has_serial_id = not any(table in sql_lower for table in tables_without_serial_id)
+        
+        needs_returning = (
+            sql.strip().upper().startswith('INSERT') and 
+            'RETURNING' not in sql.upper() and 
+            'ON CONFLICT' not in sql.upper() and
+            has_serial_id
+        )
+        if needs_returning:
+            sql = sql.rstrip(';').rstrip() + ' RETURNING id'
+        
         if params:
             self._cursor.execute(sql, params)
         else:
             self._cursor.execute(sql)
         
-        # Get lastrowid for INSERT statements (only if not ON CONFLICT)
-        if sql.strip().upper().startswith('INSERT') and 'RETURNING' not in sql.upper() and 'ON CONFLICT' not in sql.upper():
+        # Get lastrowid from RETURNING clause if we added it
+        if needs_returning:
             try:
-                # Try to get the last inserted id
-                self._cursor.execute("SELECT lastval()")
                 result = self._cursor.fetchone()
                 if result:
                     self.lastrowid = result[0]
-            except:
-                pass
+            except Exception:
+                pass  # No result to fetch
         
         return self
     
