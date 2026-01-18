@@ -202,20 +202,19 @@ def login():
         token = generate_token()
         expires_at = datetime.now(timezone.utc) + timedelta(days=7)
         
-        # Clean up old sessions for this user (keep last 5)
-        # Note: Using simple delete instead of complex subquery for PostgreSQL compatibility
+        # Clean up old sessions for this user (keep last 5) - skip on error
         try:
-            from ..db import is_postgres
             if is_postgres():
-                # PostgreSQL: delete sessions older than the 5 most recent
+                # PostgreSQL doesn't allow LIMIT in subquery with NOT IN, so use a different approach
                 db.execute('''
                     DELETE FROM user_sessions 
-                    WHERE user_id = %s AND id NOT IN (
+                    WHERE id IN (
                         SELECT id FROM user_sessions 
                         WHERE user_id = %s 
-                        ORDER BY created_at DESC LIMIT 5
+                        ORDER BY created_at DESC 
+                        OFFSET 5
                     )
-                ''', (user['id'], user['id']))
+                ''', (user['id'],))
             else:
                 db.execute('''
                     DELETE FROM user_sessions 
@@ -226,11 +225,9 @@ def login():
                     )
                 ''', (user['id'], user['id']))
         except Exception as e:
-            print(f"[Auth] Session cleanup warning: {e}")
-            # Don't fail login if cleanup fails
+            print(f"[Auth] Session cleanup warning (non-fatal): {e}")
         
         # Insert new session
-        from ..db import is_postgres
         if is_postgres():
             db.execute(
                 'INSERT INTO user_sessions (token, user_id, expires_at) VALUES (%s, %s, %s)',
