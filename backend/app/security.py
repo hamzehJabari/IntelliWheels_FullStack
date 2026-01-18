@@ -243,3 +243,30 @@ def require_auth():
     from .routes.auth import get_user_from_token
     token = request.headers.get('Authorization', '').replace('Bearer ', '')
     return get_user_from_token(token)
+
+def token_required(f):
+    """
+    Decorator that requires a valid authentication token.
+    Passes the current_user dict as the first argument to the decorated function.
+    """
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        from .routes.auth import get_user_from_token
+        token = request.headers.get('Authorization', '').replace('Bearer ', '')
+        
+        if not token:
+            return jsonify({
+                'success': False,
+                'error': 'Authentication required'
+            }), 401
+        
+        current_user = get_user_from_token(token)
+        if not current_user:
+            return jsonify({
+                'success': False,
+                'error': 'Invalid or expired token'
+            }), 401
+        
+        return f(current_user, *args, **kwargs)
+    
+    return decorated_function
