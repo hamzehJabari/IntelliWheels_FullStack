@@ -213,6 +213,12 @@ export interface DealerSummary {
   average_price?: number | null;
   top_makes: Array<{ make: string; count: number; average_price?: number | null }>;
   hero_image?: string | null;
+  location?: {
+    lat?: number;
+    lng?: number;
+    city?: string;
+    address?: string;
+  };
 }
 
 export interface DealerDetail extends DealerSummary {

@@ -630,11 +630,28 @@ export function AppView() {
   const [currentPage, setCurrentPage] = useState(1);
   const [headerSearchOpen, setHeaderSearchOpen] = useState(false);
   const [headerSearchQuery, setHeaderSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [dealerTab, setDealerTab] = useState<'map' | 'grid'>('grid');
+  const [dealerRegistrationOpen, setDealerRegistrationOpen] = useState(false);
+  const [dealerRegistrationForm, setDealerRegistrationForm] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    address: '',
+    city: '',
+    description: '',
+    website: '',
+  });
+  const [floatingChatOpen, setFloatingChatOpen] = useState(false);
+  const [floatingChatPosition, setFloatingChatPosition] = useState({ x: 20, y: 20 });
+  const [isDraggingChat, setIsDraggingChat] = useState(false);
+  const [systemPrefersDark, setSystemPrefersDark] = useState(false);
+  const floatingChatRef = useRef<HTMLDivElement | null>(null);
   const serviceMenuRef = useRef<HTMLDivElement | null>(null);
   const navMenuRef = useRef<HTMLDivElement | null>(null);
   const settingsMenuRef = useRef<HTMLDivElement | null>(null);
   const headerSearchRef = useRef<HTMLInputElement | null>(null);
-  const resolvedTheme = theme === 'system' ? 'light' : theme;
+  const resolvedTheme = theme === 'system' ? (systemPrefersDark ? 'dark' : 'light') : theme;
   const currentService = SERVICE_CONFIG.find((service) => service.key === serviceMode) ?? SERVICE_CONFIG[0];
   const router = useRouter();
 
@@ -675,7 +692,7 @@ export function AppView() {
   // Background with elegant gradient - provides professional look without external image dependency
   const backgroundImageStyle = {
     backgroundImage: resolvedTheme === 'dark'
-      ? 'linear-gradient(135deg, rgba(15, 23, 42, 1) 0%, rgba(30, 41, 59, 1) 25%, rgba(51, 65, 85, 0.9) 50%, rgba(30, 58, 138, 0.8) 75%, rgba(14, 165, 233, 0.6) 100%)'
+      ? 'linear-gradient(135deg, rgba(2, 6, 23, 1) 0%, rgba(15, 23, 42, 1) 25%, rgba(30, 41, 59, 0.95) 50%, rgba(15, 23, 42, 0.9) 75%, rgba(2, 6, 23, 1) 100%)'
       : 'linear-gradient(135deg, rgba(248, 250, 252, 1) 0%, rgba(241, 245, 249, 1) 25%, rgba(226, 232, 240, 0.95) 50%, rgba(186, 230, 253, 0.8) 75%, rgba(56, 189, 248, 0.4) 100%)',
     backgroundSize: 'cover',
     backgroundPosition: 'center',
@@ -683,10 +700,10 @@ export function AppView() {
     backgroundRepeat: 'no-repeat',
   };
   const headerSurfaceClass = resolvedTheme === 'dark'
-    ? 'bg-slate-800/95 border-b border-slate-700/60 text-slate-100'
-    : 'bg-slate-100/95 border-b border-slate-300/60 text-slate-900';
+    ? 'bg-white/95 border-b border-slate-200/60 text-slate-900'
+    : 'bg-white/95 border-b border-slate-200/60 text-slate-900';
   const mainSurfaceClass = resolvedTheme === 'dark'
-    ? 'border-slate-800 bg-slate-900/80 text-slate-100'
+    ? 'border-slate-700 bg-slate-900/95 text-slate-100'
     : 'border-slate-100 bg-white/90 text-slate-900';
   const headerMuted = resolvedTheme === 'dark' ? 'text-slate-400' : 'text-slate-500';
   const headerSubtleText = resolvedTheme === 'dark' ? 'text-slate-300' : 'text-slate-600';
@@ -725,13 +742,28 @@ export function AppView() {
     },
     [router]
   );
-  const inputFieldClass = 'rounded-2xl border border-slate-200 bg-slate-50 p-3 text-slate-900 placeholder-slate-400 focus:border-sky-500 focus:outline-none';
+  const inputFieldClass = resolvedTheme === 'dark'
+    ? 'rounded-2xl border border-slate-600 bg-slate-700 p-3 text-white placeholder-slate-400 focus:border-sky-500 focus:outline-none'
+    : 'rounded-2xl border border-slate-200 bg-slate-50 p-3 text-slate-900 placeholder-slate-400 focus:border-sky-500 focus:outline-none';
 
   const chatSession = useMemo(() => chatSessions.find((session) => session.id === activeSessionId) ?? null, [chatSessions, activeSessionId]);
   const chatMessages = chatSession?.messages ?? [];
 
   useEffect(() => {
     setMounted(true);
+  }, []);
+
+  // Detect system dark mode preference
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    setSystemPrefersDark(mediaQuery.matches);
+    
+    const handleChange = (e: MediaQueryListEvent) => {
+      setSystemPrefersDark(e.matches);
+    };
+    mediaQuery.addEventListener('change', handleChange);
+    return () => mediaQuery.removeEventListener('change', handleChange);
   }, []);
 
   useEffect(() => {
@@ -889,11 +921,22 @@ export function AppView() {
     setTimeout(() => setToast(null), 4000);
   }, []);
 
+  // Debounce search input to avoid excessive re-renders
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(filters.search);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [filters.search]);
+
+  // Load cars once on mount and when make filter changes (not on search)
   useEffect(() => {
     const controller = new AbortController();
     async function loadCars() {
       try {
-        const response = await fetchCars(filters, controller.signal, token);
+        // Only pass make filter to server, search is done locally
+        const serverFilters = { ...filters, search: '' };
+        const response = await fetchCars(serverFilters, controller.signal, token);
         if (response.success) {
           setCars(response.cars || []);
         }
@@ -909,7 +952,7 @@ export function AppView() {
     }
     loadCars();
     return () => controller.abort();
-  }, [filters, token, requireAuth]);
+  }, [filters.make, filters.category, filters.sort, token]);
 
   useEffect(() => {
     async function loadMakes() {
@@ -1095,10 +1138,10 @@ export function AppView() {
       try {
         if (isFavorited) {
           await removeFavorite(car.id, token);
-          showToast('Removed from favorites', 'info');
+          showToast('💔 Removed from favorites', 'info');
         } else {
           await addFavorite(car.id, token);
-          showToast('Added to favorites');
+          showToast('❤️ Added to favorites successfully');
         }
       } catch (err) {
         showToast('Unable to update favorites', 'error');
@@ -1197,9 +1240,9 @@ export function AppView() {
     try {
       const url = await uploadImageAsset(file);
       handleListingInput('image', url);
-      showToast('Image uploaded');
+      showToast('✅ Image uploaded successfully');
     } catch (err: any) {
-      showToast(err.message || 'Upload failed', 'error');
+      showToast(err.message || 'Failed to upload image', 'error');
     }
   };
 
@@ -1209,7 +1252,7 @@ export function AppView() {
       // Calculate remaining slots (max 12 images)
       const remainingSlots = 12 - listingForm.galleryImages.length;
       if (remainingSlots <= 0) {
-        showToast('Maximum 12 images allowed', 'info');
+        showToast('Gallery is full - maximum 12 images allowed', 'info');
         return;
       }
       const uploads = Array.from(fileList).slice(0, remainingSlots);
@@ -1375,7 +1418,7 @@ export function AppView() {
       };
       const response = await createListing(payload, token);
       if (response.success) {
-        showToast('Listing created successfully');
+        showToast('🎉 Listing created successfully');
         setListingForm({
           make: '',
           model: '',
@@ -1422,7 +1465,7 @@ export function AppView() {
     try {
       await deleteListing(carId, token);
       setMyListings((prev) => prev.filter((car) => car.id !== carId));
-      showToast('Listing removed', 'info');
+      showToast('🗑️ Listing removed', 'info');
     } catch (err: any) {
       showToast(err.message || 'Unable to delete listing', 'error');
     }
@@ -1573,7 +1616,7 @@ export function AppView() {
       };
       const response = await updateListing(editingListing.id, payload, token);
       if (response.success) {
-        showToast('Listing updated successfully');
+        showToast('✅ Listing updated successfully');
         setEditingListing(null);
         const refresh = await fetchMyListings(token);
         if (refresh.success) setMyListings(refresh.cars || []);
@@ -1757,8 +1800,13 @@ export function AppView() {
     if (!toast) return null;
     const base = toast.type === 'error' ? 'bg-red-500/90' : toast.type === 'info' ? 'bg-blue-500/90' : 'bg-emerald-500/90';
     return (
-      <div className={`fixed top-6 right-6 z-50 rounded-xl px-4 py-3 text-white shadow-xl ${base}`}>
-        {toast.message}
+      <div className={`fixed top-6 right-6 z-[60] rounded-xl px-4 py-3 text-white shadow-xl animate-slide-in ${base}`}>
+        <div className="flex items-center gap-2">
+          {toast.type === 'success' && <span>✓</span>}
+          {toast.type === 'error' && <span>✕</span>}
+          {toast.type === 'info' && <span>ℹ</span>}
+          {toast.message}
+        </div>
       </div>
     );
   };
@@ -1766,13 +1814,13 @@ export function AppView() {
   const filteredCars = useMemo(() => {
     return cars.filter((car) => {
       if (filters.make !== 'all' && car.make !== filters.make) return false;
-      if (filters.search) {
+      if (debouncedSearch) {
         const haystack = `${car.make} ${car.model} ${car.year}`.toLowerCase();
-        if (!haystack.includes(filters.search.toLowerCase())) return false;
+        if (!haystack.includes(debouncedSearch.toLowerCase())) return false;
       }
       return true;
     });
-  }, [cars, filters]);
+  }, [cars, filters.make, debouncedSearch]);
 
   const sortedCars = useMemo(() => {
     const clone = [...filteredCars];
@@ -1794,7 +1842,7 @@ export function AppView() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [filters.make, filters.search, filters.sort]);
+  }, [filters.make, debouncedSearch, filters.sort]);
 
   useEffect(() => {
     if (currentPage > totalPages) {
@@ -1831,9 +1879,9 @@ export function AppView() {
   const renderCarCard = (car: Car) => (
     <div
       key={car.id}
-      className="flex flex-col rounded-3xl border border-slate-100 bg-white/90 p-4 shadow-lg transition hover:-translate-y-1 hover:shadow-xl"
+      className={`flex flex-col rounded-3xl border p-4 shadow-lg transition hover:-translate-y-1 hover:shadow-xl ${resolvedTheme === 'dark' ? 'border-slate-700 bg-slate-800' : 'border-slate-100 bg-white/90'}`}
     >
-      <div className="relative overflow-hidden rounded-2xl bg-slate-100">
+      <div className={`relative overflow-hidden rounded-2xl ${resolvedTheme === 'dark' ? 'bg-slate-700' : 'bg-slate-100'}`}>
         <img
           src={getCarImage(car)}
           alt={`${car.make} ${car.model}`}
@@ -1855,17 +1903,17 @@ export function AppView() {
       </div>
       <div className="mt-4 flex items-start justify-between gap-3">
         <div>
-          <h3 className="text-lg font-semibold text-slate-900">{car.make} {car.model}</h3>
-          <p className="text-sm text-slate-500">{car.year || 'Year TBD'}</p>
+          <h3 className={`text-lg font-semibold ${resolvedTheme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{car.make} {car.model}</h3>
+          <p className={`text-sm ${resolvedTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>{car.year || 'Year TBD'}</p>
         </div>
-        <div className="text-right text-2xl font-bold text-emerald-600">
+        <div className="text-right text-2xl font-bold text-emerald-500">
           {formatPrice(car.price, car.currency)}
         </div>
       </div>
       {car.specs?.bodyStyle && (
-        <p className="text-sm text-slate-600">{car.specs.bodyStyle}</p>
+        <p className={`text-sm ${resolvedTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>{car.specs.bodyStyle}</p>
       )}
-      <div className="mt-4 flex flex-wrap gap-2 text-xs text-slate-500">
+      <div className={`mt-4 flex flex-wrap gap-2 text-xs ${resolvedTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
         {car.rating ? <span>⭐ {car.rating.toFixed(1)}</span> : null}
         {car.reviews ? <span>{car.reviews} reviews</span> : null}
         {car.galleryImages?.length ? <span>{car.galleryImages.length} photos</span> : null}
@@ -1873,7 +1921,7 @@ export function AppView() {
         {car.odometerKm ? <span>{car.odometerKm.toLocaleString()} km</span> : null}
       </div>
       {car.description && (
-        <p className="mt-3 line-clamp-3 text-sm text-slate-600">{car.description}</p>
+        <p className={`mt-3 line-clamp-3 text-sm ${resolvedTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>{car.description}</p>
       )}
       <button
         className="mt-4 w-full rounded-xl bg-sky-600 py-2 text-sm font-semibold text-white hover:bg-sky-700"
@@ -1885,8 +1933,8 @@ export function AppView() {
   );
 
   const renderDealerCard = (dealer: DealerSummary) => (
-    <div key={dealer.id} className="flex flex-col rounded-3xl border border-slate-100 bg-white/90 p-4 shadow hover:shadow-lg">
-      <div className="h-40 overflow-hidden rounded-2xl bg-slate-100">
+    <div key={dealer.id} className={`flex flex-col rounded-3xl border p-4 shadow hover:shadow-lg ${resolvedTheme === 'dark' ? 'border-slate-700 bg-slate-800' : 'border-slate-100 bg-white/90'}`}>
+      <div className={`h-40 overflow-hidden rounded-2xl ${resolvedTheme === 'dark' ? 'bg-slate-700' : 'bg-slate-100'}`}>
         <img
           src={dealer.hero_image || '/placeholder-car.svg'}
           alt={dealer.name}
@@ -1895,24 +1943,24 @@ export function AppView() {
       </div>
       <div className="mt-4 flex items-start justify-between gap-3">
         <div>
-          <h3 className="text-lg font-semibold text-slate-900">{dealer.name}</h3>
-          <p className="text-sm text-slate-500">{dealer.total_listings} {copy.dealerMetaListings}</p>
+          <h3 className={`text-lg font-semibold ${resolvedTheme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{dealer.name}</h3>
+          <p className={`text-sm ${resolvedTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>{dealer.total_listings} {copy.dealerMetaListings}</p>
         </div>
-        <div className="text-right text-sm text-slate-500">
+        <div className={`text-right text-sm ${resolvedTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
           <p>{copy.dealerMetaAverage}</p>
-          <p className="text-base font-semibold text-emerald-600">
+          <p className="text-base font-semibold text-emerald-500">
             {dealer.average_price ? formatPrice(dealer.average_price, 'JOD') : '—'}
           </p>
         </div>
       </div>
       {dealer.top_makes?.length ? (
-        <div className="mt-3 text-xs text-slate-500">
-          <p className="font-semibold text-slate-700">{copy.dealerMetaTopMakes}</p>
+        <div className={`mt-3 text-xs ${resolvedTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+          <p className={`font-semibold ${resolvedTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>{copy.dealerMetaTopMakes}</p>
           <p>{dealer.top_makes.map((entry) => entry.make).slice(0, 3).join(', ')}</p>
         </div>
       ) : null}
       <button
-        className="mt-4 w-full rounded-xl bg-slate-900/90 py-2 text-sm font-semibold text-white"
+        className={`mt-4 w-full rounded-xl py-2 text-sm font-semibold text-white ${resolvedTheme === 'dark' ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-slate-900/90 hover:bg-slate-800'}`}
         onClick={() => handleOpenDealer(dealer.id)}
       >
         {copy.dealersVisit}
@@ -1923,10 +1971,10 @@ export function AppView() {
 
   const renderAuthPanel = () => (
     <div className="grid gap-6 md:grid-cols-2">
-      <div className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
-        <h3 className="text-xl font-semibold text-slate-900">{copy.authSignIn}</h3>
+      <div className={`rounded-3xl border p-6 shadow-sm ${resolvedTheme === 'dark' ? 'border-slate-700 bg-slate-800' : 'border-slate-100 bg-white'}`}>
+        <h3 className={`text-xl font-semibold ${resolvedTheme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{copy.authSignIn}</h3>
         {authError && (
-          <p className="mt-3 rounded-2xl bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-600">{authError}</p>
+          <p className={`mt-3 rounded-2xl px-4 py-2 text-sm font-semibold ${resolvedTheme === 'dark' ? 'bg-rose-900/30 text-rose-400' : 'bg-rose-50 text-rose-600'}`}>{authError}</p>
         )}
         <form
           className="mt-4 space-y-4"
@@ -1946,11 +1994,11 @@ export function AppView() {
         >
           <input name="login-username" placeholder={copy.authUsername} className={`w-full ${inputFieldClass}`} required />
           <input name="login-password" type="password" placeholder={copy.authPassword} className={`w-full ${inputFieldClass}`} required />
-          <button className="w-full rounded-2xl bg-sky-600 py-3 font-semibold text-white">{copy.authSignIn}</button>
+          <button className="w-full rounded-2xl bg-sky-600 py-3 font-semibold text-white hover:bg-sky-700">{copy.authSignIn}</button>
         </form>
       </div>
-      <div className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
-        <h3 className="text-xl font-semibold text-slate-900">{copy.authCreateAccount}</h3>
+      <div className={`rounded-3xl border p-6 shadow-sm ${resolvedTheme === 'dark' ? 'border-slate-700 bg-slate-800' : 'border-slate-100 bg-white'}`}>
+        <h3 className={`text-xl font-semibold ${resolvedTheme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{copy.authCreateAccount}</h3>
         <form
           className="mt-4 space-y-4"
           onSubmit={async (event: React.FormEvent<HTMLFormElement>) => {
@@ -1973,7 +2021,7 @@ export function AppView() {
           <input name="signup-username" placeholder={copy.authUsername} className={`w-full ${inputFieldClass}`} required />
           <input name="signup-email" type="email" placeholder={copy.authEmail} className={`w-full ${inputFieldClass}`} required />
           <input name="signup-password" type="password" placeholder={copy.authPassword} className={`w-full ${inputFieldClass}`} required />
-          <button className="w-full rounded-2xl bg-emerald-500 py-3 font-semibold text-white">{copy.authSignUp}</button>
+          <button className="w-full rounded-2xl bg-emerald-500 py-3 font-semibold text-white hover:bg-emerald-600">{copy.authSignUp}</button>
         </form>
       </div>
     </div>
@@ -1983,23 +2031,23 @@ export function AppView() {
     if (!user) {
       return (
         <div className="space-y-6">
-          <p className="text-slate-600">{copy.profileSignInPrompt}</p>
+          <p className={resolvedTheme === 'dark' ? 'text-slate-300' : 'text-slate-600'}>{copy.profileSignInPrompt}</p>
           {renderAuthPanel()}
         </div>
       );
     }
     return (
       <div className="grid gap-6 md:grid-cols-2">
-        <div className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
-          <h3 className="text-xl font-semibold text-slate-900">{copy.profileTitle}</h3>
-          <p className="text-slate-600">{copy.authUsername}: {user.username}</p>
-          <p className="text-slate-600">{copy.authEmail}: {user.email}</p>
-          <button className="mt-4 rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-900" onClick={() => refreshProfile()}>
+        <div className={`rounded-3xl border p-6 shadow-sm ${resolvedTheme === 'dark' ? 'border-slate-700 bg-slate-800' : 'border-slate-100 bg-white'}`}>
+          <h3 className={`text-xl font-semibold ${resolvedTheme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{copy.profileTitle}</h3>
+          <p className={resolvedTheme === 'dark' ? 'text-slate-300' : 'text-slate-600'}>{copy.authUsername}: {user.username}</p>
+          <p className={resolvedTheme === 'dark' ? 'text-slate-300' : 'text-slate-600'}>{copy.authEmail}: {user.email}</p>
+          <button className={`mt-4 rounded-2xl border px-4 py-2 text-sm font-semibold ${resolvedTheme === 'dark' ? 'border-slate-600 text-slate-200 hover:bg-slate-700' : 'border-slate-200 text-slate-900 hover:bg-slate-50'}`} onClick={() => refreshProfile()}>
             {copy.profileRefresh}
           </button>
         </div>
-        <div className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
-          <h3 className="text-xl font-semibold text-slate-900">{copy.profileUpdate}</h3>
+        <div className={`rounded-3xl border p-6 shadow-sm ${resolvedTheme === 'dark' ? 'border-slate-700 bg-slate-800' : 'border-slate-100 bg-white'}`}>
+          <h3 className={`text-xl font-semibold ${resolvedTheme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{copy.profileUpdate}</h3>
           <form
             className="mt-4 space-y-3"
             onSubmit={async (event: React.FormEvent<HTMLFormElement>) => {
@@ -2012,7 +2060,7 @@ export function AppView() {
               const password = formData.get('profile-password')?.toString();
               const result = await updateMyProfile({ username, email, current_password, password });
               if (result) {
-                showToast('Profile updated');
+                showToast('✅ Profile updated successfully');
                 formElement.reset();
               }
             }}
@@ -2021,9 +2069,9 @@ export function AppView() {
             <input name="profile-email" type="email" placeholder={copy.authEmail} defaultValue={user.email} className={`w-full ${inputFieldClass}`} />
             <input name="profile-current-password" type="password" placeholder={copy.authCurrentPassword} className={`w-full ${inputFieldClass}`} />
             <input name="profile-password" type="password" placeholder={copy.authNewPassword} className={`w-full ${inputFieldClass}`} />
-            <button className="w-full rounded-2xl bg-emerald-500 py-3 font-semibold text-white">{copy.profileSaveChanges}</button>
+            <button className="w-full rounded-2xl bg-emerald-500 py-3 font-semibold text-white hover:bg-emerald-600">{copy.profileSaveChanges}</button>
           </form>
-          <button className="mt-4 w-full rounded-2xl border border-slate-200 py-2 font-semibold text-slate-900" onClick={() => logout()}>
+          <button className={`mt-4 w-full rounded-2xl border py-2 font-semibold ${resolvedTheme === 'dark' ? 'border-slate-600 text-slate-200 hover:bg-slate-700' : 'border-slate-200 text-slate-900 hover:bg-slate-50'}`} onClick={() => logout()}>
             {copy.authSignOut}
           </button>
         </div>
@@ -2344,7 +2392,7 @@ export function AppView() {
         return (
           <div className="space-y-6">
             <div className="grid gap-4 lg:grid-cols-[2fr,1fr]">
-              <div className="rounded-3xl border border-slate-100 bg-white p-4 shadow-sm">
+              <div className={`rounded-3xl border p-4 shadow-sm ${resolvedTheme === 'dark' ? 'border-slate-700 bg-slate-800' : 'border-slate-100 bg-white'}`}>
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                   <select value={filters.category || 'all'} name="filter-category" id="filter-category" onChange={(event) => setFilters((prev) => ({ ...prev, category: event.target.value as any }))} className={inputFieldClass}>
                     {CATEGORY_OPTIONS.map((opt) => (
@@ -2374,8 +2422,8 @@ export function AppView() {
                   </select>
                 </div>
               </div>
-              <form onSubmit={handleSemanticSearch} className="rounded-3xl border border-slate-100 bg-white p-4 shadow-sm">
-                <p className="text-sm font-semibold text-slate-900">AI Semantic Search</p>
+              <form onSubmit={handleSemanticSearch} className={`rounded-3xl border p-4 shadow-sm ${resolvedTheme === 'dark' ? 'border-slate-700 bg-slate-800' : 'border-slate-100 bg-white'}`}>
+                <p className={`text-sm font-semibold ${resolvedTheme === 'dark' ? 'text-white' : 'text-slate-900'}`}>AI Semantic Search</p>
                 <div className="mt-3 flex gap-3">
                   <input
                     name="semantic-query"
@@ -2385,19 +2433,19 @@ export function AppView() {
                     placeholder="e.g. Luxury hybrid SUV under 150k"
                     className={`flex-1 ${inputFieldClass}`}
                   />
-                  <button type="submit" className="rounded-2xl bg-sky-600 px-4 py-2 text-sm font-semibold text-white">
+                  <button type="submit" className="rounded-2xl bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700">
                     {semanticLoading ? 'Searching...' : 'Search'}
                   </button>
                 </div>
                 {semanticResults.length > 0 && (
                   <div className="mt-4 space-y-3">
                     {semanticResults.map((car) => (
-                      <div key={car.id} className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-3 text-sm text-slate-600">
+                      <div key={car.id} className={`flex items-center gap-3 rounded-2xl border p-3 text-sm ${resolvedTheme === 'dark' ? 'border-slate-600 bg-slate-700 text-slate-300' : 'border-slate-100 bg-slate-50 text-slate-600'}`}>
                         <img src={getCarImage(car)} alt={car.model} className="h-14 w-20 rounded-xl object-cover" />
                         <div className="flex-1">
                           <div className="flex items-center justify-between">
-                            <span className="font-semibold text-slate-900">{car.make} {car.model}</span>
-                            <button className="text-xs text-sky-600" onClick={() => handleOpenCarDetails(car.id)}>Inspect</button>
+                            <span className={`font-semibold ${resolvedTheme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{car.make} {car.model}</span>
+                            <button className="text-xs text-sky-500 hover:text-sky-400" onClick={() => handleOpenCarDetails(car.id)}>Inspect</button>
                           </div>
                           <p>{formatPrice(car.price, car.currency)}</p>
                         </div>
@@ -2415,7 +2463,7 @@ export function AppView() {
               )}
             </div>
             {sortedCars.length > 0 && (
-              <div className="flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-slate-100 bg-white px-4 py-3 text-sm text-slate-600 shadow-sm">
+              <div className={`flex flex-wrap items-center justify-between gap-4 rounded-3xl border px-4 py-3 text-sm shadow-sm ${resolvedTheme === 'dark' ? 'border-slate-700 bg-slate-800 text-slate-300' : 'border-slate-100 bg-white text-slate-600'}`}>
                 <p>
                   Showing {Math.min((currentPage - 1) * LISTINGS_PER_PAGE + 1, sortedCars.length)}-
                   {Math.min(currentPage * LISTINGS_PER_PAGE, sortedCars.length)} of {sortedCars.length} listings
@@ -2426,7 +2474,7 @@ export function AppView() {
                       type="button"
                       onClick={() => goToPage(currentPage - 1)}
                       disabled={currentPage === 1}
-                      className="rounded-2xl border border-slate-200 px-3 py-1 font-semibold text-slate-700 disabled:cursor-not-allowed disabled:border-slate-100 disabled:text-slate-300"
+                      className={`rounded-2xl border px-3 py-1 font-semibold disabled:cursor-not-allowed disabled:opacity-50 ${resolvedTheme === 'dark' ? 'border-slate-600 text-slate-300 hover:bg-slate-700' : 'border-slate-200 text-slate-700 hover:bg-slate-50'}`}
                     >
                       Prev
                     </button>
@@ -2435,11 +2483,11 @@ export function AppView() {
                         <button
                           type="button"
                           onClick={() => goToPage(1)}
-                          className="rounded-2xl border border-slate-200 px-3 py-1 font-semibold text-slate-700"
+                          className={`rounded-2xl border px-3 py-1 font-semibold ${resolvedTheme === 'dark' ? 'border-slate-600 text-slate-300 hover:bg-slate-700' : 'border-slate-200 text-slate-700 hover:bg-slate-50'}`}
                         >
                           1
                         </button>
-                        {paginationWindow[0] > 2 && <span className="text-slate-400">…</span>}
+                        {paginationWindow[0] > 2 && <span className={resolvedTheme === 'dark' ? 'text-slate-500' : 'text-slate-400'}>…</span>}
                       </>
                     )}
                     {paginationWindow.map((page) => (
@@ -2447,8 +2495,7 @@ export function AppView() {
                         key={page}
                         type="button"
                         onClick={() => goToPage(page)}
-                        className={`rounded-2xl px-3 py-1 font-semibold ${currentPage === page ? 'bg-sky-600 text-white' : 'border border-slate-200 text-slate-700'
-                          }`}
+                        className={`rounded-2xl px-3 py-1 font-semibold ${currentPage === page ? 'bg-sky-600 text-white' : resolvedTheme === 'dark' ? 'border border-slate-600 text-slate-300 hover:bg-slate-700' : 'border border-slate-200 text-slate-700 hover:bg-slate-50'}`}
                       >
                         {page}
                       </button>
@@ -2456,12 +2503,12 @@ export function AppView() {
                     {paginationWindow[paginationWindow.length - 1] < totalPages && (
                       <>
                         {paginationWindow[paginationWindow.length - 1] < totalPages - 1 && (
-                          <span className="text-slate-400">…</span>
+                          <span className={resolvedTheme === 'dark' ? 'text-slate-500' : 'text-slate-400'}>…</span>
                         )}
                         <button
                           type="button"
                           onClick={() => goToPage(totalPages)}
-                          className="rounded-2xl border border-slate-200 px-3 py-1 font-semibold text-slate-700"
+                          className={`rounded-2xl border px-3 py-1 font-semibold ${resolvedTheme === 'dark' ? 'border-slate-600 text-slate-300 hover:bg-slate-700' : 'border-slate-200 text-slate-700 hover:bg-slate-50'}`}
                         >
                           {totalPages}
                         </button>
@@ -2471,7 +2518,7 @@ export function AppView() {
                       type="button"
                       onClick={() => goToPage(currentPage + 1)}
                       disabled={currentPage === totalPages}
-                      className="rounded-2xl border border-slate-200 px-3 py-1 font-semibold text-slate-700 disabled:cursor-not-allowed disabled:border-slate-100 disabled:text-slate-300"
+                      className={`rounded-2xl border px-3 py-1 font-semibold disabled:cursor-not-allowed disabled:opacity-50 ${resolvedTheme === 'dark' ? 'border-slate-600 text-slate-300 hover:bg-slate-700' : 'border-slate-200 text-slate-700 hover:bg-slate-50'}`}
                     >
                       Next
                     </button>
@@ -2489,21 +2536,311 @@ export function AppView() {
           </div>
         );
       case 'dealers':
-        if (!requireAuth()) return null;
+        // Sample dealers for showcase (shown when no live dealers yet)
+        const sampleDealers: DealerSummary[] = [
+          {
+            id: 1001,
+            name: 'Premium Motors Amman',
+            total_listings: 45,
+            average_price: 35000,
+            top_makes: [{ make: 'BMW', count: 15 }, { make: 'Mercedes', count: 12 }],
+            hero_image: '/placeholder-car.svg',
+            location: { lat: 31.9454, lng: 35.9284, city: 'Amman', address: 'Mecca Street, Amman' },
+          },
+          {
+            id: 1002,
+            name: 'Elite Auto Gallery',
+            total_listings: 32,
+            average_price: 42000,
+            top_makes: [{ make: 'Porsche', count: 10 }, { make: 'Audi', count: 8 }],
+            hero_image: '/placeholder-car.svg',
+            location: { lat: 31.9632, lng: 35.9106, city: 'Amman', address: 'Abdoun, Amman' },
+          },
+          {
+            id: 1003,
+            name: 'Jordan Car Hub',
+            total_listings: 67,
+            average_price: 22000,
+            top_makes: [{ make: 'Toyota', count: 25 }, { make: 'Honda', count: 18 }],
+            hero_image: '/placeholder-car.svg',
+            location: { lat: 31.9872, lng: 35.8676, city: 'Amman', address: 'Al-Bayader, Amman' },
+          },
+          {
+            id: 1004,
+            name: 'Luxury Wheels Jordan',
+            total_listings: 28,
+            average_price: 55000,
+            top_makes: [{ make: 'Range Rover', count: 12 }, { make: 'Bentley', count: 5 }],
+            hero_image: '/placeholder-car.svg',
+            location: { lat: 32.0553, lng: 36.0886, city: 'Zarqa', address: 'Downtown Zarqa' },
+          },
+        ];
+        const displayDealers = dealers.length > 0 ? dealers : sampleDealers;
+        
         return (
           <div className="space-y-6">
-            <div>
-              <h2 className="text-2xl font-bold text-slate-900">{copy.dealersHeading}</h2>
-              <p className="text-sm text-slate-600">{copy.dealersSubheading}</p>
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <h2 className={`text-2xl font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{copy.dealersHeading}</h2>
+                <p className={`text-sm ${resolvedTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>{copy.dealersSubheading}</p>
+              </div>
+              <div className="flex items-center gap-3">
+                {/* View Toggle */}
+                <div className={`flex rounded-xl p-1 ${resolvedTheme === 'dark' ? 'bg-slate-800' : 'bg-slate-100'}`}>
+                  <button
+                    onClick={() => setDealerTab('grid')}
+                    className={`rounded-lg px-4 py-2 text-sm font-medium transition ${dealerTab === 'grid' ? 'bg-white text-slate-900 shadow' : resolvedTheme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'}`}
+                  >
+                    <span className="flex items-center gap-2">
+                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                      </svg>
+                      Grid
+                    </span>
+                  </button>
+                  <button
+                    onClick={() => setDealerTab('map')}
+                    className={`rounded-lg px-4 py-2 text-sm font-medium transition ${dealerTab === 'map' ? 'bg-white text-slate-900 shadow' : resolvedTheme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'}`}
+                  >
+                    <span className="flex items-center gap-2">
+                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                      Map
+                    </span>
+                  </button>
+                </div>
+                {/* Become a Dealer Button */}
+                <button
+                  onClick={() => setDealerRegistrationOpen(true)}
+                  className="rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 px-4 py-2 text-sm font-semibold text-white shadow-md hover:from-indigo-600 hover:to-purple-700"
+                >
+                  Become a Dealer
+                </button>
+              </div>
             </div>
+
             {dealersLoading ? (
-              <p className="text-slate-500">Loading dealers...</p>
-            ) : dealers.length ? (
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                {dealers.map((dealer) => renderDealerCard(dealer))}
+              <div className="flex items-center justify-center py-12">
+                <div className="h-8 w-8 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent"></div>
+                <span className={`ml-3 ${resolvedTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Loading dealers...</span>
+              </div>
+            ) : dealerTab === 'map' ? (
+              /* Map View */
+              <div className={`rounded-3xl overflow-hidden border ${resolvedTheme === 'dark' ? 'border-slate-700' : 'border-slate-200'}`}>
+                <div className="relative h-[500px] bg-slate-200">
+                  {/* Map placeholder - would integrate Google Maps or Leaflet here */}
+                  <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-blue-100 to-indigo-100">
+                    <div className="text-center">
+                      <svg className="mx-auto h-16 w-16 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                      </svg>
+                      <p className="mt-4 text-lg font-semibold text-indigo-700">Interactive Map</p>
+                      <p className="text-sm text-indigo-500">Showing {displayDealers.length} dealer locations</p>
+                    </div>
+                  </div>
+                  {/* Dealer markers overlay */}
+                  <div className="absolute inset-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4 items-end pointer-events-none">
+                    {displayDealers.slice(0, 4).map((dealer, idx) => (
+                      <div key={dealer.id} className="pointer-events-auto">
+                        <div className={`rounded-xl p-3 shadow-lg ${resolvedTheme === 'dark' ? 'bg-slate-800 text-white' : 'bg-white'}`}>
+                          <div className="flex items-center gap-2">
+                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-500 text-xs font-bold text-white">
+                              {idx + 1}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-sm font-semibold">{dealer.name}</p>
+                              <p className="text-xs text-slate-500">{(dealer as any).location?.city || 'Jordan'}</p>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => handleOpenDealer(dealer.id)}
+                            className="mt-2 w-full rounded-lg bg-indigo-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-600"
+                          >
+                            View Showroom
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                {/* Dealer list below map */}
+                <div className={`p-4 ${resolvedTheme === 'dark' ? 'bg-slate-800' : 'bg-slate-50'}`}>
+                  <div className="flex flex-wrap gap-3">
+                    {displayDealers.map((dealer, idx) => (
+                      <button
+                        key={dealer.id}
+                        onClick={() => handleOpenDealer(dealer.id)}
+                        className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition ${resolvedTheme === 'dark' ? 'bg-slate-700 text-white hover:bg-slate-600' : 'bg-white text-slate-700 hover:bg-slate-100'}`}
+                      >
+                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-500 text-xs text-white">
+                          {idx + 1}
+                        </span>
+                        {dealer.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
             ) : (
-              <p className="text-slate-500">{copy.dealersEmpty}</p>
+              /* Grid View */
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {displayDealers.map((dealer) => renderDealerCard(dealer))}
+              </div>
+            )}
+
+            {dealers.length === 0 && (
+              <div className={`text-center rounded-2xl p-4 ${resolvedTheme === 'dark' ? 'bg-amber-900/20 text-amber-300' : 'bg-amber-50 text-amber-700'}`}>
+                <p className="text-sm">🏪 Showing sample dealers. Live dealer network coming soon!</p>
+              </div>
+            )}
+
+            {/* Dealer Registration Modal */}
+            {dealerRegistrationOpen && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+                <div className={`w-full max-w-lg rounded-3xl p-6 shadow-2xl ${resolvedTheme === 'dark' ? 'bg-slate-800' : 'bg-white'}`}>
+                  <div className="flex items-center justify-between mb-6">
+                    <div>
+                      <h3 className={`text-xl font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-slate-900'}`}>Become a Dealer</h3>
+                      <p className={`text-sm ${resolvedTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Submit your application to join our dealer network</p>
+                    </div>
+                    <button
+                      onClick={() => setDealerRegistrationOpen(false)}
+                      className={`rounded-full p-2 ${resolvedTheme === 'dark' ? 'hover:bg-slate-700' : 'hover:bg-slate-100'}`}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  <form
+                    className="space-y-4"
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      // Validate required fields
+                      if (!dealerRegistrationForm.name || !dealerRegistrationForm.email || !dealerRegistrationForm.phone || !dealerRegistrationForm.city) {
+                        showToast('Please fill in all required fields', 'error');
+                        return;
+                      }
+                      // Simulate submission
+                      showToast('Application submitted! We will review and contact you within 48 hours.', 'success');
+                      setDealerRegistrationOpen(false);
+                      setDealerRegistrationForm({
+                        name: '', email: '', phone: '', address: '', city: '', description: '', website: ''
+                      });
+                    }}
+                  >
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div>
+                        <label className={`text-sm font-medium ${resolvedTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
+                          Dealership Name <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={dealerRegistrationForm.name}
+                          onChange={(e) => setDealerRegistrationForm(prev => ({ ...prev, name: e.target.value }))}
+                          className={inputFieldClass}
+                          placeholder="Your dealership name"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className={`text-sm font-medium ${resolvedTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
+                          Email <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="email"
+                          value={dealerRegistrationForm.email}
+                          onChange={(e) => setDealerRegistrationForm(prev => ({ ...prev, email: e.target.value }))}
+                          className={inputFieldClass}
+                          placeholder="contact@dealer.com"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className={`text-sm font-medium ${resolvedTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
+                          Phone <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="tel"
+                          value={dealerRegistrationForm.phone}
+                          onChange={(e) => setDealerRegistrationForm(prev => ({ ...prev, phone: e.target.value }))}
+                          className={inputFieldClass}
+                          placeholder="+962 7X XXX XXXX"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className={`text-sm font-medium ${resolvedTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
+                          City <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={dealerRegistrationForm.city}
+                          onChange={(e) => setDealerRegistrationForm(prev => ({ ...prev, city: e.target.value }))}
+                          className={inputFieldClass}
+                          placeholder="Amman"
+                          required
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className={`text-sm font-medium ${resolvedTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
+                        Address
+                      </label>
+                      <input
+                        type="text"
+                        value={dealerRegistrationForm.address}
+                        onChange={(e) => setDealerRegistrationForm(prev => ({ ...prev, address: e.target.value }))}
+                        className={inputFieldClass}
+                        placeholder="Full showroom address"
+                      />
+                    </div>
+                    <div>
+                      <label className={`text-sm font-medium ${resolvedTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
+                        Website
+                      </label>
+                      <input
+                        type="url"
+                        value={dealerRegistrationForm.website}
+                        onChange={(e) => setDealerRegistrationForm(prev => ({ ...prev, website: e.target.value }))}
+                        className={inputFieldClass}
+                        placeholder="https://yourdealer.com"
+                      />
+                    </div>
+                    <div>
+                      <label className={`text-sm font-medium ${resolvedTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
+                        Description
+                      </label>
+                      <textarea
+                        value={dealerRegistrationForm.description}
+                        onChange={(e) => setDealerRegistrationForm(prev => ({ ...prev, description: e.target.value }))}
+                        className={`h-24 w-full ${inputFieldClass}`}
+                        placeholder="Tell us about your dealership, specializations, and inventory..."
+                      />
+                    </div>
+                    <div className={`rounded-xl p-3 ${resolvedTheme === 'dark' ? 'bg-blue-900/30 text-blue-300' : 'bg-blue-50 text-blue-700'}`}>
+                      <p className="text-sm">
+                        <strong>Note:</strong> Applications are reviewed within 48 hours. You will receive a verification email once approved.
+                      </p>
+                    </div>
+                    <div className="flex gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setDealerRegistrationOpen(false)}
+                        className={`flex-1 rounded-xl py-3 font-semibold ${resolvedTheme === 'dark' ? 'bg-slate-700 text-white hover:bg-slate-600' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        className="flex-1 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 py-3 font-semibold text-white hover:from-indigo-600 hover:to-purple-700"
+                      >
+                        Submit Application
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
             )}
           </div>
         );
@@ -2842,78 +3179,106 @@ export function AppView() {
         if (!requireAuth()) return null;
         return (
           <div className="grid gap-6 lg:grid-cols-[1.2fr,0.8fr]">
-            <form className="space-y-4 rounded-3xl border border-slate-100 bg-white p-6 shadow-sm" onSubmit={handleListingSubmit}>
-              <div className="grid gap-4 md:grid-cols-2">
-                <select
-                  name="listing-make"
-                  id="listing-make"
-                  value={listingForm.make}
-                  onChange={(event) => handleMakeSelect(event.target.value)}
-                  className={inputFieldClass}
-                  required
-                >
-                  <option value="">{copy.makeSelectLabel}</option>
-                  {availableMakeOptions.map((makeOption) => (
-                    <option key={makeOption} value={makeOption}>{makeOption}</option>
-                  ))}
-                </select>
-                <select
-                  name="listing-model"
-                  id="listing-model"
-                  value={listingForm.model}
-                  onChange={(event) => handleModelSelect(event.target.value)}
-                  className={inputFieldClass}
-                  required
-                  disabled={!listingForm.make}
-                >
-                  <option value="">{copy.modelSelectLabel}</option>
-                  {availableModelOptions.map((model) => (
-                    <option key={model} value={model}>{model}</option>
-                  ))}
-                </select>
-                <input name="listing-year" id="listing-year" value={listingForm.year} onChange={(event) => handleListingInput('year', event.target.value)} placeholder="Year" className={inputFieldClass} required />
-                <input name="listing-price" id="listing-price" value={listingForm.price} onChange={(event) => handleListingInput('price', event.target.value)} placeholder="Price" className={inputFieldClass} required />
-                <select name="listing-currency" id="listing-currency" value={listingForm.currency} onChange={(event) => handleListingInput('currency', event.target.value)} className={inputFieldClass}>
-                  {CURRENCY_OPTIONS.map((currency) => (
-                    <option key={currency} value={currency}>{currency}</option>
-                  ))}
-                </select>
-                <input name="listing-bodystyle" id="listing-bodystyle" value={listingForm.bodyStyle} onChange={(event) => handleListingInput('bodyStyle', event.target.value)} placeholder="Body style" className={inputFieldClass} />
-                <input name="listing-horsepower" id="listing-horsepower" value={listingForm.horsepower} onChange={(event) => handleListingInput('horsepower', event.target.value)} placeholder="Horsepower" className={inputFieldClass} />
-                {availableEngineOptions.length > 0 ? (
-                  <select
-                    name="listing-engine"
-                    id="listing-engine"
-                    value={listingForm.engine}
-                    onChange={(event) => handleListingInput('engine', event.target.value)}
+            <form className={`space-y-4 rounded-3xl border p-6 shadow-sm ${resolvedTheme === 'dark' ? 'border-slate-700 bg-slate-800' : 'border-slate-100 bg-white'}`} onSubmit={handleListingSubmit}>
+              {/* Required Fields Section */}
+              <div className={`rounded-2xl border p-4 ${resolvedTheme === 'dark' ? 'border-indigo-500/30 bg-indigo-900/20' : 'border-indigo-200 bg-indigo-50/50'}`}>
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-indigo-500">★</span>
+                  <p className={`text-sm font-semibold ${resolvedTheme === 'dark' ? 'text-indigo-300' : 'text-indigo-700'}`}>Required Information</p>
+                </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <label className={`text-xs font-medium ${resolvedTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>Make <span className="text-red-500">*</span></label>
+                    <select
+                      name="listing-make"
+                      id="listing-make"
+                      value={listingForm.make}
+                      onChange={(event) => handleMakeSelect(event.target.value)}
+                      className={inputFieldClass}
+                      required
+                    >
+                      <option value="">{copy.makeSelectLabel}</option>
+                      {availableMakeOptions.map((makeOption) => (
+                        <option key={makeOption} value={makeOption}>{makeOption}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className={`text-xs font-medium ${resolvedTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>Model <span className="text-red-500">*</span></label>
+                    <select
+                      name="listing-model"
+                      id="listing-model"
+                      value={listingForm.model}
+                      onChange={(event) => handleModelSelect(event.target.value)}
+                      className={inputFieldClass}
+                      required
+                      disabled={!listingForm.make}
+                    >
+                      <option value="">{copy.modelSelectLabel}</option>
+                      {availableModelOptions.map((model) => (
+                        <option key={model} value={model}>{model}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className={`text-xs font-medium ${resolvedTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>Year <span className="text-red-500">*</span></label>
+                    <input name="listing-year" id="listing-year" value={listingForm.year} onChange={(event) => handleListingInput('year', event.target.value)} placeholder="e.g. 2023" className={inputFieldClass} required type="number" min="1900" max={new Date().getFullYear() + 2} />
+                  </div>
+                  <div>
+                    <label className={`text-xs font-medium ${resolvedTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>Price <span className="text-red-500">*</span></label>
+                    <div className="flex gap-2">
+                      <input name="listing-price" id="listing-price" value={listingForm.price} onChange={(event) => handleListingInput('price', event.target.value)} placeholder="e.g. 25000" className={`flex-1 ${inputFieldClass}`} required type="number" min="0" />
+                      <select name="listing-currency" id="listing-currency" value={listingForm.currency} onChange={(event) => handleListingInput('currency', event.target.value)} className={`w-24 ${inputFieldClass}`}>
+                        {CURRENCY_OPTIONS.map((currency) => (
+                          <option key={currency} value={currency}>{currency}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Optional Basic Details */}
+              <div className={`rounded-2xl border p-4 ${resolvedTheme === 'dark' ? 'border-slate-600 bg-slate-800/50' : 'border-slate-200 bg-slate-50/50'}`}>
+                <p className={`mb-3 text-sm font-semibold ${resolvedTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>Vehicle Specifications (Optional)</p>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <input name="listing-bodystyle" id="listing-bodystyle" value={listingForm.bodyStyle} onChange={(event) => handleListingInput('bodyStyle', event.target.value)} placeholder="Body style (Sedan, SUV, etc.)" className={inputFieldClass} />
+                  <input name="listing-horsepower" id="listing-horsepower" value={listingForm.horsepower} onChange={(event) => handleListingInput('horsepower', event.target.value)} placeholder="Horsepower" className={inputFieldClass} type="number" min="0" />
+                  {availableEngineOptions.length > 0 ? (
+                    <select
+                      name="listing-engine"
+                      id="listing-engine"
+                      value={listingForm.engine}
+                      onChange={(event) => handleListingInput('engine', event.target.value)}
+                      className={inputFieldClass}
+                      disabled={!listingForm.model}
+                    >
+                      <option value="">{copy.engineSelectLabel}</option>
+                      {availableEngineOptions.map((engine) => (
+                        <option key={engine} value={engine}>{engine}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input name="listing-engine" id="listing-engine" value={listingForm.engine} onChange={(event) => handleListingInput('engine', event.target.value)} placeholder="Engine (e.g. 2.0L Turbo)" className={inputFieldClass} />
+                  )}
+                  <input name="listing-fueleconomy" id="listing-fueleconomy" value={listingForm.fuelEconomy} onChange={(event) => handleListingInput('fuelEconomy', event.target.value)} placeholder="Fuel economy (e.g. 12km/L)" className={inputFieldClass} />
+                  <input
+                    name="listing-odometer"
+                    id="listing-odometer"
+                    value={listingForm.odometer}
+                    onChange={(event) => handleListingInput('odometer', event.target.value)}
+                    placeholder={copy.odometerLabel}
                     className={inputFieldClass}
-                    disabled={!listingForm.model}
-                  >
-                    <option value="">{copy.engineSelectLabel}</option>
-                    {availableEngineOptions.map((engine) => (
-                      <option key={engine} value={engine}>{engine}</option>
-                    ))}
-                  </select>
-                ) : (
-                  <input name="listing-engine" id="listing-engine" value={listingForm.engine} onChange={(event) => handleListingInput('engine', event.target.value)} placeholder={copy.engineSelectLabel} className={inputFieldClass} />
-                )}
-                <input name="listing-fueleconomy" id="listing-fueleconomy" value={listingForm.fuelEconomy} onChange={(event) => handleListingInput('fuelEconomy', event.target.value)} placeholder="Fuel economy" className={inputFieldClass} />
-                <input
-                  name="listing-odometer"
-                  id="listing-odometer"
-                  value={listingForm.odometer}
-                  onChange={(event) => handleListingInput('odometer', event.target.value)}
-                  placeholder={copy.odometerLabel}
-                  className={inputFieldClass}
-                  type="number"
-                  min="0"
-                />
-                <input name="listing-image" id="listing-image" value={listingForm.image} onChange={(event) => handleListingInput('image', event.target.value)} placeholder="Image URL" className={inputFieldClass} />
+                    type="number"
+                    min="0"
+                  />
+                  <input name="listing-image" id="listing-image" value={listingForm.image} onChange={(event) => handleListingInput('image', event.target.value)} placeholder="Image URL (or upload below)" className={inputFieldClass} />
+                </div>
               </div>
               
               {/* Additional Vehicle Details */}
-              <div className="rounded-2xl border border-slate-200 bg-slate-50/50 p-4">
-                <p className="mb-3 text-sm font-semibold text-slate-700">Additional Details (Optional)</p>
+              <div className={`rounded-2xl border p-4 ${resolvedTheme === 'dark' ? 'border-slate-600 bg-slate-800/50' : 'border-slate-200 bg-slate-50/50'}`}>
+                <p className={`mb-3 text-sm font-semibold ${resolvedTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>Additional Details (Optional)</p>
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                   <select name="listing-category" value={listingForm.category} onChange={(e) => handleListingInput('category', e.target.value)} className={inputFieldClass}>
                     {CATEGORY_OPTIONS.filter(c => c.value !== 'all').map(opt => (
@@ -3149,6 +3514,7 @@ export function AppView() {
                         setFilters((prev) => ({ ...prev, search: headerSearchQuery.trim() }));
                         setActivePage('listings');
                         setHeaderSearchOpen(false);
+                        setHeaderSearchQuery('');
                       }
                     }}
                     className="flex items-center gap-2"
@@ -3350,6 +3716,160 @@ export function AppView() {
           <p className="mt-6 text-xs text-slate-400">© {currentYear} IntelliWheels. {copy.footerRights}</p>
         </div>
       </footer>
+      
+      {/* Floating AI Chat Button */}
+      {activePage !== 'chatbot' && (
+        <div
+          ref={floatingChatRef}
+          className="fixed z-50 cursor-move"
+          style={{
+            bottom: floatingChatPosition.y,
+            right: floatingChatPosition.x,
+          }}
+          onMouseDown={(e) => {
+            if ((e.target as HTMLElement).closest('button')) return;
+            setIsDraggingChat(true);
+            const startX = e.clientX;
+            const startY = e.clientY;
+            const startPosX = floatingChatPosition.x;
+            const startPosY = floatingChatPosition.y;
+            
+            const handleMouseMove = (moveEvent: MouseEvent) => {
+              const deltaX = startX - moveEvent.clientX;
+              const deltaY = startY - moveEvent.clientY;
+              setFloatingChatPosition({
+                x: Math.max(0, Math.min(window.innerWidth - 60, startPosX + deltaX)),
+                y: Math.max(0, Math.min(window.innerHeight - 60, startPosY + deltaY)),
+              });
+            };
+            
+            const handleMouseUp = () => {
+              setIsDraggingChat(false);
+              document.removeEventListener('mousemove', handleMouseMove);
+              document.removeEventListener('mouseup', handleMouseUp);
+            };
+            
+            document.addEventListener('mousemove', handleMouseMove);
+            document.addEventListener('mouseup', handleMouseUp);
+          }}
+        >
+          {floatingChatOpen ? (
+            <div className={`w-80 sm:w-96 rounded-2xl shadow-2xl overflow-hidden ${resolvedTheme === 'dark' ? 'bg-slate-800 border border-slate-700' : 'bg-white border border-slate-200'}`}>
+              {/* Mini Chat Header */}
+              <div className="flex items-center justify-between bg-gradient-to-r from-indigo-500 to-purple-600 px-4 py-3">
+                <div className="flex items-center gap-2">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/20">
+                    <svg className="h-4 w-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                    </svg>
+                  </div>
+                  <span className="text-sm font-semibold text-white">{copy.chatAssistantName}</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => { setActivePage('chatbot'); setFloatingChatOpen(false); }}
+                    className="rounded-lg p-1.5 text-white/70 hover:bg-white/20 hover:text-white"
+                    title="Open full chat"
+                  >
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                    </svg>
+                  </button>
+                  <button
+                    onClick={() => setFloatingChatOpen(false)}
+                    className="rounded-lg p-1.5 text-white/70 hover:bg-white/20 hover:text-white"
+                  >
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+              {/* Mini Chat Messages */}
+              <div className={`h-64 overflow-y-auto p-3 ${resolvedTheme === 'dark' ? 'bg-slate-900' : 'bg-slate-50'}`}>
+                {chatMessages.length === 0 ? (
+                  <div className="flex h-full items-center justify-center text-center">
+                    <div>
+                      <p className={`text-sm font-medium ${resolvedTheme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{copy.chatWelcome}</p>
+                      <p className={`mt-1 text-xs ${resolvedTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Ask me about cars, pricing, or listings</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {chatMessages.slice(-5).map((msg) => (
+                      <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                        <div className={`max-w-[85%] rounded-xl px-3 py-2 text-xs ${
+                          msg.role === 'user'
+                            ? 'bg-indigo-500 text-white'
+                            : resolvedTheme === 'dark' ? 'bg-slate-700 text-slate-200' : 'bg-white text-slate-800 shadow-sm'
+                        }`}>
+                          <p className="whitespace-pre-line">{msg.text.slice(0, 200)}{msg.text.length > 200 ? '...' : ''}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              {/* Mini Chat Input */}
+              <div className={`border-t p-3 ${resolvedTheme === 'dark' ? 'border-slate-700 bg-slate-800' : 'border-slate-200 bg-white'}`}>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={chatInput}
+                    onChange={(e) => setChatInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey && !chatBusy) {
+                        e.preventDefault();
+                        handleChatSubmit();
+                      }
+                    }}
+                    placeholder="Type a message..."
+                    className={`flex-1 rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 ${resolvedTheme === 'dark' ? 'border-slate-600 bg-slate-700 text-white placeholder-slate-400' : 'border-slate-200 bg-slate-50 text-slate-900 placeholder-slate-400'}`}
+                  />
+                  <button
+                    onClick={handleChatSubmit}
+                    disabled={!chatInput.trim() || chatBusy}
+                    className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-500 text-white hover:bg-indigo-600 disabled:opacity-50"
+                  >
+                    {chatBusy ? (
+                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                    ) : (
+                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <button
+              onClick={() => {
+                if (!isDraggingChat) {
+                  if (!token) {
+                    showToast('Please sign in to use the AI assistant', 'info');
+                    setActivePage('profile');
+                  } else {
+                    setFloatingChatOpen(true);
+                  }
+                }
+              }}
+              className="group flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-lg transition-all hover:scale-110 hover:shadow-xl"
+            >
+              <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+              </svg>
+              {/* Notification dot for new users */}
+              {chatMessages.length === 0 && (
+                <span className="absolute -right-1 -top-1 flex h-4 w-4">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-pink-400 opacity-75"></span>
+                  <span className="relative inline-flex h-4 w-4 rounded-full bg-pink-500"></span>
+                </span>
+              )}
+            </button>
+          )}
+        </div>
+      )}
       </div>
     </div>
   );
