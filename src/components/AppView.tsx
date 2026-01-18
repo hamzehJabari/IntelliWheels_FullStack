@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import dynamic from 'next/dynamic';
 import {
   addFavorite,
   analyzeListingImage,
@@ -39,10 +40,24 @@ import {
 import { CHAT_HISTORY_LIMIT, STORAGE_KEYS } from '@/lib/config';
 import { getAllMakes, getModelsForMake } from '@/lib/vehicleDatabase';
 
+// Dynamic import for map component (client-side only)
+const DealerMap = dynamic(() => import('./DealerMap').then(mod => ({ default: mod.DealerMap })), {
+  ssr: false,
+  loading: () => (
+    <div className="flex h-[500px] items-center justify-center rounded-3xl bg-slate-100">
+      <div className="text-center">
+        <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent"></div>
+        <p className="mt-3 text-sm text-slate-500">Loading map...</p>
+      </div>
+    </div>
+  ),
+});
+
 // Make/model options for Add Listing come from comprehensive vehicle database
 // Filter makes come from actual database listings
 
 const NAV_CONFIG = [
+  { key: 'home', labelKey: 'navHome', descriptionKey: 'navHomeDesc' },
   { key: 'listings', labelKey: 'navCatalog', descriptionKey: 'navCatalogDesc' },
   { key: 'favorites', labelKey: 'navFavorites', descriptionKey: 'navFavoritesDesc' },
   { key: 'dealers', labelKey: 'navDealers', descriptionKey: 'navDealersDesc' },
@@ -56,7 +71,7 @@ const NAV_CONFIG = [
 type PageKey = (typeof NAV_CONFIG)[number]['key'];
 
 const SERVICE_CONFIG = [
-  { key: 'marketplace', labelKey: 'serviceMarketplace', descriptionKey: 'serviceMarketplaceDesc', defaultPage: 'listings' as PageKey },
+  { key: 'marketplace', labelKey: 'serviceMarketplace', descriptionKey: 'serviceMarketplaceDesc', defaultPage: 'home' as PageKey },
   { key: 'dealer', labelKey: 'serviceDealer', descriptionKey: 'serviceDealerDesc', defaultPage: 'myListings' as PageKey },
   { key: 'insights', labelKey: 'serviceInsights', descriptionKey: 'serviceInsightsDesc', defaultPage: 'chatbot' as PageKey },
 ] as const;
@@ -64,9 +79,9 @@ const SERVICE_CONFIG = [
 type ServiceMode = (typeof SERVICE_CONFIG)[number]['key'];
 
 const SERVICE_NAV_MAP: Record<ServiceMode, PageKey[]> = {
-  marketplace: ['listings', 'favorites', 'dealers', 'myListings', 'addListing', 'profile'],
-  dealer: ['listings', 'dealers', 'myListings', 'addListing', 'profile', 'analytics'],
-  insights: ['chatbot', 'analytics', 'listings', 'favorites', 'profile'],
+  marketplace: ['home', 'listings', 'favorites', 'dealers', 'myListings', 'addListing', 'profile'],
+  dealer: ['home', 'listings', 'dealers', 'myListings', 'addListing', 'profile', 'analytics'],
+  insights: ['home', 'chatbot', 'analytics', 'listings', 'favorites', 'profile'],
 };
 
 type ThemeMode = 'light' | 'dark' | 'system';
@@ -105,6 +120,8 @@ const TRANSLATIONS = {
     settingsSubtitle: 'Personalize your experience',
     settingsProfileCta: 'Manage profile',
     settingsProfileGuest: 'Sign in / Sign up',
+    navHome: 'Home',
+    navHomeDesc: 'Welcome to IntelliWheels',
     navCatalog: 'Catalog',
     navCatalogDesc: 'Explore the latest inventory',
     navFavorites: 'Favorites',
@@ -123,6 +140,40 @@ const TRANSLATIONS = {
     navAnalyticsDesc: 'Market intelligence',
     searchPlaceholder: 'Search make, model, year',
     semanticPlaceholder: 'e.g. Luxury hybrid SUV under 150k',
+    // Home page translations
+    heroTitle: 'Find Your Perfect Ride with AI',
+    heroSubtitle: 'Jordan\'s smartest automotive marketplace powered by artificial intelligence',
+    heroCta: 'Explore Catalog',
+    heroSecondaryCta: 'Meet Our AI',
+    featuresTitle: 'Why Choose IntelliWheels?',
+    featuresSubtitle: 'Experience the future of car buying and selling',
+    feature1Title: 'AI-Powered Search',
+    feature1Desc: 'Describe your dream car in natural language and let our AI find the perfect match',
+    feature2Title: 'Smart Price Analysis',
+    feature2Desc: 'Get instant fair market value estimates powered by machine learning',
+    feature3Title: 'Vision Recognition',
+    feature3Desc: 'Upload a car photo and our AI identifies make, model, and specifications',
+    feature4Title: 'Verified Dealers',
+    feature4Desc: 'Connect with trusted dealers across Jordan with verified listings',
+    feature5Title: 'Real-Time Analytics',
+    feature5Desc: 'Track market trends, pricing insights, and make data-driven decisions',
+    feature6Title: 'Multi-Currency Support',
+    feature6Desc: 'View prices in JOD, USD, EUR, or SAR with real-time conversion',
+    howItWorksTitle: 'How It Works',
+    howItWorksSubtitle: 'Three simple steps to your next car',
+    step1Title: 'Browse or Search',
+    step1Desc: 'Explore our catalog or use AI search to find exactly what you need',
+    step2Title: 'Get AI Insights',
+    step2Desc: 'Chat with our AI assistant for recommendations and price analysis',
+    step3Title: 'Connect & Buy',
+    step3Desc: 'Contact verified dealers directly and make your purchase',
+    statsListings: 'Active Listings',
+    statsDealers: 'Verified Dealers',
+    statsUsers: 'Happy Users',
+    statsAiQueries: 'AI Queries Processed',
+    ctaTitle: 'Ready to Find Your Dream Car?',
+    ctaSubtitle: 'Join thousands of satisfied customers who found their perfect vehicle with IntelliWheels',
+    ctaButton: 'Get Started Free',
     dropPrompt: 'Drag & drop or paste an image',
     dropHint: 'JPG, PNG up to 10MB',
     priceAssistLabel: 'AI Price Assist',
@@ -279,6 +330,8 @@ const TRANSLATIONS = {
     settingsSubtitle: 'خصص تجربتك',
     settingsProfileCta: 'إدارة الحساب',
     settingsProfileGuest: 'تسجيل الدخول / إنشاء حساب',
+    navHome: 'الرئيسية',
+    navHomeDesc: 'مرحباً بك في إنتلي ويلز',
     navCatalog: 'الكتالوج',
     navCatalogDesc: 'اكتشف أحدث السيارات',
     navFavorites: 'المفضلة',
@@ -297,6 +350,40 @@ const TRANSLATIONS = {
     navAnalyticsDesc: 'رؤى السوق',
     searchPlaceholder: 'ابحث عن الموديل أو السنة',
     semanticPlaceholder: 'مثال: سيارة هجينة فاخرة أقل من 150 ألف',
+    // Home page translations
+    heroTitle: 'اعثر على سيارتك المثالية مع الذكاء الاصطناعي',
+    heroSubtitle: 'أذكى سوق سيارات في الأردن مدعوم بالذكاء الاصطناعي',
+    heroCta: 'استكشف الكتالوج',
+    heroSecondaryCta: 'تعرف على المساعد الذكي',
+    featuresTitle: 'لماذا تختار إنتلي ويلز؟',
+    featuresSubtitle: 'اختبر مستقبل شراء وبيع السيارات',
+    feature1Title: 'بحث ذكي بالذكاء الاصطناعي',
+    feature1Desc: 'صِف سيارة أحلامك بكلماتك ودع الذكاء الاصطناعي يجد المطابقة المثالية',
+    feature2Title: 'تحليل ذكي للأسعار',
+    feature2Desc: 'احصل على تقديرات فورية للقيمة السوقية العادلة بتقنية التعلم الآلي',
+    feature3Title: 'تعرف بصري على السيارات',
+    feature3Desc: 'ارفع صورة سيارة ويتعرف الذكاء الاصطناعي على الشركة والموديل والمواصفات',
+    feature4Title: 'وكلاء معتمدون',
+    feature4Desc: 'تواصل مع وكلاء موثوقين في جميع أنحاء الأردن بعروض مضمونة',
+    feature5Title: 'تحليلات فورية',
+    feature5Desc: 'تابع اتجاهات السوق ورؤى الأسعار واتخذ قرارات مبنية على البيانات',
+    feature6Title: 'دعم متعدد العملات',
+    feature6Desc: 'شاهد الأسعار بالدينار أو الدولار أو اليورو أو الريال مع تحويل فوري',
+    howItWorksTitle: 'كيف يعمل؟',
+    howItWorksSubtitle: 'ثلاث خطوات بسيطة لسيارتك القادمة',
+    step1Title: 'تصفح أو ابحث',
+    step1Desc: 'استكشف الكتالوج أو استخدم البحث الذكي للعثور على ما تريده بالضبط',
+    step2Title: 'احصل على رؤى ذكية',
+    step2Desc: 'تحدث مع المساعد الذكي للحصول على توصيات وتحليل الأسعار',
+    step3Title: 'تواصل واشترِ',
+    step3Desc: 'تواصل مع الوكلاء المعتمدين مباشرة وأتمم عملية الشراء',
+    statsListings: 'عروض نشطة',
+    statsDealers: 'وكلاء معتمدون',
+    statsUsers: 'عملاء سعداء',
+    statsAiQueries: 'استعلامات ذكية',
+    ctaTitle: 'مستعد للعثور على سيارة أحلامك؟',
+    ctaSubtitle: 'انضم لآلاف العملاء الراضين الذين وجدوا سيارتهم المثالية مع إنتلي ويلز',
+    ctaButton: 'ابدأ مجاناً',
     dropPrompt: 'اسحب وأفلت أو الصق صورة هنا',
     dropHint: 'صور ‎JPG, PNG‎ حتى 10 ميغابايت',
     priceAssistLabel: 'مساعد التسعير بالذكاء الاصطناعي',
@@ -537,7 +624,7 @@ interface VisionSuggestion extends VisionAttributes {
 export function AppView() {
   const { user, token, loading: authLoading, login, signup, logout, updateMyProfile, refreshProfile, error: authError, clearError, currency, setCurrency, formatPrice, convertCurrency } = useAuth();
   const [mounted, setMounted] = useState(false);
-  const [activePage, setActivePage] = useState<PageKey>('listings');
+  const [activePage, setActivePage] = useState<PageKey>('home');
   const [serviceMode, setServiceMode] = useState<ServiceMode>('marketplace');
   const [theme, setTheme] = useState<ThemeMode>('light');
   const [filters, setFilters] = useState<CarFilters>(DEFAULT_FILTERS);
@@ -2388,6 +2475,198 @@ export function AppView() {
 
   const renderContent = () => {
     switch (activePage) {
+      case 'home':
+        return (
+          <div className="space-y-16">
+            {/* Hero Section */}
+            <section className="relative overflow-hidden rounded-3xl">
+              <div className={`absolute inset-0 ${resolvedTheme === 'dark' ? 'bg-gradient-to-br from-indigo-900 via-purple-900 to-slate-900' : 'bg-gradient-to-br from-indigo-600 via-purple-600 to-indigo-800'}`}></div>
+              <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'60\' height=\'60\' viewBox=\'0 0 60 60\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'none\' fill-rule=\'evenodd\'%3E%3Cg fill=\'%23ffffff\' fill-opacity=\'0.4\'%3E%3Cpath d=\'M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z\'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")' }}></div>
+              <div className="relative px-8 py-20 text-center md:py-32">
+                <div className="mx-auto max-w-4xl">
+                  <div className="mb-6 inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-sm font-medium text-white backdrop-blur-sm">
+                    <span className="flex h-2 w-2 rounded-full bg-emerald-400"></span>
+                    Powered by AI
+                  </div>
+                  <h1 className="text-4xl font-bold text-white md:text-6xl lg:text-7xl">
+                    {copy.heroTitle}
+                  </h1>
+                  <p className="mx-auto mt-6 max-w-2xl text-lg text-white/80 md:text-xl">
+                    {copy.heroSubtitle}
+                  </p>
+                  <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
+                    <button
+                      onClick={() => setActivePage('listings')}
+                      className="group flex items-center gap-2 rounded-2xl bg-white px-8 py-4 text-lg font-semibold text-indigo-600 shadow-xl transition hover:bg-indigo-50 hover:shadow-2xl"
+                    >
+                      {copy.heroCta}
+                      <svg className="h-5 w-5 transition group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                      </svg>
+                    </button>
+                    <button
+                      onClick={() => setActivePage('chatbot')}
+                      className="flex items-center gap-2 rounded-2xl border-2 border-white/30 bg-white/10 px-8 py-4 text-lg font-semibold text-white backdrop-blur-sm transition hover:bg-white/20"
+                    >
+                      <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                      </svg>
+                      {copy.heroSecondaryCta}
+                    </button>
+                  </div>
+                </div>
+                {/* Floating car images */}
+                <div className="absolute -bottom-4 left-10 hidden h-32 w-48 rounded-2xl bg-white/10 backdrop-blur-sm lg:block" style={{ transform: 'rotate(-6deg)' }}>
+                  <div className="flex h-full items-center justify-center text-6xl">🚗</div>
+                </div>
+                <div className="absolute -bottom-4 right-10 hidden h-32 w-48 rounded-2xl bg-white/10 backdrop-blur-sm lg:block" style={{ transform: 'rotate(6deg)' }}>
+                  <div className="flex h-full items-center justify-center text-6xl">🏎️</div>
+                </div>
+              </div>
+            </section>
+
+            {/* Stats Section */}
+            <section className="grid grid-cols-2 gap-4 md:grid-cols-4">
+              {[
+                { value: '2,500+', label: copy.statsListings, icon: '🚗' },
+                { value: '50+', label: copy.statsDealers, icon: '🏪' },
+                { value: '10,000+', label: copy.statsUsers, icon: '👥' },
+                { value: '100K+', label: copy.statsAiQueries, icon: '🤖' },
+              ].map((stat, idx) => (
+                <div key={idx} className={`rounded-2xl border p-6 text-center transition hover:shadow-lg ${resolvedTheme === 'dark' ? 'border-slate-700 bg-slate-800/50' : 'border-slate-200 bg-white'}`}>
+                  <div className="text-3xl">{stat.icon}</div>
+                  <div className={`mt-2 text-3xl font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{stat.value}</div>
+                  <div className={`text-sm ${resolvedTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>{stat.label}</div>
+                </div>
+              ))}
+            </section>
+
+            {/* Features Section */}
+            <section>
+              <div className="text-center">
+                <h2 className={`text-3xl font-bold md:text-4xl ${resolvedTheme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                  {copy.featuresTitle}
+                </h2>
+                <p className={`mx-auto mt-3 max-w-2xl text-lg ${resolvedTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                  {copy.featuresSubtitle}
+                </p>
+              </div>
+              <div className="mt-12 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                {[
+                  { icon: '🔍', title: copy.feature1Title, desc: copy.feature1Desc, color: 'from-blue-500 to-cyan-500' },
+                  { icon: '💰', title: copy.feature2Title, desc: copy.feature2Desc, color: 'from-emerald-500 to-teal-500' },
+                  { icon: '📸', title: copy.feature3Title, desc: copy.feature3Desc, color: 'from-purple-500 to-pink-500' },
+                  { icon: '✅', title: copy.feature4Title, desc: copy.feature4Desc, color: 'from-amber-500 to-orange-500' },
+                  { icon: '📊', title: copy.feature5Title, desc: copy.feature5Desc, color: 'from-indigo-500 to-purple-500' },
+                  { icon: '💱', title: copy.feature6Title, desc: copy.feature6Desc, color: 'from-rose-500 to-red-500' },
+                ].map((feature, idx) => (
+                  <div key={idx} className={`group rounded-2xl border p-6 transition hover:-translate-y-1 hover:shadow-xl ${resolvedTheme === 'dark' ? 'border-slate-700 bg-slate-800/50' : 'border-slate-200 bg-white'}`}>
+                    <div className={`flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br ${feature.color} text-2xl shadow-lg`}>
+                      {feature.icon}
+                    </div>
+                    <h3 className={`mt-4 text-xl font-semibold ${resolvedTheme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                      {feature.title}
+                    </h3>
+                    <p className={`mt-2 ${resolvedTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                      {feature.desc}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            {/* How It Works Section */}
+            <section className={`rounded-3xl p-8 md:p-12 ${resolvedTheme === 'dark' ? 'bg-slate-800/50' : 'bg-gradient-to-br from-slate-50 to-slate-100'}`}>
+              <div className="text-center">
+                <h2 className={`text-3xl font-bold md:text-4xl ${resolvedTheme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                  {copy.howItWorksTitle}
+                </h2>
+                <p className={`mx-auto mt-3 max-w-2xl text-lg ${resolvedTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                  {copy.howItWorksSubtitle}
+                </p>
+              </div>
+              <div className="mt-12 grid gap-8 md:grid-cols-3">
+                {[
+                  { step: 1, icon: '🔎', title: copy.step1Title, desc: copy.step1Desc },
+                  { step: 2, icon: '🤖', title: copy.step2Title, desc: copy.step2Desc },
+                  { step: 3, icon: '🤝', title: copy.step3Title, desc: copy.step3Desc },
+                ].map((item, idx) => (
+                  <div key={idx} className="relative text-center">
+                    {idx < 2 && (
+                      <div className="absolute left-1/2 top-10 hidden h-0.5 w-full bg-gradient-to-r from-indigo-500 to-transparent md:block" />
+                    )}
+                    <div className="relative mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-3xl shadow-lg">
+                      {item.icon}
+                      <div className="absolute -right-2 -top-2 flex h-8 w-8 items-center justify-center rounded-full bg-white text-sm font-bold text-indigo-600 shadow">
+                        {item.step}
+                      </div>
+                    </div>
+                    <h3 className={`mt-6 text-xl font-semibold ${resolvedTheme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                      {item.title}
+                    </h3>
+                    <p className={`mt-2 ${resolvedTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                      {item.desc}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            {/* Featured Cars Preview */}
+            <section>
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className={`text-2xl font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                    Featured Vehicles
+                  </h2>
+                  <p className={`mt-1 ${resolvedTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                    Explore our latest inventory
+                  </p>
+                </div>
+                <button
+                  onClick={() => setActivePage('listings')}
+                  className="flex items-center gap-2 rounded-xl bg-indigo-500 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-600"
+                >
+                  View All
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+              </div>
+              <div className="mt-6 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                {cars.slice(0, 4).map((car) => renderCarCard(car))}
+                {cars.length === 0 && (
+                  <div className={`col-span-full rounded-2xl border p-8 text-center ${resolvedTheme === 'dark' ? 'border-slate-700 bg-slate-800' : 'border-slate-200 bg-slate-50'}`}>
+                    <p className={resolvedTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}>Loading featured vehicles...</p>
+                  </div>
+                )}
+              </div>
+            </section>
+
+            {/* CTA Section */}
+            <section className="relative overflow-hidden rounded-3xl">
+              <div className="absolute inset-0 bg-gradient-to-r from-indigo-600 to-purple-600"></div>
+              <div className="absolute inset-0" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'100\' height=\'100\' viewBox=\'0 0 100 100\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cpath d=\'M11 18c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm48 25c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm-43-7c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm63 31c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM34 90c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm56-76c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM12 86c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm28-65c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm23-11c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-6 60c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm29 22c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zM32 63c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm57-13c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-9-21c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM60 91c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM35 41c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM12 60c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2z\' fill=\'%23ffffff\' fill-opacity=\'0.1\' fill-rule=\'evenodd\'/%3E%3C/svg%3E")' }}></div>
+              <div className="relative px-8 py-16 text-center md:py-20">
+                <h2 className="text-3xl font-bold text-white md:text-4xl">
+                  {copy.ctaTitle}
+                </h2>
+                <p className="mx-auto mt-4 max-w-2xl text-lg text-white/80">
+                  {copy.ctaSubtitle}
+                </p>
+                <button
+                  onClick={() => user ? setActivePage('listings') : setActivePage('profile')}
+                  className="mt-8 inline-flex items-center gap-2 rounded-2xl bg-white px-8 py-4 text-lg font-semibold text-indigo-600 shadow-xl transition hover:bg-indigo-50"
+                >
+                  {copy.ctaButton}
+                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                  </svg>
+                </button>
+              </div>
+            </section>
+          </div>
+        );
       case 'listings':
         return (
           <div className="space-y-6">
@@ -2536,7 +2815,7 @@ export function AppView() {
           </div>
         );
       case 'dealers':
-        // Sample dealers for showcase (shown when no live dealers yet)
+        // Sample dealers across Jordan with real coordinates
         const sampleDealers: DealerSummary[] = [
           {
             id: 1001,
@@ -2545,7 +2824,7 @@ export function AppView() {
             average_price: 35000,
             top_makes: [{ make: 'BMW', count: 15 }, { make: 'Mercedes', count: 12 }],
             hero_image: '/placeholder-car.svg',
-            location: { lat: 31.9454, lng: 35.9284, city: 'Amman', address: 'Mecca Street, Amman' },
+            location: { lat: 31.9539, lng: 35.9106, city: 'Amman', address: 'Abdoun, Amman' },
           },
           {
             id: 1002,
@@ -2554,7 +2833,7 @@ export function AppView() {
             average_price: 42000,
             top_makes: [{ make: 'Porsche', count: 10 }, { make: 'Audi', count: 8 }],
             hero_image: '/placeholder-car.svg',
-            location: { lat: 31.9632, lng: 35.9106, city: 'Amman', address: 'Abdoun, Amman' },
+            location: { lat: 31.9772, lng: 35.8468, city: 'Amman', address: 'Khalda, Amman' },
           },
           {
             id: 1003,
@@ -2563,7 +2842,7 @@ export function AppView() {
             average_price: 22000,
             top_makes: [{ make: 'Toyota', count: 25 }, { make: 'Honda', count: 18 }],
             hero_image: '/placeholder-car.svg',
-            location: { lat: 31.9872, lng: 35.8676, city: 'Amman', address: 'Al-Bayader, Amman' },
+            location: { lat: 32.5568, lng: 35.8469, city: 'Irbid', address: 'University Street, Irbid' },
           },
           {
             id: 1004,
@@ -2572,7 +2851,43 @@ export function AppView() {
             average_price: 55000,
             top_makes: [{ make: 'Range Rover', count: 12 }, { make: 'Bentley', count: 5 }],
             hero_image: '/placeholder-car.svg',
-            location: { lat: 32.0553, lng: 36.0886, city: 'Zarqa', address: 'Downtown Zarqa' },
+            location: { lat: 32.0392, lng: 36.0879, city: 'Zarqa', address: 'King Hussein Street, Zarqa' },
+          },
+          {
+            id: 1005,
+            name: 'Aqaba Motors',
+            total_listings: 38,
+            average_price: 28000,
+            top_makes: [{ make: 'Nissan', count: 14 }, { make: 'Hyundai', count: 12 }],
+            hero_image: '/placeholder-car.svg',
+            location: { lat: 29.5321, lng: 35.0063, city: 'Aqaba', address: 'City Center, Aqaba' },
+          },
+          {
+            id: 1006,
+            name: 'Salt Premium Cars',
+            total_listings: 22,
+            average_price: 31000,
+            top_makes: [{ make: 'Kia', count: 8 }, { make: 'Mazda', count: 7 }],
+            hero_image: '/placeholder-car.svg',
+            location: { lat: 32.0392, lng: 35.7272, city: 'Salt', address: 'Main Street, Salt' },
+          },
+          {
+            id: 1007,
+            name: 'Madaba Auto Center',
+            total_listings: 19,
+            average_price: 24000,
+            top_makes: [{ make: 'Chevrolet', count: 6 }, { make: 'Ford', count: 5 }],
+            hero_image: '/placeholder-car.svg',
+            location: { lat: 31.7160, lng: 35.7939, city: 'Madaba', address: 'King Talal Street, Madaba' },
+          },
+          {
+            id: 1008,
+            name: 'Petra Luxury Motors',
+            total_listings: 15,
+            average_price: 48000,
+            top_makes: [{ make: 'Lexus', count: 6 }, { make: 'Infiniti', count: 4 }],
+            hero_image: '/placeholder-car.svg',
+            location: { lat: 30.3285, lng: 35.4444, city: 'Petra/Wadi Musa', address: 'Tourism Street, Wadi Musa' },
           },
         ];
         const displayDealers = dealers.length > 0 ? dealers : sampleDealers;
@@ -2627,57 +2942,32 @@ export function AppView() {
                 <span className={`ml-3 ${resolvedTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Loading dealers...</span>
               </div>
             ) : dealerTab === 'map' ? (
-              /* Map View */
-              <div className={`rounded-3xl overflow-hidden border ${resolvedTheme === 'dark' ? 'border-slate-700' : 'border-slate-200'}`}>
-                <div className="relative h-[500px] bg-slate-200">
-                  {/* Map placeholder - would integrate Google Maps or Leaflet here */}
-                  <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-blue-100 to-indigo-100">
-                    <div className="text-center">
-                      <svg className="mx-auto h-16 w-16 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
-                      </svg>
-                      <p className="mt-4 text-lg font-semibold text-indigo-700">Interactive Map</p>
-                      <p className="text-sm text-indigo-500">Showing {displayDealers.length} dealer locations</p>
-                    </div>
-                  </div>
-                  {/* Dealer markers overlay */}
-                  <div className="absolute inset-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4 items-end pointer-events-none">
-                    {displayDealers.slice(0, 4).map((dealer, idx) => (
-                      <div key={dealer.id} className="pointer-events-auto">
-                        <div className={`rounded-xl p-3 shadow-lg ${resolvedTheme === 'dark' ? 'bg-slate-800 text-white' : 'bg-white'}`}>
-                          <div className="flex items-center gap-2">
-                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-500 text-xs font-bold text-white">
-                              {idx + 1}
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <p className="truncate text-sm font-semibold">{dealer.name}</p>
-                              <p className="text-xs text-slate-500">{(dealer as any).location?.city || 'Jordan'}</p>
-                            </div>
-                          </div>
-                          <button
-                            onClick={() => handleOpenDealer(dealer.id)}
-                            className="mt-2 w-full rounded-lg bg-indigo-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-600"
-                          >
-                            View Showroom
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                {/* Dealer list below map */}
-                <div className={`p-4 ${resolvedTheme === 'dark' ? 'bg-slate-800' : 'bg-slate-50'}`}>
-                  <div className="flex flex-wrap gap-3">
+              /* Map View - Real Interactive Map */
+              <div className="space-y-4">
+                <DealerMap 
+                  dealers={displayDealers} 
+                  onDealerClick={handleOpenDealer}
+                  isDark={resolvedTheme === 'dark'}
+                />
+                {/* Dealer chips below map */}
+                <div className={`rounded-2xl p-4 ${resolvedTheme === 'dark' ? 'bg-slate-800' : 'bg-slate-50'}`}>
+                  <p className={`mb-3 text-sm font-medium ${resolvedTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                    {displayDealers.length} dealers across Jordan
+                  </p>
+                  <div className="flex flex-wrap gap-2">
                     {displayDealers.map((dealer, idx) => (
                       <button
                         key={dealer.id}
                         onClick={() => handleOpenDealer(dealer.id)}
-                        className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition ${resolvedTheme === 'dark' ? 'bg-slate-700 text-white hover:bg-slate-600' : 'bg-white text-slate-700 hover:bg-slate-100'}`}
+                        className={`flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-medium transition ${resolvedTheme === 'dark' ? 'bg-slate-700 text-white hover:bg-slate-600' : 'bg-white text-slate-700 shadow-sm hover:bg-slate-100'}`}
                       >
-                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-500 text-xs text-white">
+                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 text-[10px] font-bold text-white">
                           {idx + 1}
                         </span>
-                        {dealer.name}
+                        <span className="max-w-[120px] truncate">{dealer.name}</span>
+                        <span className={`text-xs ${resolvedTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                          {(dealer as any).location?.city}
+                        </span>
                       </button>
                     ))}
                   </div>
@@ -3466,7 +3756,7 @@ export function AppView() {
             {/* Logo */}
             <div
               className="group flex cursor-pointer items-center gap-3 h-20"
-              onClick={() => setActivePage('listings')}
+              onClick={() => setActivePage('home')}
             >
               <img
                 src="/Intelli_Wheels.png"
@@ -3478,6 +3768,7 @@ export function AppView() {
             {/* Desktop Nav */}
             <nav className="hidden items-center gap-1 md:flex">
               {[
+                { key: 'home', label: copy.navHome },
                 { key: 'listings', label: copy.navCatalog },
                 { key: 'dealers', label: copy.navDealers },
                 { key: 'favorites', label: copy.navFavorites },

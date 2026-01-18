@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" fill="none">
+  <defs>
+    <linearGradient id="grad2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#10b981"/>
+      <stop offset="100%" style="stop-color:#14b8a6"/>
+    </linearGradient>
+  </defs>
+  <rect width="200" height="200" fill="url(#grad2)" rx="24"/>
+  <!-- Dollar/price icon -->
+  <circle cx="100" cy="90" r="45" stroke="#fff" stroke-width="5" fill="none"/>
+  <text x="100" y="105" text-anchor="middle" font-family="system-ui, sans-serif" font-size="50" font-weight="700" fill="#fff">$</text>
+  <!-- Trend line -->
+  <g stroke="#fff" stroke-width="3" fill="none" opacity="0.8">
+    <path d="M60 130 L80 125 L100 135 L120 115 L140 120"/>
+    <circle cx="140" cy="120" r="4" fill="#fff"/>
+  </g>
+  <!-- Text -->
+  <text x="100" y="175" text-anchor="middle" font-family="system-ui, sans-serif" font-size="14" font-weight="600" fill="#fff">Price Analysis</text>
+</svg>
