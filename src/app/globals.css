@@ -77,3 +77,65 @@ body {
 .animate-pulse-ring {
   animation: pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
+
+/* Leaflet map fixes - ensure tiles display correctly */
+.leaflet-container {
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+}
+
+.leaflet-tile-pane {
+  z-index: 1;
+}
+
+.leaflet-overlay-pane {
+  z-index: 2;
+}
+
+.leaflet-marker-pane {
+  z-index: 3;
+}
+
+.leaflet-tooltip-pane {
+  z-index: 4;
+}
+
+.leaflet-popup-pane {
+  z-index: 5;
+}
+
+.leaflet-control {
+  z-index: 6;
+}
+
+/* Fix for tiles not showing - prevent Tailwind from interfering */
+.leaflet-pane,
+.leaflet-tile,
+.leaflet-marker-icon,
+.leaflet-marker-shadow,
+.leaflet-tile-container,
+.leaflet-pane > svg,
+.leaflet-pane > canvas,
+.leaflet-zoom-box,
+.leaflet-image-layer,
+.leaflet-layer {
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+
+.leaflet-tile {
+  filter: inherit;
+  visibility: inherit;
+}
+
+.leaflet-tile-container {
+  pointer-events: none;
+}
+
+/* Custom marker styling */
+.custom-marker {
+  background: transparent !important;
+  border: none !important;
+}

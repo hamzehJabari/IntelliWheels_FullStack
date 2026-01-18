@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { DealerSummary } from '@/lib/types';
+import 'leaflet/dist/leaflet.css';
 
 interface DealerMapProps {
   dealers: DealerSummary[];
@@ -83,24 +84,17 @@ export function DealerMap({ dealers, onDealerClick, isDark = false }: DealerMapP
 
   return (
     <div className="relative overflow-hidden rounded-3xl">
-      <link
-        rel="stylesheet"
-        href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"
-        integrity="sha512-h9FcoyWjHcOcmEVkxOfTLnmZFWIH0iZhZT1H2TbOq55xssQGEJHEaIm+PgoUaZbRvQTNTluNOEfb1ZRy6D3BOw=="
-        crossOrigin="anonymous"
-      />
       <MapContainer
         center={jordanCenter}
         zoom={8}
         style={{ height: '500px', width: '100%' }}
         scrollWheelZoom={true}
       >
-        {/* Using OpenStreetMap France Humanitarian tiles - shows Arabic names and respects Palestine */}
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, Tiles: <a href="https://www.hotosm.org/">HOT</a>'
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url={isDark 
-            ? 'https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}.png'
-            : 'https://tile.openstreetmap.fr/hot/{z}/{x}/{y}.png'
+            ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+            : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
           }
         />
         {dealers.map((dealer, index) => {
