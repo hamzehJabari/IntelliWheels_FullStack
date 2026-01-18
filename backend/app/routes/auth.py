@@ -203,11 +203,19 @@ def login():
         expires_at = datetime.now(timezone.utc) + timedelta(days=7)
         
         # Insert new session (cleanup old sessions later via cron if needed)
-        db.execute(
-            'INSERT INTO user_sessions (token, user_id, expires_at) VALUES (?, ?, ?)',
-            (token, user['id'], expires_at)
-        )
-        db.commit()
+        print(f"[Auth Login] Creating session for user_id={user['id']}, token={token[:10]}..., expires={expires_at}")
+        try:
+            db.execute(
+                'INSERT INTO user_sessions (token, user_id, expires_at) VALUES (?, ?, ?)',
+                (token, user['id'], expires_at)
+            )
+            db.commit()
+            print(f"[Auth Login] Session committed successfully")
+        except Exception as e:
+            print(f"[Auth Login] ERROR creating session: {e}")
+            import traceback
+            traceback.print_exc()
+            return jsonify({'success': False, 'error': 'Failed to create session'}), 500
 
         # Safely check is_admin column
         is_admin = False
