@@ -247,7 +247,7 @@ def login():
         is_admin = False
         try:
             is_admin = bool(user['is_admin']) if user['is_admin'] else False
-        except (KeyError, TypeError):
+        except (KeyError, TypeError, IndexError):
             pass  # Column doesn't exist
 
         return jsonify({

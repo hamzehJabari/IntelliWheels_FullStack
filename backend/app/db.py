@@ -107,7 +107,12 @@ class PostgresConnectionWrapper:
         return wrapper
     
     def commit(self):
-        self._connection.commit()
+        try:
+            self._connection.commit()
+            print("[DB] PostgreSQL commit successful")
+        except Exception as e:
+            print(f"[DB] PostgreSQL commit FAILED: {e}")
+            raise
     
     def rollback(self):
         self._connection.rollback()
@@ -131,6 +136,8 @@ def get_db():
             if database_url.startswith('postgres://'):
                 database_url = database_url.replace('postgres://', 'postgresql://', 1)
             conn = psycopg2.connect(database_url)
+            # Set autocommit to False (default) but ensure we handle transactions properly
+            conn.autocommit = False
             g.db = PostgresConnectionWrapper(conn)
             print("[DB] Connected to PostgreSQL")
         else:

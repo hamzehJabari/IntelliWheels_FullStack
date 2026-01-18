@@ -77,6 +77,35 @@ def health_check():
         'storage_type': 'cloudinary' if cloudinary_configured else 'local (ephemeral)'
     })
 
+# TEMPORARY DEBUG - REMOVE AFTER FIXING
+@bp.route('/debug-sessions')
+def debug_sessions():
+    """TEMPORARY: Public debug endpoint to check sessions. REMOVE AFTER DEBUGGING!"""
+    from ..db import is_postgres
+    db = get_db()
+    
+    try:
+        sessions = db.execute('SELECT id, token, user_id, expires_at FROM user_sessions ORDER BY id DESC LIMIT 10').fetchall()
+        return jsonify({
+            'is_postgres': is_postgres(),
+            'session_count': len(sessions),
+            'sessions': [
+                {
+                    'id': s['id'],
+                    'token_preview': s['token'][:15] + '...' if s['token'] else None,
+                    'user_id': s['user_id'],
+                    'expires_at': str(s['expires_at']) if s['expires_at'] else None
+                }
+                for s in sessions
+            ]
+        })
+    except Exception as e:
+        import traceback
+        return jsonify({
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        }), 500
+
 
 # ============================================
 # TEMPORARY ADMIN SETUP ENDPOINTS
