@@ -202,42 +202,11 @@ def login():
         token = generate_token()
         expires_at = datetime.now(timezone.utc) + timedelta(days=7)
         
-        # Clean up old sessions for this user (keep last 5) - skip on error
-        try:
-            if is_postgres():
-                # PostgreSQL doesn't allow LIMIT in subquery with NOT IN, so use a different approach
-                db.execute('''
-                    DELETE FROM user_sessions 
-                    WHERE id IN (
-                        SELECT id FROM user_sessions 
-                        WHERE user_id = %s 
-                        ORDER BY created_at DESC 
-                        OFFSET 5
-                    )
-                ''', (user['id'],))
-            else:
-                db.execute('''
-                    DELETE FROM user_sessions 
-                    WHERE user_id = ? AND token NOT IN (
-                        SELECT token FROM user_sessions 
-                        WHERE user_id = ? 
-                        ORDER BY created_at DESC LIMIT 5
-                    )
-                ''', (user['id'], user['id']))
-        except Exception as e:
-            print(f"[Auth] Session cleanup warning (non-fatal): {e}")
-        
-        # Insert new session
-        if is_postgres():
-            db.execute(
-                'INSERT INTO user_sessions (token, user_id, expires_at) VALUES (%s, %s, %s)',
-                (token, user['id'], expires_at)
-            )
-        else:
-            db.execute(
-                'INSERT INTO user_sessions (token, user_id, expires_at) VALUES (?, ?, ?)',
-                (token, user['id'], expires_at)
-            )
+        # Insert new session (cleanup old sessions later via cron if needed)
+        db.execute(
+            'INSERT INTO user_sessions (token, user_id, expires_at) VALUES (?, ?, ?)',
+            (token, user['id'], expires_at)
+        )
         db.commit()
 
         # Safely check is_admin column
