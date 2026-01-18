@@ -77,6 +77,80 @@ def health_check():
         'storage_type': 'cloudinary' if cloudinary_configured else 'local (ephemeral)'
     })
 
+
+# ============================================
+# TEMPORARY ADMIN SETUP ENDPOINTS
+# Remove these after initial setup!
+# ============================================
+
+@bp.route('/admin-setup/users', methods=['GET'])
+def admin_setup_list_users():
+    """TEMPORARY: List all users for admin setup."""
+    secret = request.args.get('secret')
+    if secret != os.environ.get('SECRET_KEY', '')[:16]:
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    db = get_db()
+    users = db.execute('SELECT id, username, email, role, is_admin, password_hash, created_at FROM users ORDER BY id').fetchall()
+    return jsonify({
+        'users': [
+            {
+                'id': u['id'],
+                'username': u['username'],
+                'email': u['email'],
+                'role': u['role'],
+                'is_admin': bool(u['is_admin']) if u['is_admin'] else False,
+                'has_password': bool(u['password_hash'] and len(u['password_hash']) > 10),
+                'password_hash_preview': u['password_hash'][:30] + '...' if u['password_hash'] else None,
+                'created_at': str(u['created_at']) if u['created_at'] else None
+            }
+            for u in users
+        ],
+        'total': len(users)
+    })
+
+@bp.route('/admin-setup/reset-password', methods=['POST'])
+def admin_setup_reset_password():
+    """TEMPORARY: Reset a user's password."""
+    from werkzeug.security import generate_password_hash
+    
+    data = request.get_json() or {}
+    secret = data.get('secret')
+    if secret != os.environ.get('SECRET_KEY', '')[:16]:
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    user_id = data.get('user_id')
+    new_password = data.get('password')
+    
+    if not user_id or not new_password:
+        return jsonify({'error': 'user_id and password required'}), 400
+    
+    db = get_db()
+    password_hash = generate_password_hash(new_password, method='pbkdf2:sha256:260000')
+    db.execute('UPDATE users SET password_hash = ? WHERE id = ?', (password_hash, user_id))
+    db.commit()
+    
+    return jsonify({'success': True, 'message': f'Password reset for user {user_id}'})
+
+@bp.route('/admin-setup/make-admin', methods=['POST'])
+def admin_setup_make_admin():
+    """TEMPORARY: Make a user an admin."""
+    data = request.get_json() or {}
+    secret = data.get('secret')
+    if secret != os.environ.get('SECRET_KEY', '')[:16]:
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    user_id = data.get('user_id')
+    if not user_id:
+        return jsonify({'error': 'user_id required'}), 400
+    
+    db = get_db()
+    db.execute('UPDATE users SET is_admin = TRUE WHERE id = ?', (user_id,))
+    db.commit()
+    
+    return jsonify({'success': True, 'message': f'User {user_id} is now an admin'})
+
+
 @bp.route('/stats')
 def platform_stats():
     """
