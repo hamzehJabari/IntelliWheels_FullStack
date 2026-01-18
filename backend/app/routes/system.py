@@ -158,25 +158,34 @@ def admin_setup_sessions():
         return jsonify({'error': 'Unauthorized'}), 401
     
     user_id = request.args.get('user_id')
-    token_prefix = request.args.get('token', '')[:10] if request.args.get('token') else None
     
     db = get_db()
     from ..db import is_postgres
-    from datetime import datetime, timezone
     
     # Get current server time
-    if is_postgres():
-        now_row = db.execute("SELECT NOW() AT TIME ZONE 'UTC' as now").fetchone()
-    else:
-        now_row = db.execute("SELECT datetime('now') as now").fetchone()
-    
-    server_now = now_row['now'] if now_row else 'unknown'
+    try:
+        if is_postgres():
+            now_row = db.execute("SELECT NOW() AT TIME ZONE 'UTC' as now").fetchone()
+        else:
+            now_row = db.execute("SELECT datetime('now') as now").fetchone()
+        server_now = now_row['now'] if now_row else 'unknown'
+    except Exception as e:
+        server_now = f'error: {e}'
     
     # Get sessions
-    if user_id:
-        sessions = db.execute('SELECT id, token, user_id, created_at, expires_at FROM user_sessions WHERE user_id = ? ORDER BY created_at DESC LIMIT 10', (user_id,)).fetchall()
-    else:
-        sessions = db.execute('SELECT id, token, user_id, created_at, expires_at FROM user_sessions ORDER BY created_at DESC LIMIT 20').fetchall()
+    try:
+        if is_postgres():
+            if user_id:
+                sessions = db.execute('SELECT id, token, user_id, created_at, expires_at FROM user_sessions WHERE user_id = %s ORDER BY created_at DESC LIMIT 10', (user_id,)).fetchall()
+            else:
+                sessions = db.execute('SELECT id, token, user_id, created_at, expires_at FROM user_sessions ORDER BY created_at DESC LIMIT 20').fetchall()
+        else:
+            if user_id:
+                sessions = db.execute('SELECT id, token, user_id, created_at, expires_at FROM user_sessions WHERE user_id = ? ORDER BY created_at DESC LIMIT 10', (user_id,)).fetchall()
+            else:
+                sessions = db.execute('SELECT id, token, user_id, created_at, expires_at FROM user_sessions ORDER BY created_at DESC LIMIT 20').fetchall()
+    except Exception as e:
+        return jsonify({'error': str(e), 'server_time_utc': str(server_now)})
     
     return jsonify({
         'server_time_utc': str(server_now),
@@ -184,6 +193,7 @@ def admin_setup_sessions():
             {
                 'id': s['id'],
                 'token_preview': s['token'][:15] + '...' if s['token'] else None,
+                'full_token': s['token'],
                 'user_id': s['user_id'],
                 'created_at': str(s['created_at']),
                 'expires_at': str(s['expires_at']),
