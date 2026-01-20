@@ -10,6 +10,23 @@ interface DealerDetailViewProps {
   dealerId: string;
 }
 
+// Map page keys to readable labels
+const getBackLabel = (from: string | null): string => {
+  if (!from) return 'Back to listings';
+  const labels: Record<string, string> = {
+    home: 'Back to home',
+    listings: 'Back to listings',
+    favorites: 'Back to favorites',
+    myListings: 'Back to my listings',
+    dealers: 'Back to dealers',
+    analytics: 'Back to analytics',
+    chatbot: 'Back to chat',
+    messages: 'Back to messages',
+    profile: 'Back to profile',
+  };
+  return labels[from] ?? 'Back to listings';
+};
+
 // Helper to navigate back with fallback to listings
 const handleGoBack = (router: ReturnType<typeof useRouter>, searchParams: URLSearchParams) => {
   const from = searchParams.get('from');
@@ -104,7 +121,7 @@ export function DealerDetailView({ dealerId }: DealerDetailViewProps) {
           className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm"
           onClick={() => handleGoBack(router, searchParams)}
         >
-          ← Back
+          ← {getBackLabel(searchParams.get('from'))}
         </button>
         <div className="overflow-hidden rounded-3xl border border-slate-100 bg-white shadow">
           <div className="h-72 w-full bg-slate-100">

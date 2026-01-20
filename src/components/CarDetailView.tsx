@@ -13,6 +13,24 @@ interface CarDetailViewProps {
   carId: string;
 }
 
+// Map page keys to readable labels
+const getBackLabel = (from: string | null): string => {
+  if (!from) return 'Back to listings';
+  if (from.startsWith('dealer-')) return 'Back to dealer';
+  const labels: Record<string, string> = {
+    home: 'Back to home',
+    listings: 'Back to listings',
+    favorites: 'Back to favorites',
+    myListings: 'Back to my listings',
+    dealers: 'Back to dealers',
+    analytics: 'Back to analytics',
+    chatbot: 'Back to chat',
+    messages: 'Back to messages',
+    profile: 'Back to profile',
+  };
+  return labels[from] ?? 'Back to listings';
+};
+
 // Helper to navigate back with fallback to catalog
 const handleGoBack = (router: ReturnType<typeof useRouter>, searchParams: URLSearchParams) => {
   const from = searchParams.get('from');
@@ -455,7 +473,7 @@ export function CarDetailView({ carId }: CarDetailViewProps) {
           className={`rounded-full border px-4 py-2 text-sm font-semibold shadow-sm ${isDark ? 'border-slate-600 bg-slate-800 text-slate-200 hover:bg-slate-700' : 'border-slate-200 bg-white text-slate-700'}`}
           onClick={() => handleGoBack(router, searchParams)}
         >
-          ← Back to listings
+          ← {getBackLabel(searchParams.get('from'))}
         </button>
         <div className="mt-6 grid gap-6 lg:grid-cols-[2fr,1fr]">
           <div className={`rounded-3xl border shadow-sm ${isDark ? 'border-slate-700 bg-slate-800' : 'border-slate-100 bg-white'}`}>

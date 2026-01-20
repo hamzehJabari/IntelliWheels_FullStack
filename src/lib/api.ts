@@ -314,7 +314,7 @@ export async function getProfile(token: string | null) {
 }
 
 export async function updateProfile(payload: Partial<UserProfile> & { password?: string; current_password?: string }, token: string | null) {
-  return apiRequest(`/api/auth/profile`, {
+  return apiRequest(`/auth/profile`, {
     method: 'PATCH',
     token,
     body: payload,

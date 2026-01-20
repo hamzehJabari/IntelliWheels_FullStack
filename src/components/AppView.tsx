@@ -1021,6 +1021,17 @@ export function AppView() {
         // Clean up URL
         window.history.replaceState({}, '', window.location.pathname);
       }
+      
+      // Handle view parameter (for returning from detail pages)
+      const viewParam = params.get('view');
+      if (viewParam && !resetTokenParam) {
+        const validPages: PageKey[] = ['home', 'listings', 'favorites', 'myListings', 'addListing', 'dealers', 'analytics', 'chatbot', 'messages', 'profile'];
+        if (validPages.includes(viewParam as PageKey)) {
+          setActivePage(viewParam as PageKey);
+          // Clean up URL to avoid re-triggering on refresh
+          window.history.replaceState({}, '', window.location.pathname);
+        }
+      }
     }
   }, []);
 
