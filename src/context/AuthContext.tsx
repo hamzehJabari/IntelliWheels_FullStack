@@ -64,26 +64,37 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     [currency]
   );
 
+  // Track if we've done the initial localStorage check
+  const [initialCheckDone, setInitialCheckDone] = useState(false);
+
   useEffect(() => {
     const storedToken = typeof window !== 'undefined' ? localStorage.getItem(STORAGE_KEYS.token) : null;
     const storedUser = typeof window !== 'undefined' ? localStorage.getItem(STORAGE_KEYS.user) : null;
 
     if (storedToken) {
       setToken(storedToken);
-    }
-    if (storedUser) {
-      try {
-        setUser(JSON.parse(storedUser));
-      } catch (err) {
-        console.warn('Failed to parse stored user', err);
+      if (storedUser) {
+        try {
+          setUser(JSON.parse(storedUser));
+        } catch (err) {
+          console.warn('Failed to parse stored user', err);
+        }
       }
+    } else {
+      // No stored token - we're done loading
+      setLoading(false);
     }
+    setInitialCheckDone(true);
   }, []);
 
   useEffect(() => {
+    // Don't run until initial localStorage check is complete
+    if (!initialCheckDone) {
+      return;
+    }
     async function validateSession() {
       if (!token) {
-        setLoading(false);
+        // No token after initial check means guest user - loading already set to false
         return;
       }
       try {
@@ -105,7 +116,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
     validateSession();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
+  }, [token, initialCheckDone]);
 
   const persistAuth = useCallback((authToken: string, profile: UserProfile) => {
     setToken(authToken);
