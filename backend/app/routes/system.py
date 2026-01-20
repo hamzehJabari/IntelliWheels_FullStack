@@ -65,8 +65,8 @@ def health_check():
     
     return jsonify({
         'status': 'healthy',
-        'version': '2.0.2',  # Updated: buyer_id/seller_id schema fix
-        'build_id': '20260120-fix3-messages',
+        'version': '2.0.3',  # Fixed: car_id instead of listing_id for PostgreSQL
+        'build_id': '20260120-fix4-car_id',
         'ai_enabled': ai_configured,
         'ai_working': gemini_working,
         'ai_model': active_model,

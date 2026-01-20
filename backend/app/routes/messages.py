@@ -137,12 +137,14 @@ def get_conversations():
         
         return jsonify({'success': True, 'conversations': conversations})
     except Exception as e:
+        import traceback
         print(f"Error fetching conversations: {e}")
+        traceback.print_exc()
         try:
             db.rollback()
         except:
             pass
-        return jsonify({'success': False, 'error': 'Failed to fetch conversations'}), 500
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 @bp.route('/conversations/<int:conversation_id>', methods=['GET'])
