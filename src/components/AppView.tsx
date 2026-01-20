@@ -347,6 +347,30 @@ const TRANSLATIONS = {
     priceTo: 'to',
     priceRange: 'Price Range',
     priceEstimated: 'Estimated Price',
+    // Car detail labels
+    conditionNew: 'New',
+    conditionUsed: 'Used',
+    conditionCertified: 'Certified Pre-Owned',
+    transmissionAutomatic: 'Automatic',
+    transmissionManual: 'Manual',
+    transmissionCvt: 'CVT',
+    fuelPetrol: 'Petrol',
+    fuelDiesel: 'Diesel',
+    fuelElectric: 'Electric',
+    fuelHybrid: 'Hybrid',
+    fuelPluginHybrid: 'Plug-in Hybrid',
+    paymentCash: 'Cash',
+    paymentInstallment: 'Installment',
+    paymentBoth: 'Cash or Installments',
+    specGcc: 'GCC Specs',
+    specAmerican: 'American Specs',
+    specEuropean: 'European Specs',
+    specJapanese: 'Japanese Specs',
+    specOther: 'Other Specs',
+    // Grid layout
+    gridLayout: 'Grid',
+    listLayout: 'List',
+    columnsLabel: 'Columns',
   },
   ar: {
     tagline: 'منصة سيارات ذكية',
@@ -594,6 +618,30 @@ const TRANSLATIONS = {
     priceTo: 'إلى',
     priceRange: 'نطاق السعر',
     priceEstimated: 'السعر المقدر',
+    // Car detail labels - تفاصيل السيارة
+    conditionNew: 'جديد',
+    conditionUsed: 'مستعمل',
+    conditionCertified: 'معتمد مستعمل',
+    transmissionAutomatic: 'أوتوماتيك',
+    transmissionManual: 'عادي (مانيوال)',
+    transmissionCvt: 'CVT',
+    fuelPetrol: 'بنزين',
+    fuelDiesel: 'ديزل',
+    fuelElectric: 'كهربائي',
+    fuelHybrid: 'هجين',
+    fuelPluginHybrid: 'هجين قابل للشحن',
+    paymentCash: 'كاش',
+    paymentInstallment: 'أقساط',
+    paymentBoth: 'كاش أو أقساط',
+    specGcc: 'خليجي',
+    specAmerican: 'أمريكي',
+    specEuropean: 'أوروبي',
+    specJapanese: 'ياباني',
+    specOther: 'مواصفات أخرى',
+    // Grid layout - تخطيط الشبكة
+    gridLayout: 'شبكة',
+    listLayout: 'قائمة',
+    columnsLabel: 'الأعمدة',
   },
 } as const;
 
@@ -804,6 +852,7 @@ export function AppView() {
   const [headerSearchQuery, setHeaderSearchQuery] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [dealerTab, setDealerTab] = useState<'map' | 'grid'>('grid');
+  const [gridColumns, setGridColumns] = useState<1 | 2 | 3>(3); // Grid layout columns: 1, 2, or 3
   const [dealerRegistrationOpen, setDealerRegistrationOpen] = useState(false);
   const [dealerRegistrationForm, setDealerRegistrationForm] = useState({
     name: '',
@@ -3424,7 +3473,34 @@ export function AppView() {
                 )}
               </form>
             </div>
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            
+            {/* Grid Layout Toggle */}
+            <div className={`flex items-center justify-end gap-2 ${resolvedTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+              <span className="text-sm font-medium">{copy.columnsLabel}:</span>
+              <div className="flex rounded-xl border overflow-hidden">
+                {[1, 2, 3].map((cols) => (
+                  <button
+                    key={cols}
+                    onClick={() => setGridColumns(cols as 1 | 2 | 3)}
+                    className={`px-3 py-1.5 text-sm font-medium transition ${
+                      gridColumns === cols
+                        ? resolvedTheme === 'dark' ? 'bg-indigo-600 text-white' : 'bg-sky-600 text-white'
+                        : resolvedTheme === 'dark' ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    {cols}
+                  </button>
+                ))}
+              </div>
+            </div>
+            
+            <div className={`grid gap-4 ${
+              gridColumns === 1 
+                ? 'grid-cols-1' 
+                : gridColumns === 2 
+                  ? 'grid-cols-1 sm:grid-cols-2' 
+                  : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'
+            }`}>
               {paginatedCars.length === 0 ? (
                 <p className="col-span-full text-center text-slate-500">No listings match your filters yet.</p>
               ) : (
@@ -4464,23 +4540,23 @@ export function AppView() {
   const currentYear = new Date().getFullYear();
 
   return (
-    <div className={`${backgroundClass} min-h-screen relative`} dir={direction} style={backgroundImageStyle}>
+    <div className={`${backgroundClass} min-h-screen relative overflow-x-hidden`} dir={direction} style={backgroundImageStyle}>
       {/* Overlay for readability */}
       <div className={`absolute inset-0 ${resolvedTheme === 'dark' ? 'bg-slate-950/85' : 'bg-white/80'}`} />
-      <div className="relative z-10">
+      <div className="relative z-10 overflow-x-hidden">
       {renderToast()}
       <header className={`sticky top-0 z-50 border-b backdrop-blur-md transition-colors duration-300 ${headerSurfaceClass} ${subtleBorderClass}`}>
-        <div className="mx-auto flex h-24 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+        <div className="mx-auto flex h-16 sm:h-20 md:h-24 max-w-7xl items-center justify-between px-2 sm:px-4 lg:px-8">
           <div className="flex items-center gap-8">
             {/* Logo */}
             <div
-              className="group flex cursor-pointer items-center gap-3 h-20"
+              className="group flex cursor-pointer items-center gap-3 h-12 sm:h-16 md:h-20"
               onClick={() => setActivePage('home')}
             >
               <img
                 src="/Intelli_Wheels.png"
                 alt="IntelliWheels"
-                className="h-20 w-auto object-contain object-center transition-transform group-hover:scale-105"
+                className="h-12 sm:h-16 md:h-20 w-auto object-contain object-center transition-transform group-hover:scale-105"
               />
             </div>
 

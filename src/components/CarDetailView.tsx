@@ -2,9 +2,12 @@
 
 import { useAuth } from '@/context/AuthContext';
 import { fetchCarById, fetchCarReviews, submitReview, deleteReview, fetchFavorites, addFavorite, removeFavorite, requestCallback } from '@/lib/api';
+import { STORAGE_KEYS } from '@/lib/config';
 import { Car, Review, ReviewStats } from '@/lib/types';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+
+type ThemeMode = 'light' | 'dark' | 'system';
 
 interface CarDetailViewProps {
   carId: string;
@@ -17,6 +20,13 @@ export function CarDetailView({ carId }: CarDetailViewProps) {
   const [car, setCar] = useState<Car | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // Theme state
+  const [theme, setTheme] = useState<ThemeMode>('light');
+  const [systemPrefersDark, setSystemPrefersDark] = useState(false);
+  
+  // Toast state
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   
   // Favorites state
   const [isFavorited, setIsFavorited] = useState(false);
@@ -42,6 +52,28 @@ export function CarDetailView({ carId }: CarDetailViewProps) {
   const apiHost = useMemo(() => {
     const base = process.env.NEXT_PUBLIC_API_BASE_URL ?? '';
     return base.replace(/\/api$/, '');
+  }, []);
+
+  // Load theme from localStorage and detect system preference
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const storedTheme = localStorage.getItem(STORAGE_KEYS.theme) as ThemeMode | null;
+    if (storedTheme) setTheme(storedTheme);
+    
+    const darkMatcher = window.matchMedia('(prefers-color-scheme: dark)');
+    setSystemPrefersDark(darkMatcher.matches);
+    const handler = (e: MediaQueryListEvent) => setSystemPrefersDark(e.matches);
+    darkMatcher.addEventListener('change', handler);
+    return () => darkMatcher.removeEventListener('change', handler);
+  }, []);
+  
+  const resolvedTheme = theme === 'system' ? (systemPrefersDark ? 'dark' : 'light') : theme;
+  const isDark = resolvedTheme === 'dark';
+
+  // Toast helper
+  const showToast = useCallback((message: string, type: 'success' | 'error' | 'info') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 4000);
   }, []);
 
   const resolveImageUrl = useCallback(
@@ -168,8 +200,9 @@ export function CarDetailView({ carId }: CarDetailViewProps) {
       const response = await submitReview(numericId, reviewRating, reviewComment, token);
       console.log('Review response:', response);
       if (response.success) {
+        showToast('✓ Review submitted successfully!', 'success');
         // Short delay to ensure DB consistency, then refresh reviews
-        await new Promise(resolve => setTimeout(resolve, 300));
+        await new Promise(resolve => setTimeout(resolve, 500));
         const refreshed = await fetchCarReviews(numericId);
         console.log('Refreshed reviews:', refreshed);
         if (refreshed.success) {
@@ -180,11 +213,14 @@ export function CarDetailView({ carId }: CarDetailViewProps) {
         setReviewRating(5);
         setShowReviewForm(false);
       } else {
+        showToast(response.error || 'Failed to submit review', 'error');
         setReviewError(response.error || 'Failed to submit review');
       }
     } catch (err) {
       console.error('Review submission error:', err);
-      setReviewError(err instanceof Error ? err.message : 'Failed to submit review');
+      const errMsg = err instanceof Error ? err.message : 'Failed to submit review';
+      showToast(errMsg, 'error');
+      setReviewError(errMsg);
     } finally {
       setReviewSubmitting(false);
     }
@@ -195,6 +231,7 @@ export function CarDetailView({ carId }: CarDetailViewProps) {
     try {
       const response = await deleteReview(reviewId, token);
       if (response.success) {
+        showToast('Review deleted', 'info');
         const refreshed = await fetchCarReviews(numericId);
         if (refreshed.success) {
           setReviews(refreshed.reviews || []);
@@ -203,6 +240,7 @@ export function CarDetailView({ carId }: CarDetailViewProps) {
       }
     } catch (err) {
       console.warn('Failed to delete review:', err);
+      showToast('Failed to delete review', 'error');
     }
   };
 
@@ -346,7 +384,7 @@ export function CarDetailView({ carId }: CarDetailViewProps) {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50 text-slate-500">
+      <div className={`flex min-h-screen items-center justify-center ${isDark ? 'bg-slate-900 text-slate-400' : 'bg-slate-50 text-slate-500'}`}>
         Loading car details...
       </div>
     );
@@ -354,34 +392,46 @@ export function CarDetailView({ carId }: CarDetailViewProps) {
 
   if (error || !car) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
-        <div className="max-w-md rounded-3xl border border-slate-200 bg-white p-6 text-center shadow">
-          <p className="text-lg font-semibold text-slate-900">Unable to load this car</p>
-          <p className="mt-2 text-sm text-slate-600">{error || 'The requested listing could not be found.'}</p>
+      <div className={`flex min-h-screen items-center justify-center px-4 ${isDark ? 'bg-slate-900' : 'bg-slate-50'}`}>
+        <div className={`max-w-md rounded-3xl border p-6 text-center shadow ${isDark ? 'border-slate-700 bg-slate-800' : 'border-slate-200 bg-white'}`}>
+          <p className={`text-lg font-semibold ${isDark ? 'text-white' : 'text-slate-900'}`}>Unable to load this car</p>
+          <p className={`mt-2 text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>{error || 'The requested listing could not be found.'}</p>
           <button
             type="button"
-            className="mt-6 w-full rounded-2xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white"
-            onClick={() => router.push('/')}
+            className={`mt-6 w-full rounded-2xl px-4 py-2 text-sm font-semibold text-white ${isDark ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-slate-900'}`}
+            onClick={() => router.back()}
           >
-            Go to listings
+            Go back
           </button>
         </div>
       </div>
     );
   }
 
+  // Toast component
+  const renderToast = () => {
+    if (!toast) return null;
+    const bgColor = toast.type === 'success' ? 'bg-emerald-600' : toast.type === 'error' ? 'bg-red-600' : 'bg-sky-600';
+    return (
+      <div className={`fixed top-4 right-4 z-[9999] ${bgColor} text-white px-6 py-3 rounded-2xl shadow-lg animate-fade-in`}>
+        {toast.message}
+      </div>
+    );
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-sky-50">
+    <div className={`min-h-screen ${isDark ? 'bg-slate-900' : 'bg-gradient-to-br from-slate-50 via-white to-sky-50'}`}>
+      {renderToast()}
       <div className="mx-auto max-w-6xl px-4 py-8">
         <button
           type="button"
-          className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm"
-          onClick={() => router.push('/')}
+          className={`rounded-full border px-4 py-2 text-sm font-semibold shadow-sm ${isDark ? 'border-slate-600 bg-slate-800 text-slate-200 hover:bg-slate-700' : 'border-slate-200 bg-white text-slate-700'}`}
+          onClick={() => router.back()}
         >
           ← Back to listings
         </button>
         <div className="mt-6 grid gap-6 lg:grid-cols-[2fr,1fr]">
-          <div className="rounded-3xl border border-slate-100 bg-white shadow-sm">
+          <div className={`rounded-3xl border shadow-sm ${isDark ? 'border-slate-700 bg-slate-800' : 'border-slate-100 bg-white'}`}>
             <div className="relative h-96 w-full overflow-hidden rounded-t-3xl">
               <img
                 src={activeImage}
@@ -418,13 +468,13 @@ export function CarDetailView({ carId }: CarDetailViewProps) {
               )}
             </div>
             {hasMultipleImages && (
-              <div className="flex flex-wrap gap-2 border-t border-slate-100 p-4">
+              <div className={`flex flex-wrap gap-2 border-t p-4 ${isDark ? 'border-slate-700' : 'border-slate-100'}`}>
                 {gallery.map((url, index) => (
                   <button
                     key={`${url}-${index}`}
                     type="button"
                     onClick={() => setActiveIndex(index)}
-                    className={`h-16 w-16 overflow-hidden rounded-xl border ${index === activeIndex ? 'border-sky-500' : 'border-slate-200'}`}
+                    className={`h-16 w-16 overflow-hidden rounded-xl border ${index === activeIndex ? 'border-sky-500' : isDark ? 'border-slate-600' : 'border-slate-200'}`}
                   >
                     <img src={url} alt={`Thumbnail ${index + 1}`} className="h-full w-full object-cover" />
                   </button>
@@ -434,9 +484,9 @@ export function CarDetailView({ carId }: CarDetailViewProps) {
             <div className="space-y-6 p-6">
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div className="flex-1">
-                  <p className="text-sm uppercase tracking-wide text-slate-400">Listing</p>
-                  <h1 className="text-3xl font-bold text-slate-900">{car.make} {car.model}</h1>
-                  <p className="text-lg text-slate-600">{car.year} • {car.specs?.trim}</p>
+                  <p className={`text-sm uppercase tracking-wide ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Listing</p>
+                  <h1 className={`text-3xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{car.make} {car.model}</h1>
+                  <p className={`text-lg ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>{car.year} • {car.specs?.trim}</p>
                 </div>
                 <div className="flex flex-col items-end gap-3">
                   {!Number.isNaN(Number(car.price)) && (
@@ -468,59 +518,59 @@ export function CarDetailView({ carId }: CarDetailViewProps) {
                 </div>
               </div>
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                <div className="rounded-2xl border border-slate-100 p-4">
-                  <p className="text-xs uppercase text-slate-400">Rating</p>
-                  <p className="text-3xl font-semibold text-slate-900">{car.rating ? car.rating.toFixed(1) : '—'}</p>
+                <div className={`rounded-2xl border p-4 ${isDark ? 'border-slate-700 bg-slate-800' : 'border-slate-100 bg-white'}`}>
+                  <p className={`text-xs uppercase ${isDark ? 'text-slate-400' : 'text-slate-400'}`}>Rating</p>
+                  <p className={`text-3xl font-semibold ${isDark ? 'text-white' : 'text-slate-900'}`}>{car.rating ? car.rating.toFixed(1) : '—'}</p>
                 </div>
-                <div className="rounded-2xl border border-slate-100 p-4">
-                  <p className="text-xs uppercase text-slate-400">Reviews</p>
-                  <p className="text-3xl font-semibold text-slate-900">{car.reviews ?? '—'}</p>
+                <div className={`rounded-2xl border p-4 ${isDark ? 'border-slate-700 bg-slate-800' : 'border-slate-100 bg-white'}`}>
+                  <p className={`text-xs uppercase ${isDark ? 'text-slate-400' : 'text-slate-400'}`}>Reviews</p>
+                  <p className={`text-3xl font-semibold ${isDark ? 'text-white' : 'text-slate-900'}`}>{car.reviews ?? '—'}</p>
                 </div>
                 {car.odometerKm ? (
-                  <div className="rounded-2xl border border-slate-100 p-4">
-                    <p className="text-xs uppercase text-slate-400">Odometer</p>
-                    <p className="text-3xl font-semibold text-slate-900">{car.odometerKm.toLocaleString()} km</p>
+                  <div className={`rounded-2xl border p-4 ${isDark ? 'border-slate-700 bg-slate-800' : 'border-slate-100 bg-white'}`}>
+                    <p className={`text-xs uppercase ${isDark ? 'text-slate-400' : 'text-slate-400'}`}>Odometer</p>
+                    <p className={`text-3xl font-semibold ${isDark ? 'text-white' : 'text-slate-900'}`}>{car.odometerKm.toLocaleString()} km</p>
                   </div>
                 ) : null}
               </div>
               {descriptionText && (
-                <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-5">
-                  <p className="text-sm font-semibold text-slate-900">Description</p>
-                  <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-slate-700">{descriptionText}</p>
+                <div className={`rounded-2xl border p-5 ${isDark ? 'border-slate-700 bg-slate-800' : 'border-slate-100 bg-slate-50/70'}`}>
+                  <p className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-slate-900'}`}>Description</p>
+                  <p className={`mt-2 whitespace-pre-line text-sm leading-relaxed ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{descriptionText}</p>
                 </div>
               )}
               
               {/* Vehicle Details */}
               {(car.condition || car.transmission || car.fuelType || car.regionalSpec || car.exteriorColor || car.interiorColor || car.city || car.trim) && (
-                <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-5">
-                  <p className="text-sm font-semibold text-slate-900 mb-3">Vehicle Details</p>
+                <div className={`rounded-2xl border p-5 ${isDark ? 'border-slate-700 bg-slate-800' : 'border-slate-100 bg-slate-50/70'}`}>
+                  <p className={`text-sm font-semibold mb-3 ${isDark ? 'text-white' : 'text-slate-900'}`}>Vehicle Details</p>
                   <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
                     {car.condition && (
-                      <div className="text-sm"><span className="font-medium text-slate-700">Condition:</span> <span className="capitalize text-slate-600">{car.condition}</span></div>
+                      <div className="text-sm"><span className={`font-medium ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Condition:</span> <span className={`capitalize ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>{car.condition}</span></div>
                     )}
                     {car.transmission && (
-                      <div className="text-sm"><span className="font-medium text-slate-700">Transmission:</span> <span className="capitalize text-slate-600">{car.transmission}</span></div>
+                      <div className="text-sm"><span className={`font-medium ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Transmission:</span> <span className={`capitalize ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>{car.transmission}</span></div>
                     )}
                     {car.fuelType && (
-                      <div className="text-sm"><span className="font-medium text-slate-700">Fuel Type:</span> <span className="capitalize text-slate-600">{car.fuelType.replace('_', ' ')}</span></div>
+                      <div className="text-sm"><span className={`font-medium ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Fuel Type:</span> <span className={`capitalize ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>{car.fuelType.replace('_', ' ')}</span></div>
                     )}
                     {car.regionalSpec && (
-                      <div className="text-sm"><span className="font-medium text-slate-700">Specs:</span> <span className="uppercase text-slate-600">{car.regionalSpec}</span></div>
+                      <div className="text-sm"><span className={`font-medium ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Specs:</span> <span className={`uppercase ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>{car.regionalSpec}</span></div>
                     )}
                     {car.exteriorColor && (
-                      <div className="text-sm"><span className="font-medium text-slate-700">Exterior:</span> <span className="text-slate-600">{car.exteriorColor}</span></div>
+                      <div className="text-sm"><span className={`font-medium ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Exterior:</span> <span className={`${isDark ? 'text-slate-400' : 'text-slate-600'}`}>{car.exteriorColor}</span></div>
                     )}
                     {car.interiorColor && (
-                      <div className="text-sm"><span className="font-medium text-slate-700">Interior:</span> <span className="text-slate-600">{car.interiorColor}</span></div>
+                      <div className="text-sm"><span className={`font-medium ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Interior:</span> <span className={`${isDark ? 'text-slate-400' : 'text-slate-600'}`}>{car.interiorColor}</span></div>
                     )}
                     {car.trim && (
-                      <div className="text-sm"><span className="font-medium text-slate-700">Trim:</span> <span className="text-slate-600">{car.trim}</span></div>
+                      <div className="text-sm"><span className={`font-medium ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Trim:</span> <span className={`${isDark ? 'text-slate-400' : 'text-slate-600'}`}>{car.trim}</span></div>
                     )}
                     {car.city && (
-                      <div className="text-sm"><span className="font-medium text-slate-700">Location:</span> <span className="text-slate-600">{car.city}{car.neighborhood ? `, ${car.neighborhood}` : ''}</span></div>
+                      <div className="text-sm"><span className={`font-medium ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Location:</span> <span className={`${isDark ? 'text-slate-400' : 'text-slate-600'}`}>{car.city}{car.neighborhood ? `, ${car.neighborhood}` : ''}</span></div>
                     )}
                     {car.paymentType && car.paymentType !== 'cash' && (
-                      <div className="text-sm"><span className="font-medium text-slate-700">Payment:</span> <span className="capitalize text-slate-600">{car.paymentType === 'both' ? 'Cash or Installments' : car.paymentType}</span></div>
+                      <div className="text-sm"><span className={`font-medium ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Payment:</span> <span className={`capitalize ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>{car.paymentType === 'both' ? 'Cash or Installments' : car.paymentType}</span></div>
                     )}
                   </div>
                 </div>
@@ -530,21 +580,21 @@ export function CarDetailView({ carId }: CarDetailViewProps) {
                 <div className="grid gap-3 md:grid-cols-2">
                   {Object.entries(car.specs).map(([key, value]) =>
                     value ? (
-                      <div key={key} className="rounded-2xl bg-slate-50 p-3 text-sm text-slate-700">
-                        <span className="font-semibold text-slate-900">{camelToTitle(key)}:</span> {String(value)}
+                      <div key={key} className={`rounded-2xl p-3 text-sm ${isDark ? 'bg-slate-800 text-slate-300' : 'bg-slate-50 text-slate-700'}`}>
+                        <span className={`font-semibold ${isDark ? 'text-white' : 'text-slate-900'}`}>{camelToTitle(key)}:</span> {String(value)}
                       </div>
                     ) : null
                   )}
                 </div>
               )}
               {videoSources.length > 0 && (
-                <div className="rounded-2xl border border-slate-100 p-4">
-                  <p className="text-sm font-semibold text-slate-900">
+                <div className={`rounded-2xl border p-4 ${isDark ? 'border-slate-700 bg-slate-800' : 'border-slate-100 bg-white'}`}>
+                  <p className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-slate-900'}`}>
                     {videoSources.length === 1 ? 'Video spotlight' : `Videos (${videoSources.length})`}
                   </p>
                   <div className="mt-3 grid gap-4 md:grid-cols-2">
                     {videoSources.map((videoUrl, idx) => (
-                      <div key={idx} className="overflow-hidden rounded-2xl border border-slate-200 bg-black">
+                      <div key={idx} className={`overflow-hidden rounded-2xl border bg-black ${isDark ? 'border-slate-700' : 'border-slate-200'}`}>
                         {renderVideoEmbed(videoUrl, idx)}
                       </div>
                     ))}
@@ -553,16 +603,16 @@ export function CarDetailView({ carId }: CarDetailViewProps) {
               )}
               
               {/* Reviews Section */}
-              <div className="rounded-2xl border border-slate-100 bg-white p-5">
+              <div className={`rounded-2xl border p-5 ${isDark ? 'border-slate-700 bg-slate-800' : 'border-slate-100 bg-white'}`}>
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-semibold text-slate-900">Reviews & Ratings</p>
+                    <p className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-slate-900'}`}>Reviews & Ratings</p>
                     <div className="mt-1 flex items-center gap-2">
                       <div className="flex items-center">
                         {[1, 2, 3, 4, 5].map((star) => (
                           <svg
                             key={star}
-                            className={`h-5 w-5 ${star <= Math.round(reviewStats.average_rating) ? 'text-yellow-400' : 'text-slate-200'}`}
+                            className={`h-5 w-5 ${star <= Math.round(reviewStats.average_rating) ? 'text-yellow-400' : isDark ? 'text-slate-600' : 'text-slate-200'}`}
                             fill="currentColor"
                             viewBox="0 0 20 20"
                           >
@@ -570,14 +620,14 @@ export function CarDetailView({ carId }: CarDetailViewProps) {
                           </svg>
                         ))}
                       </div>
-                      <span className="text-sm font-semibold text-slate-900">{reviewStats.average_rating.toFixed(1)}</span>
-                      <span className="text-sm text-slate-500">({reviewStats.total_reviews} reviews)</span>
+                      <span className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-slate-900'}`}>{reviewStats.average_rating.toFixed(1)}</span>
+                      <span className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>({reviewStats.total_reviews} reviews)</span>
                     </div>
                   </div>
                   {token && !userHasReview && (
                     <button
                       onClick={() => setShowReviewForm(!showReviewForm)}
-                      className="rounded-xl bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700"
+                      className={`rounded-xl px-4 py-2 text-sm font-semibold text-white ${isDark ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-sky-600 hover:bg-sky-700'}`}
                     >
                       Write a Review
                     </button>
@@ -586,10 +636,10 @@ export function CarDetailView({ carId }: CarDetailViewProps) {
 
                 {/* Review Form */}
                 {showReviewForm && (
-                  <form onSubmit={handleSubmitReview} className="mt-4 rounded-xl border border-slate-100 bg-slate-50 p-4">
-                    <p className="text-sm font-semibold text-slate-900">Your Review</p>
+                  <form onSubmit={handleSubmitReview} className={`mt-4 rounded-xl border p-4 ${isDark ? 'border-slate-600 bg-slate-700' : 'border-slate-100 bg-slate-50'}`}>
+                    <p className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-slate-900'}`}>Your Review</p>
                     <div className="mt-3">
-                      <label className="block text-xs text-slate-500">Rating</label>
+                      <label className={`block text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Rating</label>
                       <div className="mt-1 flex gap-1">
                         {[1, 2, 3, 4, 5].map((star) => (
                           <button
@@ -599,7 +649,7 @@ export function CarDetailView({ carId }: CarDetailViewProps) {
                             className="focus:outline-none"
                           >
                             <svg
-                              className={`h-8 w-8 transition ${star <= reviewRating ? 'text-yellow-400' : 'text-slate-300 hover:text-yellow-300'}`}
+                              className={`h-8 w-8 transition ${star <= reviewRating ? 'text-yellow-400' : isDark ? 'text-slate-500 hover:text-yellow-300' : 'text-slate-300 hover:text-yellow-300'}`}
                               fill="currentColor"
                               viewBox="0 0 20 20"
                             >
@@ -610,17 +660,17 @@ export function CarDetailView({ carId }: CarDetailViewProps) {
                       </div>
                     </div>
                     <div className="mt-3">
-                      <label className="block text-xs text-slate-500">Comment (optional)</label>
+                      <label className={`block text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Comment (optional)</label>
                       <textarea
                         value={reviewComment}
                         onChange={(e) => setReviewComment(e.target.value)}
                         placeholder="Share your thoughts about this car..."
-                        className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                        className={`mt-1 w-full rounded-xl border px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 ${isDark ? 'border-slate-500 bg-slate-600 text-white placeholder-slate-400' : 'border-slate-300 bg-white text-slate-900 placeholder-slate-400'}`}
                         rows={3}
                         maxLength={1000}
                       />
                     </div>
-                    {reviewError && <p className="mt-2 text-sm text-red-600">{reviewError}</p>}
+                    {reviewError && <p className="mt-2 text-sm text-red-500">{reviewError}</p>}
                     <div className="mt-3 flex gap-2">
                       <button
                         type="submit"
@@ -632,7 +682,7 @@ export function CarDetailView({ carId }: CarDetailViewProps) {
                       <button
                         type="button"
                         onClick={() => setShowReviewForm(false)}
-                        className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                        className={`rounded-xl border px-4 py-2 text-sm font-semibold ${isDark ? 'border-slate-500 text-slate-300 hover:bg-slate-600' : 'border-slate-200 text-slate-700 hover:bg-slate-50'}`}
                       >
                         Cancel
                       </button>
@@ -644,7 +694,7 @@ export function CarDetailView({ carId }: CarDetailViewProps) {
                 {reviews.length > 0 ? (
                   <div className="mt-4 space-y-3">
                     {reviews.map((review) => (
-                      <div key={review.id} className="rounded-xl border border-slate-100 bg-slate-50/50 p-4">
+                      <div key={review.id} className={`rounded-xl border p-4 ${isDark ? 'border-slate-600 bg-slate-700/50' : 'border-slate-100 bg-slate-50/50'}`}>
                         <div className="flex items-start justify-between">
                           <div>
                             <div className="flex items-center gap-2">
@@ -669,7 +719,7 @@ export function CarDetailView({ carId }: CarDetailViewProps) {
                           {user && user.id === review.user_id && (
                             <button
                               onClick={() => handleDeleteReview(review.id)}
-                              className="rounded-lg p-1 text-slate-400 hover:bg-red-50 hover:text-red-600"
+                              className={`rounded-lg p-1 ${isDark ? 'text-slate-400 hover:bg-red-900/30 hover:text-red-400' : 'text-slate-400 hover:bg-red-50 hover:text-red-600'}`}
                               title="Delete review"
                             >
                               <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -679,33 +729,33 @@ export function CarDetailView({ carId }: CarDetailViewProps) {
                           )}
                         </div>
                         {review.comment && (
-                          <p className="mt-2 text-sm text-slate-600">{review.comment}</p>
+                          <p className={`mt-2 text-sm ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{review.comment}</p>
                         )}
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <p className="mt-4 text-sm text-slate-500">No reviews yet. Be the first to review this car!</p>
+                  <p className={`mt-4 text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>No reviews yet. Be the first to review this car!</p>
                 )}
               </div>
             </div>
           </div>
           <div className="flex flex-col gap-4">
-            <div className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
-              <p className="text-sm font-semibold text-slate-900">Seller actions</p>
-              <p className="mt-2 text-sm text-slate-600">Ready to discuss this car? Reach out to the IntelliWheels concierge team.</p>
+            <div className={`rounded-3xl border p-6 shadow-sm ${isDark ? 'border-slate-700 bg-slate-800' : 'border-slate-100 bg-white'}`}>
+              <p className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-slate-900'}`}>Seller actions</p>
+              <p className={`mt-2 text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>Ready to discuss this car? Reach out to the IntelliWheels concierge team.</p>
               <div className="mt-4 space-y-2">
                 <button
-                  className="w-full rounded-2xl bg-sky-600 py-2 text-sm font-semibold text-white"
+                  className={`w-full rounded-2xl py-2 text-sm font-semibold text-white ${isDark ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-sky-600 hover:bg-sky-700'}`}
                   onClick={() => setShowCallbackForm(true)}
                 >
                   Request callback
                 </button>
                 {showCallbackForm && (
-                  <div className="mt-4 rounded-2xl border border-slate-100 bg-white p-4">
-                    <h4 className="mb-2 text-sm font-semibold text-slate-900">Request a callback</h4>
+                  <div className={`mt-4 rounded-2xl border p-4 ${isDark ? 'border-slate-600 bg-slate-700' : 'border-slate-100 bg-white'}`}>
+                    <h4 className={`mb-2 text-sm font-semibold ${isDark ? 'text-white' : 'text-slate-900'}`}>Request a callback</h4>
                     {cbSuccess ? (
-                      <p className="text-sm text-emerald-600">{cbSuccess}</p>
+                      <p className="text-sm text-emerald-500">{cbSuccess}</p>
                     ) : (
                       <form
                         onSubmit={async (e) => {
@@ -734,15 +784,15 @@ export function CarDetailView({ carId }: CarDetailViewProps) {
                           }
                         }}
                       >
-                        <input value={cbName} onChange={(e) => setCbName(e.target.value)} placeholder="Your name" className="w-full mb-2 rounded-lg border px-3 py-2 text-sm" />
-                        <input value={cbPhone} onChange={(e) => setCbPhone(e.target.value)} placeholder="Phone number" className="w-full mb-2 rounded-lg border px-3 py-2 text-sm" />
-                        <input value={cbPreferredTime} onChange={(e) => setCbPreferredTime(e.target.value)} placeholder="Preferred time (optional)" className="w-full mb-2 rounded-lg border px-3 py-2 text-sm" />
-                        <textarea value={cbMessage} onChange={(e) => setCbMessage(e.target.value)} placeholder="Message (optional)" className="w-full mb-3 rounded-lg border px-3 py-2 text-sm" />
+                        <input value={cbName} onChange={(e) => setCbName(e.target.value)} placeholder="Your name" className={`w-full mb-2 rounded-lg border px-3 py-2 text-sm ${isDark ? 'border-slate-500 bg-slate-600 text-white placeholder-slate-400' : 'border-slate-300 bg-white text-slate-900 placeholder-slate-400'}`} />
+                        <input value={cbPhone} onChange={(e) => setCbPhone(e.target.value)} placeholder="Phone number" className={`w-full mb-2 rounded-lg border px-3 py-2 text-sm ${isDark ? 'border-slate-500 bg-slate-600 text-white placeholder-slate-400' : 'border-slate-300 bg-white text-slate-900 placeholder-slate-400'}`} />
+                        <input value={cbPreferredTime} onChange={(e) => setCbPreferredTime(e.target.value)} placeholder="Preferred time (optional)" className={`w-full mb-2 rounded-lg border px-3 py-2 text-sm ${isDark ? 'border-slate-500 bg-slate-600 text-white placeholder-slate-400' : 'border-slate-300 bg-white text-slate-900 placeholder-slate-400'}`} />
+                        <textarea value={cbMessage} onChange={(e) => setCbMessage(e.target.value)} placeholder="Message (optional)" className={`w-full mb-3 rounded-lg border px-3 py-2 text-sm ${isDark ? 'border-slate-500 bg-slate-600 text-white placeholder-slate-400' : 'border-slate-300 bg-white text-slate-900 placeholder-slate-400'}`} />
                         <div className="flex items-center gap-2">
-                          <button type="submit" disabled={cbSubmitting} className="rounded-2xl bg-sky-600 px-4 py-2 text-sm font-semibold text-white">
+                          <button type="submit" disabled={cbSubmitting} className={`rounded-2xl px-4 py-2 text-sm font-semibold text-white ${isDark ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-sky-600 hover:bg-sky-700'}`}>
                             {cbSubmitting ? 'Submitting...' : 'Send request'}
                           </button>
-                          <button type="button" onClick={() => setShowCallbackForm(false)} className="rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-900">
+                          <button type="button" onClick={() => setShowCallbackForm(false)} className={`rounded-2xl border px-4 py-2 text-sm font-semibold ${isDark ? 'border-slate-500 text-slate-300 hover:bg-slate-600' : 'border-slate-200 text-slate-900 hover:bg-slate-50'}`}>
                             Cancel
                           </button>
                         </div>
@@ -750,10 +800,10 @@ export function CarDetailView({ carId }: CarDetailViewProps) {
                     )}
                   </div>
                 )}
-                <button className="w-full rounded-2xl border border-slate-200 py-2 text-sm font-semibold text-slate-900">Add to watchlist</button>
+                <button className={`w-full rounded-2xl border py-2 text-sm font-semibold ${isDark ? 'border-slate-600 text-slate-300 hover:bg-slate-700' : 'border-slate-200 text-slate-900 hover:bg-slate-50'}`}>Add to watchlist</button>
                 {car.owner_id ? (
                   <button
-                    className="w-full rounded-2xl border border-slate-200 py-2 text-sm font-semibold text-slate-900"
+                    className={`w-full rounded-2xl border py-2 text-sm font-semibold ${isDark ? 'border-slate-600 text-slate-300 hover:bg-slate-700' : 'border-slate-200 text-slate-900 hover:bg-slate-50'}`}
                     onClick={() => router.push(`/dealers/${car.owner_id}`)}
                   >
                     Visit dealer page
@@ -761,9 +811,9 @@ export function CarDetailView({ carId }: CarDetailViewProps) {
                 ) : null}
               </div>
             </div>
-            <div className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
-              <p className="text-sm font-semibold text-slate-900">Listing metadata</p>
-              <ul className="mt-3 space-y-2 text-sm text-slate-600">
+            <div className={`rounded-3xl border p-6 shadow-sm ${isDark ? 'border-slate-700 bg-slate-800' : 'border-slate-100 bg-white'}`}>
+              <p className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-slate-900'}`}>Listing metadata</p>
+              <ul className={`mt-3 space-y-2 text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
                 <li>Currency: {car.currency || 'AED'}</li>
                 <li>Created: {car.created_at ? new Date(car.created_at).toLocaleDateString() : 'Recently added'}</li>
                 {car.updated_at && <li>Updated: {new Date(car.updated_at).toLocaleDateString()}</li>}
