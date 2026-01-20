@@ -9,10 +9,14 @@ try:
     HAS_POSTGRES = True
 except ImportError:
     HAS_POSTGRES = False
+    # Warn if DATABASE_URL is set but psycopg2 is missing
+    if os.environ.get('DATABASE_URL'):
+        print("[DB WARNING] DATABASE_URL is set but psycopg2 is not installed! Falling back to SQLite.")
 
 def is_postgres():
-    """Check if we're using PostgreSQL based on DATABASE_URL."""
-    return bool(os.environ.get('DATABASE_URL'))
+    """Check if we're using PostgreSQL based on DATABASE_URL AND driver availability."""
+    # FIX: Only return True if we actually have the psycopg2 driver installed!
+    return bool(os.environ.get('DATABASE_URL')) and HAS_POSTGRES
 
 class PostgresRowWrapper:
     """Wrapper to make psycopg2 rows behave like sqlite3.Row."""
