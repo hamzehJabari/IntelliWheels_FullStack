@@ -81,7 +81,7 @@ def create_app(test_config=None):
     init_db(app)
 
     # Register Blueprints
-    from .routes import cars, ai, system, auth, dealers, favorites, listings, reviews
+    from .routes import cars, ai, system, auth, dealers, favorites, listings, reviews, messages
     app.register_blueprint(cars.bp)
     app.register_blueprint(ai.bp)
     app.register_blueprint(system.bp)
@@ -90,6 +90,7 @@ def create_app(test_config=None):
     app.register_blueprint(favorites.bp)
     app.register_blueprint(listings.bp)
     app.register_blueprint(reviews.bp)
+    app.register_blueprint(messages.bp)
     
     # Setup Swagger UI
     SWAGGER_URL = '/api/docs'

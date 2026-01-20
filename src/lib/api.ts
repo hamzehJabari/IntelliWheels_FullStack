@@ -275,7 +275,7 @@ export async function getProfile(token: string | null) {
 }
 
 export async function updateProfile(payload: Partial<UserProfile> & { password?: string; current_password?: string }, token: string | null) {
-  return apiRequest(`/profile`, {
+  return apiRequest(`/api/auth/profile`, {
     method: 'PATCH',
     token,
     body: payload,
@@ -494,4 +494,46 @@ export async function fetchPlatformStats() {
     stats: PlatformStats;
     definitions: Record<string, string>;
   }>(`/stats`);
+}
+
+// ============ MESSAGING API ============
+export interface Conversation {
+  id: number;
+  other_user_id: number;
+  other_username: string;
+  listing_id: number | null;
+  listing_title: string | null;
+  last_message: string | null;
+  unread_count: number;
+  updated_at: string;
+}
+
+export interface Message {
+  id: number;
+  sender_id: number;
+  sender_username: string;
+  content: string;
+  is_read: boolean;
+  created_at: string;
+  is_mine: boolean;
+}
+
+export async function fetchConversations(token: string | null) {
+  return apiRequest<{ success: boolean; conversations: Conversation[] }>(`/messages/conversations`, { token });
+}
+
+export async function fetchMessages(conversationId: number, token: string | null) {
+  return apiRequest<{ success: boolean; messages: Message[] }>(`/messages/conversations/${conversationId}`, { token });
+}
+
+export async function sendMessage(recipientId: number, content: string, listingId: number | null, token: string | null) {
+  return apiRequest<{ success: boolean; conversation_id: number; message: string }>(`/messages/send`, {
+    method: 'POST',
+    token,
+    body: { recipient_id: recipientId, content, listing_id: listingId },
+  });
+}
+
+export async function fetchUnreadCount(token: string | null) {
+  return apiRequest<{ success: boolean; unread_count: number }>(`/messages/unread-count`, { token });
 }

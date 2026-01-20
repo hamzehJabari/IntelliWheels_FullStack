@@ -7,26 +7,32 @@ import {
   addFavorite,
   analyzeListingImage,
   approveDealerApplication,
+  Conversation,
   createListing,
   deleteListing,
   fetchCars,
+  fetchConversations,
   fetchDealerApplications,
   fetchFavorites,
   fetchDealers,
   fetchMakes,
+  fetchMessages,
   fetchMyListings,
   fetchMyListingsAnalytics,
   fetchPlatformStats,
+  fetchUnreadCount,
   getAnalytics,
   getOAuthConfig,
   getPriceEstimate,
   handleChatbotMessage,
   handleListingAssistantMessage,
+  Message,
   MyListingsAnalytics,
   PlatformStats,
   rejectDealerApplication,
   removeFavorite,
   semanticSearch,
+  sendMessage,
   updateListing,
   uploadListingImage,
   uploadListingVideo,
@@ -67,6 +73,7 @@ const NAV_CONFIG = [
   { key: 'home', labelKey: 'navHome', descriptionKey: 'navHomeDesc' },
   { key: 'listings', labelKey: 'navCatalog', descriptionKey: 'navCatalogDesc' },
   { key: 'favorites', labelKey: 'navFavorites', descriptionKey: 'navFavoritesDesc' },
+  { key: 'messages', labelKey: 'navMessages', descriptionKey: 'navMessagesDesc' },
   { key: 'dealers', labelKey: 'navDealers', descriptionKey: 'navDealersDesc' },
   { key: 'myListings', labelKey: 'navMyListings', descriptionKey: 'navMyListingsDesc' },
   { key: 'addListing', labelKey: 'navAddListing', descriptionKey: 'navAddListingDesc' },
@@ -87,9 +94,9 @@ const SERVICE_CONFIG = [
 type ServiceMode = (typeof SERVICE_CONFIG)[number]['key'];
 
 const SERVICE_NAV_MAP: Record<ServiceMode, PageKey[]> = {
-  marketplace: ['home', 'listings', 'favorites', 'dealers', 'myListings', 'addListing', 'profile', 'admin'],
-  dealer: ['home', 'listings', 'dealers', 'myListings', 'addListing', 'profile', 'analytics', 'admin'],
-  insights: ['home', 'chatbot', 'analytics', 'listings', 'favorites', 'profile', 'admin'],
+  marketplace: ['home', 'listings', 'favorites', 'messages', 'dealers', 'myListings', 'addListing', 'profile', 'admin'],
+  dealer: ['home', 'listings', 'dealers', 'messages', 'myListings', 'addListing', 'profile', 'analytics', 'admin'],
+  insights: ['home', 'chatbot', 'analytics', 'listings', 'favorites', 'messages', 'profile', 'admin'],
 };
 
 type ThemeMode = 'light' | 'dark' | 'system';
@@ -134,6 +141,8 @@ const TRANSLATIONS = {
     navCatalogDesc: 'Explore the latest inventory',
     navFavorites: 'Favorites',
     navFavoritesDesc: 'Your saved picks',
+    navMessages: 'Messages',
+    navMessagesDesc: 'Chat with sellers',
     navDealers: 'Dealers',
     navDealersDesc: 'Meet verified sellers',
     navMyListings: 'My Listings',
@@ -405,6 +414,8 @@ const TRANSLATIONS = {
     navCatalogDesc: 'اكتشف أحدث السيارات',
     navFavorites: 'المفضلة',
     navFavoritesDesc: 'سياراتك المختارة',
+    navMessages: 'الرسائل',
+    navMessagesDesc: 'تواصل مع البائعين',
     navDealers: 'الوكلاء',
     navDealersDesc: 'تعرف على شركائنا المعتمدين',
     navMyListings: 'سياراتي',
@@ -847,6 +858,7 @@ export function AppView() {
   const [chatBusy, setChatBusy] = useState(false);
   const [chatAbortController, setChatAbortController] = useState<AbortController | null>(null);
   const [chatAttachment, setChatAttachment] = useState<{ preview: string; base64: string; mime: string } | null>(null);
+  const [mobileChatHistoryOpen, setMobileChatHistoryOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [headerSearchOpen, setHeaderSearchOpen] = useState(false);
   const [headerSearchQuery, setHeaderSearchQuery] = useState('');
@@ -876,6 +888,14 @@ export function AppView() {
   const [adminReason, setAdminReason] = useState('');
   // Platform stats for home page
   const [platformStats, setPlatformStats] = useState<PlatformStats | null>(null);
+  // Messaging state
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [messagesLoading, setMessagesLoading] = useState(false);
+  const [activeConversationId, setActiveConversationId] = useState<number | null>(null);
+  const [activeConversationMessages, setActiveConversationMessages] = useState<Message[]>([]);
+  const [newMessageText, setNewMessageText] = useState('');
+  const [sendingMessage, setSendingMessage] = useState(false);
+  const [unreadMessageCount, setUnreadMessageCount] = useState(0);
   const floatingChatRef = useRef<HTMLDivElement | null>(null);
   const serviceMenuRef = useRef<HTMLDivElement | null>(null);
   const navMenuRef = useRef<HTMLDivElement | null>(null);
@@ -1248,6 +1268,8 @@ export function AppView() {
       setFavoriteCars([]);
       setMyListings([]);
       setMyListingsAnalytics(null);
+      setConversations([]);
+      setUnreadMessageCount(0);
       return;
     }
 
@@ -1270,6 +1292,19 @@ export function AppView() {
       }
     }
     hydrateAuthorizedData();
+    
+    // Load unread message count
+    async function loadUnreadCount() {
+      try {
+        const response = await fetchUnreadCount(token);
+        if (response.success) {
+          setUnreadMessageCount(response.unread_count);
+        }
+      } catch (err) {
+        console.warn('Failed to load unread count', err);
+      }
+    }
+    loadUnreadCount();
   }, [token, authLoading]);
 
   // Load my listings analytics when on myListings page
@@ -1292,6 +1327,50 @@ export function AppView() {
     }
     loadMyListingsAnalytics();
   }, [token, activePage, authLoading]);
+
+  // Load conversations when on messages page
+  useEffect(() => {
+    if (authLoading || !token || activePage !== 'messages') {
+      return;
+    }
+    async function loadConversations() {
+      setMessagesLoading(true);
+      try {
+        const response = await fetchConversations(token);
+        if (response.success) {
+          setConversations(response.conversations);
+        }
+      } catch (err) {
+        console.warn('Failed to load conversations', err);
+      } finally {
+        setMessagesLoading(false);
+      }
+    }
+    loadConversations();
+  }, [token, activePage, authLoading]);
+
+  // Load messages for active conversation
+  useEffect(() => {
+    if (authLoading || !token || !activeConversationId) {
+      return;
+    }
+    async function loadMessages() {
+      try {
+        const response = await fetchMessages(activeConversationId!, token);
+        if (response.success) {
+          setActiveConversationMessages(response.messages);
+          // Update unread count after reading messages
+          const unreadResponse = await fetchUnreadCount(token);
+          if (unreadResponse.success) {
+            setUnreadMessageCount(unreadResponse.unread_count);
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to load messages', err);
+      }
+    }
+    loadMessages();
+  }, [token, activeConversationId, authLoading]);
 
   useEffect(() => {
     if (authLoading || !token) {
@@ -2572,41 +2651,46 @@ export function AppView() {
       );
     }
     return (
-      <div className="grid gap-6 md:grid-cols-2">
-        <div className={`rounded-3xl border p-6 shadow-sm ${resolvedTheme === 'dark' ? 'border-slate-700 bg-slate-800' : 'border-slate-100 bg-white'}`}>
-          <h3 className={`text-xl font-semibold ${resolvedTheme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{copy.profileTitle}</h3>
-          <p className={resolvedTheme === 'dark' ? 'text-slate-300' : 'text-slate-600'}>{copy.authUsername}: {user.username}</p>
-          <p className={resolvedTheme === 'dark' ? 'text-slate-300' : 'text-slate-600'}>{copy.authEmail}: {user.email}</p>
-          <button className={`mt-4 rounded-2xl border px-4 py-2 text-sm font-semibold ${resolvedTheme === 'dark' ? 'border-slate-600 text-slate-200 hover:bg-slate-700' : 'border-slate-200 text-slate-900 hover:bg-slate-50'}`} onClick={() => refreshProfile()}>
+      <div className="grid gap-4 md:gap-6 md:grid-cols-2">
+        <div className={`rounded-2xl md:rounded-3xl border p-4 md:p-6 shadow-sm ${resolvedTheme === 'dark' ? 'border-slate-700 bg-slate-800' : 'border-slate-100 bg-white'}`}>
+          <h3 className={`text-lg md:text-xl font-semibold ${resolvedTheme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{copy.profileTitle}</h3>
+          <div className="mt-3 space-y-2">
+            <p className={`text-sm ${resolvedTheme === 'dark' ? 'text-slate-300' : 'text-slate-600'}`}><span className="font-medium">{copy.authUsername}:</span> {user.username}</p>
+            <p className={`text-sm ${resolvedTheme === 'dark' ? 'text-slate-300' : 'text-slate-600'}`}><span className="font-medium">{copy.authEmail}:</span> {user.email}</p>
+            {user.phone && <p className={`text-sm ${resolvedTheme === 'dark' ? 'text-slate-300' : 'text-slate-600'}`}><span className="font-medium">📱 Phone:</span> {user.phone}</p>}
+          </div>
+          <button className={`mt-4 rounded-xl md:rounded-2xl border px-4 py-2 text-xs md:text-sm font-semibold ${resolvedTheme === 'dark' ? 'border-slate-600 text-slate-200 hover:bg-slate-700' : 'border-slate-200 text-slate-900 hover:bg-slate-50'}`} onClick={() => refreshProfile()}>
             {copy.profileRefresh}
           </button>
         </div>
-        <div className={`rounded-3xl border p-6 shadow-sm ${resolvedTheme === 'dark' ? 'border-slate-700 bg-slate-800' : 'border-slate-100 bg-white'}`}>
-          <h3 className={`text-xl font-semibold ${resolvedTheme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{copy.profileUpdate}</h3>
+        <div className={`rounded-2xl md:rounded-3xl border p-4 md:p-6 shadow-sm ${resolvedTheme === 'dark' ? 'border-slate-700 bg-slate-800' : 'border-slate-100 bg-white'}`}>
+          <h3 className={`text-lg md:text-xl font-semibold ${resolvedTheme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{copy.profileUpdate}</h3>
           <form
-            className="mt-4 space-y-3"
+            className="mt-3 md:mt-4 space-y-2 md:space-y-3"
             onSubmit={async (event: React.FormEvent<HTMLFormElement>) => {
               event.preventDefault();
               const formElement = event.currentTarget;
               const formData = new FormData(formElement);
               const username = formData.get('profile-username')?.toString();
               const email = formData.get('profile-email')?.toString();
+              const phone = formData.get('profile-phone')?.toString();
               const current_password = formData.get('profile-current-password')?.toString();
               const password = formData.get('profile-password')?.toString();
-              const result = await updateMyProfile({ username, email, current_password, password });
+              const result = await updateMyProfile({ username, email, phone, current_password, password });
               if (result) {
                 showToast('✅ Profile updated successfully');
                 formElement.reset();
               }
             }}
           >
-            <input name="profile-username" placeholder={copy.authUsername} defaultValue={user.username} className={`w-full ${inputFieldClass}`} />
-            <input name="profile-email" type="email" placeholder={copy.authEmail} defaultValue={user.email} className={`w-full ${inputFieldClass}`} />
-            <input name="profile-current-password" type="password" placeholder={copy.authCurrentPassword} className={`w-full ${inputFieldClass}`} />
-            <input name="profile-password" type="password" placeholder={copy.authNewPassword} className={`w-full ${inputFieldClass}`} />
-            <button className="w-full rounded-2xl bg-emerald-500 py-3 font-semibold text-white hover:bg-emerald-600">{copy.profileSaveChanges}</button>
+            <input name="profile-username" placeholder={copy.authUsername} defaultValue={user.username} className={`w-full text-sm ${inputFieldClass}`} />
+            <input name="profile-email" type="email" placeholder={copy.authEmail} defaultValue={user.email} className={`w-full text-sm ${inputFieldClass}`} />
+            <input name="profile-phone" type="tel" placeholder="Phone number (e.g. +962 7X XXX XXXX)" defaultValue={user.phone || ''} className={`w-full text-sm ${inputFieldClass}`} />
+            <input name="profile-current-password" type="password" placeholder={copy.authCurrentPassword} className={`w-full text-sm ${inputFieldClass}`} />
+            <input name="profile-password" type="password" placeholder={copy.authNewPassword} className={`w-full text-sm ${inputFieldClass}`} />
+            <button className="w-full rounded-xl md:rounded-2xl bg-emerald-500 py-2.5 md:py-3 text-sm font-semibold text-white hover:bg-emerald-600">{copy.profileSaveChanges}</button>
           </form>
-          <button className={`mt-4 w-full rounded-2xl border py-2 font-semibold ${resolvedTheme === 'dark' ? 'border-slate-600 text-slate-200 hover:bg-slate-700' : 'border-slate-200 text-slate-900 hover:bg-slate-50'}`} onClick={() => logout()}>
+          <button className={`mt-3 md:mt-4 w-full rounded-xl md:rounded-2xl border py-2 text-sm font-semibold ${resolvedTheme === 'dark' ? 'border-slate-600 text-slate-200 hover:bg-slate-700' : 'border-slate-200 text-slate-900 hover:bg-slate-50'}`} onClick={() => logout()}>
             {copy.authSignOut}
           </button>
         </div>
@@ -2615,8 +2699,59 @@ export function AppView() {
   };
 
   const renderChatbot = () => (
-    <div className="flex h-[calc(100vh-180px)] gap-4">
-      {/* Sidebar */}
+    <div className="flex flex-col lg:flex-row h-[calc(100vh-180px)] gap-3 md:gap-4">
+      {/* Mobile Header with New Chat & Toggle */}
+      <div className="flex lg:hidden items-center gap-2 mb-2">
+        <button
+          className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-600 px-3 py-2 text-xs font-semibold text-white shadow-sm"
+          onClick={() => startNewChat()}
+        >
+          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+          </svg>
+          {copy.chatNewChat}
+        </button>
+        <button
+          onClick={() => setMobileChatHistoryOpen(!mobileChatHistoryOpen)}
+          className={`px-3 py-2 rounded-xl border text-xs font-semibold ${mobileChatHistoryOpen ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-slate-50 border-slate-200 text-slate-600'}`}
+        >
+          📜 History ({chatSessions.length})
+        </button>
+      </div>
+      
+      {/* Mobile Chat History Dropdown */}
+      {mobileChatHistoryOpen && (
+        <div className="lg:hidden rounded-xl border border-slate-200 bg-white p-2 mb-2 max-h-48 overflow-y-auto">
+          <div className="space-y-1">
+            {chatSessions.length === 0 ? (
+              <p className="text-xs text-slate-500 text-center py-2">No chat history yet</p>
+            ) : (
+              chatSessions.map((session) => (
+                <button
+                  key={session.id}
+                  onClick={() => { setActiveSessionId(session.id); setMobileChatHistoryOpen(false); }}
+                  className={`w-full flex items-center gap-2 rounded-lg px-3 py-2 text-left text-xs transition ${
+                    session.id === activeSessionId ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <svg className="h-3 w-3 flex-shrink-0 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                  </svg>
+                  <span className="truncate flex-1">{session.title}</span>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); deleteChatSession(session.id); }}
+                    className="text-slate-400 hover:text-red-500"
+                  >
+                    ✕
+                  </button>
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+      
+      {/* Desktop Sidebar */}
       <div className="hidden w-72 flex-shrink-0 flex-col rounded-2xl border border-slate-200 bg-white lg:flex">
         <div className="border-b border-slate-100 p-4">
           <button
@@ -3408,16 +3543,16 @@ export function AppView() {
         );
       case 'listings':
         return (
-          <div className="space-y-6">
-            <div className="grid gap-4 lg:grid-cols-[2fr,1fr]">
-              <div className={`rounded-3xl border p-4 shadow-sm ${resolvedTheme === 'dark' ? 'border-slate-700 bg-slate-800' : 'border-slate-100 bg-white'}`}>
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                  <select value={filters.category || 'all'} name="filter-category" id="filter-category" onChange={(event) => setFilters((prev) => ({ ...prev, category: event.target.value as any }))} className={inputFieldClass}>
+          <div className="space-y-4 md:space-y-6">
+            <div className="grid gap-3 md:gap-4 lg:grid-cols-[2fr,1fr]">
+              <div className={`rounded-2xl md:rounded-3xl border p-3 md:p-4 shadow-sm ${resolvedTheme === 'dark' ? 'border-slate-700 bg-slate-800' : 'border-slate-100 bg-white'}`}>
+                <div className="grid grid-cols-2 gap-2 md:gap-4 md:grid-cols-2 lg:grid-cols-4">
+                  <select value={filters.category || 'all'} name="filter-category" id="filter-category" onChange={(event) => setFilters((prev) => ({ ...prev, category: event.target.value as any }))} className={`text-xs md:text-sm ${inputFieldClass}`}>
                     {CATEGORY_OPTIONS.map((opt) => (
                       <option key={opt.value} value={opt.value}>{opt.label}</option>
                     ))}
                   </select>
-                  <select value={filters.make} name="filter-make" id="filter-make" onChange={(event) => setFilters((prev) => ({ ...prev, make: event.target.value }))} className={inputFieldClass}>
+                  <select value={filters.make} name="filter-make" id="filter-make" onChange={(event) => setFilters((prev) => ({ ...prev, make: event.target.value }))} className={`text-xs md:text-sm ${inputFieldClass}`}>
                     <option value="all">All Makes</option>
                     {allVehicleMakes.map((make) => (
                       <option key={make} value={make}>{make}</option>
@@ -3428,10 +3563,10 @@ export function AppView() {
                     id="filter-search"
                     value={filters.search}
                     onChange={(event) => setFilters((prev) => ({ ...prev, search: event.target.value }))}
-                    placeholder="Search make, model, year"
-                    className={inputFieldClass}
+                    placeholder="Search..."
+                    className={`text-xs md:text-sm col-span-2 md:col-span-1 ${inputFieldClass}`}
                   />
-                  <select value={filters.sort} name="filter-sort" id="filter-sort" onChange={(event) => setFilters((prev) => ({ ...prev, sort: event.target.value as CarFilters['sort'] }))} className={inputFieldClass}>
+                  <select value={filters.sort} name="filter-sort" id="filter-sort" onChange={(event) => setFilters((prev) => ({ ...prev, sort: event.target.value as CarFilters['sort'] }))} className={`text-xs md:text-sm col-span-2 md:col-span-1 ${inputFieldClass}`}>
                     <option value="default">Recommended</option>
                     <option value="price-asc">Price: Low → High</option>
                     <option value="price-desc">Price: High → Low</option>
@@ -3440,18 +3575,18 @@ export function AppView() {
                   </select>
                 </div>
               </div>
-              <form onSubmit={handleSemanticSearch} className={`rounded-3xl border p-4 shadow-sm ${resolvedTheme === 'dark' ? 'border-slate-700 bg-slate-800' : 'border-slate-100 bg-white'}`}>
-                <p className={`text-sm font-semibold ${resolvedTheme === 'dark' ? 'text-white' : 'text-slate-900'}`}>AI Semantic Search</p>
-                <div className="mt-3 flex gap-3">
+              <form onSubmit={handleSemanticSearch} className={`rounded-2xl md:rounded-3xl border p-3 md:p-4 shadow-sm ${resolvedTheme === 'dark' ? 'border-slate-700 bg-slate-800' : 'border-slate-100 bg-white'}`}>
+                <p className={`text-xs md:text-sm font-semibold ${resolvedTheme === 'dark' ? 'text-white' : 'text-slate-900'}`}>AI Semantic Search</p>
+                <div className="mt-2 md:mt-3 flex gap-2 md:gap-3">
                   <input
                     name="semantic-query"
                     id="semantic-query"
                     value={semanticQuery}
                     onChange={(event) => setSemanticQuery(event.target.value)}
-                    placeholder="e.g. Luxury hybrid SUV under 150k"
-                    className={`flex-1 ${inputFieldClass}`}
+                    placeholder="e.g. Hybrid SUV under 150k"
+                    className={`flex-1 text-xs md:text-sm ${inputFieldClass}`}
                   />
-                  <button type="submit" className="rounded-2xl bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700">
+                  <button type="submit" className="rounded-xl md:rounded-2xl bg-sky-600 px-3 md:px-4 py-2 text-xs md:text-sm font-semibold text-white hover:bg-sky-700">
                     {semanticLoading ? 'Searching...' : 'Search'}
                   </button>
                 </div>
@@ -3475,14 +3610,14 @@ export function AppView() {
             </div>
             
             {/* Grid Layout Toggle */}
-            <div className={`flex items-center justify-end gap-2 ${resolvedTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
-              <span className="text-sm font-medium">{copy.columnsLabel}:</span>
-              <div className="flex rounded-xl border overflow-hidden">
+            <div className={`flex items-center justify-between md:justify-end gap-2 ${resolvedTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+              <span className="text-xs md:text-sm font-medium">{copy.columnsLabel}:</span>
+              <div className="flex rounded-lg md:rounded-xl border overflow-hidden">
                 {[1, 2, 3].map((cols) => (
                   <button
                     key={cols}
                     onClick={() => setGridColumns(cols as 1 | 2 | 3)}
-                    className={`px-3 py-1.5 text-sm font-medium transition ${
+                    className={`px-2 md:px-3 py-1 md:py-1.5 text-xs md:text-sm font-medium transition ${
                       gridColumns === cols
                         ? resolvedTheme === 'dark' ? 'bg-indigo-600 text-white' : 'bg-sky-600 text-white'
                         : resolvedTheme === 'dark' ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -3494,12 +3629,12 @@ export function AppView() {
               </div>
             </div>
             
-            <div className={`grid gap-4 ${
+            <div className={`grid gap-3 md:gap-4 ${
               gridColumns === 1 
                 ? 'grid-cols-1' 
                 : gridColumns === 2 
-                  ? 'grid-cols-1 sm:grid-cols-2' 
-                  : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'
+                  ? 'grid-cols-2' 
+                  : 'grid-cols-2 lg:grid-cols-3'
             }`}>
               {paginatedCars.length === 0 ? (
                 <p className="col-span-full text-center text-slate-500">No listings match your filters yet.</p>
@@ -3578,6 +3713,207 @@ export function AppView() {
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {favoriteCars.map((car) => renderCarCard(car))}
             {favoriteCars.length === 0 && <p className="text-slate-500">{copy.noFavorites}</p>}
+          </div>
+        );
+      case 'messages':
+        // Messaging page
+        if (!user) {
+          return (
+            <div className="text-center py-12">
+              <div className="text-6xl mb-4">💬</div>
+              <h2 className={`text-2xl font-bold mb-2 ${resolvedTheme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                {language === 'ar' ? 'تسجيل الدخول مطلوب' : 'Sign In Required'}
+              </h2>
+              <p className={`mb-6 ${resolvedTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                {language === 'ar' ? 'يرجى تسجيل الدخول للوصول إلى رسائلك' : 'Please sign in to access your messages'}
+              </p>
+              <button
+                onClick={() => setActivePage('profile')}
+                className="rounded-xl bg-indigo-600 px-6 py-3 font-semibold text-white hover:bg-indigo-700 transition"
+              >
+                {language === 'ar' ? 'تسجيل الدخول' : 'Sign In'}
+              </button>
+            </div>
+          );
+        }
+        
+        const activeConversation = conversations.find(c => c.id === activeConversationId);
+        
+        const handleSendMessage = async () => {
+          if (!newMessageText.trim() || !activeConversationId || sendingMessage) return;
+          
+          setSendingMessage(true);
+          try {
+            const response = await sendMessage(
+              activeConversation!.other_user_id,
+              newMessageText.trim(),
+              activeConversation!.listing_id,
+              token
+            );
+            if (response.success) {
+              setNewMessageText('');
+              // Reload messages
+              const messagesResponse = await fetchMessages(activeConversationId, token);
+              if (messagesResponse.success) {
+                setActiveConversationMessages(messagesResponse.messages);
+              }
+            }
+          } catch (err) {
+            console.error('Failed to send message', err);
+            showToast(language === 'ar' ? 'فشل إرسال الرسالة' : 'Failed to send message', 'error');
+          } finally {
+            setSendingMessage(false);
+          }
+        };
+        
+        return (
+          <div className="flex flex-col md:flex-row gap-4 h-[600px]">
+            {/* Conversation List */}
+            <div className={`w-full md:w-1/3 rounded-2xl border overflow-hidden flex flex-col ${resolvedTheme === 'dark' ? 'border-slate-700 bg-slate-800/50' : 'border-slate-200 bg-white'}`}>
+              <div className={`p-4 border-b ${resolvedTheme === 'dark' ? 'border-slate-700' : 'border-slate-200'}`}>
+                <h2 className={`text-lg font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                  {language === 'ar' ? 'المحادثات' : 'Conversations'}
+                </h2>
+              </div>
+              <div className="flex-1 overflow-y-auto">
+                {messagesLoading ? (
+                  <div className="flex items-center justify-center h-full">
+                    <div className="h-8 w-8 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent"></div>
+                  </div>
+                ) : conversations.length === 0 ? (
+                  <div className="p-4 text-center">
+                    <p className={`${resolvedTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                      {language === 'ar' ? 'لا توجد محادثات بعد' : 'No conversations yet'}
+                    </p>
+                    <p className={`text-sm mt-2 ${resolvedTheme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
+                      {language === 'ar' ? 'راسل بائعاً من صفحة السيارة' : 'Message a seller from a car listing'}
+                    </p>
+                  </div>
+                ) : (
+                  conversations.map((conv) => (
+                    <button
+                      key={conv.id}
+                      onClick={() => setActiveConversationId(conv.id)}
+                      className={`w-full p-4 text-left border-b transition ${
+                        activeConversationId === conv.id
+                          ? resolvedTheme === 'dark' ? 'bg-indigo-900/30 border-slate-700' : 'bg-indigo-50 border-slate-200'
+                          : resolvedTheme === 'dark' ? 'hover:bg-slate-700/50 border-slate-700' : 'hover:bg-slate-50 border-slate-200'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className={`font-semibold ${resolvedTheme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                          {conv.other_username}
+                        </span>
+                        {conv.unread_count > 0 && (
+                          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-indigo-500 text-xs text-white">
+                            {conv.unread_count > 9 ? '9+' : conv.unread_count}
+                          </span>
+                        )}
+                      </div>
+                      {conv.listing_title && (
+                        <p className={`text-xs mb-1 ${resolvedTheme === 'dark' ? 'text-indigo-400' : 'text-indigo-600'}`}>
+                          Re: {conv.listing_title}
+                        </p>
+                      )}
+                      <p className={`text-sm truncate ${resolvedTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                        {conv.last_message || (language === 'ar' ? 'ابدأ المحادثة' : 'Start the conversation')}
+                      </p>
+                    </button>
+                  ))
+                )}
+              </div>
+            </div>
+            
+            {/* Messages Panel */}
+            <div className={`flex-1 rounded-2xl border overflow-hidden flex flex-col ${resolvedTheme === 'dark' ? 'border-slate-700 bg-slate-800/50' : 'border-slate-200 bg-white'}`}>
+              {activeConversationId && activeConversation ? (
+                <>
+                  {/* Header */}
+                  <div className={`p-4 border-b flex items-center gap-3 ${resolvedTheme === 'dark' ? 'border-slate-700' : 'border-slate-200'}`}>
+                    <button
+                      onClick={() => setActiveConversationId(null)}
+                      className="md:hidden p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700"
+                    >
+                      ←
+                    </button>
+                    <div>
+                      <h3 className={`font-semibold ${resolvedTheme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                        {activeConversation.other_username}
+                      </h3>
+                      {activeConversation.listing_title && (
+                        <p className={`text-xs ${resolvedTheme === 'dark' ? 'text-indigo-400' : 'text-indigo-600'}`}>
+                          Re: {activeConversation.listing_title}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  
+                  {/* Messages */}
+                  <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                    {activeConversationMessages.map((msg) => (
+                      <div
+                        key={msg.id}
+                        className={`flex ${msg.is_mine ? 'justify-end' : 'justify-start'}`}
+                      >
+                        <div
+                          className={`max-w-[70%] rounded-2xl px-4 py-2 ${
+                            msg.is_mine
+                              ? 'bg-indigo-600 text-white'
+                              : resolvedTheme === 'dark' ? 'bg-slate-700 text-white' : 'bg-slate-100 text-slate-900'
+                          }`}
+                        >
+                          <p className="text-sm">{msg.content}</p>
+                          <p className={`text-xs mt-1 ${msg.is_mine ? 'text-indigo-200' : resolvedTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                            {new Date(msg.created_at).toLocaleTimeString(language === 'ar' ? 'ar-JO' : 'en-US', { hour: '2-digit', minute: '2-digit' })}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                    {activeConversationMessages.length === 0 && (
+                      <div className="flex items-center justify-center h-full">
+                        <p className={`text-center ${resolvedTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                          {language === 'ar' ? 'ابدأ المحادثة بإرسال رسالة' : 'Start the conversation by sending a message'}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Input */}
+                  <div className={`p-4 border-t ${resolvedTheme === 'dark' ? 'border-slate-700' : 'border-slate-200'}`}>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={newMessageText}
+                        onChange={(e) => setNewMessageText(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
+                        placeholder={language === 'ar' ? 'اكتب رسالتك...' : 'Type a message...'}
+                        className={`flex-1 rounded-xl border px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
+                          resolvedTheme === 'dark'
+                            ? 'border-slate-600 bg-slate-700 text-white placeholder-slate-400'
+                            : 'border-slate-300 bg-white text-slate-900 placeholder-slate-400'
+                        }`}
+                      />
+                      <button
+                        onClick={handleSendMessage}
+                        disabled={!newMessageText.trim() || sendingMessage}
+                        className="rounded-xl bg-indigo-600 px-6 py-3 font-semibold text-white hover:bg-indigo-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {sendingMessage ? '...' : language === 'ar' ? 'إرسال' : 'Send'}
+                      </button>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="flex items-center justify-center h-full">
+                  <div className="text-center">
+                    <div className="text-6xl mb-4">💬</div>
+                    <p className={`${resolvedTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                      {language === 'ar' ? 'اختر محادثة للبدء' : 'Select a conversation to start'}
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         );
       case 'dealers':
@@ -4256,23 +4592,23 @@ export function AppView() {
       case 'addListing':
         if (!requireAuth()) return null;
         return (
-          <div className="grid gap-6 lg:grid-cols-[1.2fr,0.8fr]">
-            <form className={`space-y-4 rounded-3xl border p-6 shadow-sm ${resolvedTheme === 'dark' ? 'border-slate-700 bg-slate-800' : 'border-slate-100 bg-white'}`} onSubmit={handleListingSubmit}>
+          <div className="grid gap-4 md:gap-6 lg:grid-cols-[1.2fr,0.8fr]">
+            <form className={`space-y-3 md:space-y-4 rounded-2xl md:rounded-3xl border p-4 md:p-6 shadow-sm ${resolvedTheme === 'dark' ? 'border-slate-700 bg-slate-800' : 'border-slate-100 bg-white'}`} onSubmit={handleListingSubmit}>
               {/* Required Fields Section */}
-              <div className={`rounded-2xl border p-4 ${resolvedTheme === 'dark' ? 'border-indigo-500/30 bg-indigo-900/20' : 'border-indigo-200 bg-indigo-50/50'}`}>
-                <div className="flex items-center gap-2 mb-3">
+              <div className={`rounded-xl md:rounded-2xl border p-3 md:p-4 ${resolvedTheme === 'dark' ? 'border-indigo-500/30 bg-indigo-900/20' : 'border-indigo-200 bg-indigo-50/50'}`}>
+                <div className="flex items-center gap-2 mb-2 md:mb-3">
                   <span className="text-indigo-500">★</span>
-                  <p className={`text-sm font-semibold ${resolvedTheme === 'dark' ? 'text-indigo-300' : 'text-indigo-700'}`}>{copy.formRequiredInfo}</p>
+                  <p className={`text-xs md:text-sm font-semibold ${resolvedTheme === 'dark' ? 'text-indigo-300' : 'text-indigo-700'}`}>{copy.formRequiredInfo}</p>
                 </div>
-                <div className="grid gap-4 md:grid-cols-2">
+                <div className="grid gap-2 md:gap-4 grid-cols-2 md:grid-cols-2">
                   <div>
-                    <label className={`text-xs font-medium ${resolvedTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>{copy.formMakeLabel} <span className="text-red-500">*</span></label>
+                    <label className={`text-[10px] md:text-xs font-medium ${resolvedTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>{copy.formMakeLabel} <span className="text-red-500">*</span></label>
                     <select
                       name="listing-make"
                       id="listing-make"
                       value={listingForm.make}
                       onChange={(event) => handleMakeSelect(event.target.value)}
-                      className={inputFieldClass}
+                      className={`text-xs md:text-sm ${inputFieldClass}`}
                       required
                     >
                       <option value="">{copy.makeSelectLabel}</option>
@@ -4282,13 +4618,13 @@ export function AppView() {
                     </select>
                   </div>
                   <div>
-                    <label className={`text-xs font-medium ${resolvedTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>{copy.formModelLabel} <span className="text-red-500">*</span></label>
+                    <label className={`text-[10px] md:text-xs font-medium ${resolvedTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>{copy.formModelLabel} <span className="text-red-500">*</span></label>
                     <select
                       name="listing-model"
                       id="listing-model"
                       value={listingForm.model}
                       onChange={(event) => handleModelSelect(event.target.value)}
-                      className={inputFieldClass}
+                      className={`text-xs md:text-sm ${inputFieldClass}`}
                       required
                       disabled={!listingForm.make}
                     >
@@ -4299,14 +4635,14 @@ export function AppView() {
                     </select>
                   </div>
                   <div>
-                    <label className={`text-xs font-medium ${resolvedTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>{copy.formYearLabel} <span className="text-red-500">*</span></label>
-                    <input name="listing-year" id="listing-year" value={listingForm.year} onChange={(event) => handleListingInput('year', event.target.value)} placeholder={copy.formYearPlaceholder} className={inputFieldClass} required type="number" min="1900" max={new Date().getFullYear() + 2} />
+                    <label className={`text-[10px] md:text-xs font-medium ${resolvedTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>{copy.formYearLabel} <span className="text-red-500">*</span></label>
+                    <input name="listing-year" id="listing-year" value={listingForm.year} onChange={(event) => handleListingInput('year', event.target.value)} placeholder={copy.formYearPlaceholder} className={`text-xs md:text-sm ${inputFieldClass}`} required type="number" min="1900" max={new Date().getFullYear() + 2} />
                   </div>
                   <div>
-                    <label className={`text-xs font-medium ${resolvedTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>{copy.formPriceLabel} <span className="text-red-500">*</span></label>
-                    <div className="flex gap-2">
-                      <input name="listing-price" id="listing-price" value={listingForm.price} onChange={(event) => handleListingInput('price', event.target.value)} placeholder={copy.formPricePlaceholder} className={`flex-1 ${inputFieldClass}`} required type="number" min="0" />
-                      <select name="listing-currency" id="listing-currency" value={listingForm.currency} onChange={(event) => handleListingInput('currency', event.target.value)} className={`w-24 ${inputFieldClass}`}>
+                    <label className={`text-[10px] md:text-xs font-medium ${resolvedTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>{copy.formPriceLabel} <span className="text-red-500">*</span></label>
+                    <div className="flex gap-1 md:gap-2">
+                      <input name="listing-price" id="listing-price" value={listingForm.price} onChange={(event) => handleListingInput('price', event.target.value)} placeholder={copy.formPricePlaceholder} className={`flex-1 text-xs md:text-sm ${inputFieldClass}`} required type="number" min="0" />
+                      <select name="listing-currency" id="listing-currency" value={listingForm.currency} onChange={(event) => handleListingInput('currency', event.target.value)} className={`w-16 md:w-24 text-xs md:text-sm ${inputFieldClass}`}>
                         {CURRENCY_OPTIONS.map((currency) => (
                           <option key={currency} value={currency}>{currency}</option>
                         ))}
@@ -4317,18 +4653,18 @@ export function AppView() {
               </div>
               
               {/* Optional Basic Details */}
-              <div className={`rounded-2xl border p-4 ${resolvedTheme === 'dark' ? 'border-slate-600 bg-slate-800/50' : 'border-slate-200 bg-slate-50/50'}`}>
-                <p className={`mb-3 text-sm font-semibold ${resolvedTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>{copy.formVehicleSpecs}</p>
-                <div className="grid gap-4 md:grid-cols-2">
-                  <input name="listing-bodystyle" id="listing-bodystyle" value={listingForm.bodyStyle} onChange={(event) => handleListingInput('bodyStyle', event.target.value)} placeholder={copy.formBodyStylePlaceholder} className={inputFieldClass} />
-                  <input name="listing-horsepower" id="listing-horsepower" value={listingForm.horsepower} onChange={(event) => handleListingInput('horsepower', event.target.value)} placeholder={copy.formHorsepowerPlaceholder} className={inputFieldClass} type="number" min="0" />
+              <div className={`rounded-xl md:rounded-2xl border p-3 md:p-4 ${resolvedTheme === 'dark' ? 'border-slate-600 bg-slate-800/50' : 'border-slate-200 bg-slate-50/50'}`}>
+                <p className={`mb-2 md:mb-3 text-xs md:text-sm font-semibold ${resolvedTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>{copy.formVehicleSpecs}</p>
+                <div className="grid gap-2 md:gap-4 grid-cols-2 md:grid-cols-2">
+                  <input name="listing-bodystyle" id="listing-bodystyle" value={listingForm.bodyStyle} onChange={(event) => handleListingInput('bodyStyle', event.target.value)} placeholder={copy.formBodyStylePlaceholder} className={`text-xs md:text-sm ${inputFieldClass}`} />
+                  <input name="listing-horsepower" id="listing-horsepower" value={listingForm.horsepower} onChange={(event) => handleListingInput('horsepower', event.target.value)} placeholder={copy.formHorsepowerPlaceholder} className={`text-xs md:text-sm ${inputFieldClass}`} type="number" min="0" />
                   {availableEngineOptions.length > 0 ? (
                     <select
                       name="listing-engine"
                       id="listing-engine"
                       value={listingForm.engine}
                       onChange={(event) => handleListingInput('engine', event.target.value)}
-                      className={inputFieldClass}
+                      className={`text-xs md:text-sm ${inputFieldClass}`}
                       disabled={!listingForm.model}
                     >
                       <option value="">{copy.engineSelectLabel}</option>
@@ -4337,84 +4673,84 @@ export function AppView() {
                       ))}
                     </select>
                   ) : (
-                    <input name="listing-engine" id="listing-engine" value={listingForm.engine} onChange={(event) => handleListingInput('engine', event.target.value)} placeholder={copy.formEnginePlaceholder} className={inputFieldClass} />
+                    <input name="listing-engine" id="listing-engine" value={listingForm.engine} onChange={(event) => handleListingInput('engine', event.target.value)} placeholder={copy.formEnginePlaceholder} className={`text-xs md:text-sm ${inputFieldClass}`} />
                   )}
-                  <input name="listing-fueleconomy" id="listing-fueleconomy" value={listingForm.fuelEconomy} onChange={(event) => handleListingInput('fuelEconomy', event.target.value)} placeholder={copy.formFuelEconomyPlaceholder} className={inputFieldClass} />
+                  <input name="listing-fueleconomy" id="listing-fueleconomy" value={listingForm.fuelEconomy} onChange={(event) => handleListingInput('fuelEconomy', event.target.value)} placeholder={copy.formFuelEconomyPlaceholder} className={`text-xs md:text-sm ${inputFieldClass}`} />
                   <input
                     name="listing-odometer"
                     id="listing-odometer"
                     value={listingForm.odometer}
                     onChange={(event) => handleListingInput('odometer', event.target.value)}
                     placeholder={copy.odometerLabel}
-                    className={inputFieldClass}
+                    className={`text-xs md:text-sm ${inputFieldClass}`}
                     type="number"
                     min="0"
                   />
-                  <input name="listing-image" id="listing-image" value={listingForm.image} onChange={(event) => handleListingInput('image', event.target.value)} placeholder={copy.formImageUrlPlaceholder} className={inputFieldClass} />
+                  <input name="listing-image" id="listing-image" value={listingForm.image} onChange={(event) => handleListingInput('image', event.target.value)} placeholder={copy.formImageUrlPlaceholder} className={`text-xs md:text-sm ${inputFieldClass}`} />
                 </div>
               </div>
               
               {/* Additional Vehicle Details */}
-              <div className={`rounded-2xl border p-4 ${resolvedTheme === 'dark' ? 'border-slate-600 bg-slate-800/50' : 'border-slate-200 bg-slate-50/50'}`}>
-                <p className={`mb-3 text-sm font-semibold ${resolvedTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>{copy.formAdditionalDetails}</p>
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  <select name="listing-category" value={listingForm.category} onChange={(e) => handleListingInput('category', e.target.value)} className={inputFieldClass}>
+              <div className={`rounded-xl md:rounded-2xl border p-3 md:p-4 ${resolvedTheme === 'dark' ? 'border-slate-600 bg-slate-800/50' : 'border-slate-200 bg-slate-50/50'}`}>
+                <p className={`mb-2 md:mb-3 text-xs md:text-sm font-semibold ${resolvedTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>{copy.formAdditionalDetails}</p>
+                <div className="grid gap-2 md:gap-4 grid-cols-2 md:grid-cols-2 lg:grid-cols-3">
+                  <select name="listing-category" value={listingForm.category} onChange={(e) => handleListingInput('category', e.target.value)} className={`text-xs md:text-sm ${inputFieldClass}`}>
                     {CATEGORY_OPTIONS.filter(c => c.value !== 'all').map(opt => (
                       <option key={opt.value} value={opt.value}>{opt.label}</option>
                     ))}
                   </select>
-                  <select name="listing-condition" value={listingForm.condition} onChange={(e) => handleListingInput('condition', e.target.value)} className={inputFieldClass}>
+                  <select name="listing-condition" value={listingForm.condition} onChange={(e) => handleListingInput('condition', e.target.value)} className={`text-xs md:text-sm ${inputFieldClass}`}>
                     {CONDITION_OPTIONS.map(opt => (
                       <option key={opt.value} value={opt.value}>{opt.label}</option>
                     ))}
                   </select>
-                  <select name="listing-transmission" value={listingForm.transmission} onChange={(e) => handleListingInput('transmission', e.target.value)} className={inputFieldClass}>
+                  <select name="listing-transmission" value={listingForm.transmission} onChange={(e) => handleListingInput('transmission', e.target.value)} className={`text-xs md:text-sm ${inputFieldClass}`}>
                     {TRANSMISSION_OPTIONS.map(opt => (
                       <option key={opt.value} value={opt.value}>{opt.label}</option>
                     ))}
                   </select>
-                  <select name="listing-fueltype" value={listingForm.fuelType} onChange={(e) => handleListingInput('fuelType', e.target.value)} className={inputFieldClass}>
+                  <select name="listing-fueltype" value={listingForm.fuelType} onChange={(e) => handleListingInput('fuelType', e.target.value)} className={`text-xs md:text-sm ${inputFieldClass}`}>
                     {FUEL_TYPE_OPTIONS.map(opt => (
                       <option key={opt.value} value={opt.value}>{opt.label}</option>
                     ))}
                   </select>
-                  <select name="listing-regionalspec" value={listingForm.regionalSpec} onChange={(e) => handleListingInput('regionalSpec', e.target.value)} className={inputFieldClass}>
+                  <select name="listing-regionalspec" value={listingForm.regionalSpec} onChange={(e) => handleListingInput('regionalSpec', e.target.value)} className={`text-xs md:text-sm ${inputFieldClass}`}>
                     {REGIONAL_SPEC_OPTIONS.map(opt => (
                       <option key={opt.value} value={opt.value}>{opt.label}</option>
                     ))}
                   </select>
-                  <select name="listing-paymenttype" value={listingForm.paymentType} onChange={(e) => handleListingInput('paymentType', e.target.value)} className={inputFieldClass}>
+                  <select name="listing-paymenttype" value={listingForm.paymentType} onChange={(e) => handleListingInput('paymentType', e.target.value)} className={`text-xs md:text-sm ${inputFieldClass}`}>
                     {PAYMENT_TYPE_OPTIONS.map(opt => (
                       <option key={opt.value} value={opt.value}>{opt.label}</option>
                     ))}
                   </select>
-                  <input name="listing-trim" value={listingForm.trim} onChange={(e) => handleListingInput('trim', e.target.value)} placeholder={copy.formTrimPlaceholder} className={inputFieldClass} />
-                  <input name="listing-exteriorcolor" value={listingForm.exteriorColor} onChange={(e) => handleListingInput('exteriorColor', e.target.value)} placeholder={copy.formExteriorColorPlaceholder} className={inputFieldClass} />
-                  <input name="listing-interiorcolor" value={listingForm.interiorColor} onChange={(e) => handleListingInput('interiorColor', e.target.value)} placeholder={copy.formInteriorColorPlaceholder} className={inputFieldClass} />
-                  <input name="listing-city" value={listingForm.city} onChange={(e) => handleListingInput('city', e.target.value)} placeholder={copy.formCityPlaceholder} className={inputFieldClass} />
-                  <input name="listing-neighborhood" value={listingForm.neighborhood} onChange={(e) => handleListingInput('neighborhood', e.target.value)} placeholder={copy.formNeighborhoodPlaceholder} className={inputFieldClass} />
+                  <input name="listing-trim" value={listingForm.trim} onChange={(e) => handleListingInput('trim', e.target.value)} placeholder={copy.formTrimPlaceholder} className={`text-xs md:text-sm ${inputFieldClass}`} />
+                  <input name="listing-exteriorcolor" value={listingForm.exteriorColor} onChange={(e) => handleListingInput('exteriorColor', e.target.value)} placeholder={copy.formExteriorColorPlaceholder} className={`text-xs md:text-sm ${inputFieldClass}`} />
+                  <input name="listing-interiorcolor" value={listingForm.interiorColor} onChange={(e) => handleListingInput('interiorColor', e.target.value)} placeholder={copy.formInteriorColorPlaceholder} className={`text-xs md:text-sm ${inputFieldClass}`} />
+                  <input name="listing-city" value={listingForm.city} onChange={(e) => handleListingInput('city', e.target.value)} placeholder={copy.formCityPlaceholder} className={`text-xs md:text-sm ${inputFieldClass}`} />
+                  <input name="listing-neighborhood" value={listingForm.neighborhood} onChange={(e) => handleListingInput('neighborhood', e.target.value)} placeholder={copy.formNeighborhoodPlaceholder} className={`text-xs md:text-sm ${inputFieldClass}`} />
                 </div>
               </div>
               
-              <textarea name="listing-description" id="listing-description" value={listingForm.description} onChange={(event) => handleListingInput('description', event.target.value)} placeholder={copy.formDescriptionPlaceholder} className={`h-32 w-full ${inputFieldClass}`}
+              <textarea name="listing-description" id="listing-description" value={listingForm.description} onChange={(event) => handleListingInput('description', event.target.value)} placeholder={copy.formDescriptionPlaceholder} className={`h-24 md:h-32 w-full text-xs md:text-sm ${inputFieldClass}`}
               />
-              <div className="flex flex-wrap gap-3">
+              <div className="flex flex-wrap gap-2 md:gap-3">
                 <button 
                   type="button" 
-                  className={`rounded-2xl px-4 py-2 text-sm font-semibold text-white ${priceAssistLoading ? 'bg-slate-400 cursor-not-allowed' : 'bg-sky-600 hover:bg-sky-700'}`} 
+                  className={`rounded-xl md:rounded-2xl px-3 md:px-4 py-2 text-xs md:text-sm font-semibold text-white ${priceAssistLoading ? 'bg-slate-400 cursor-not-allowed' : 'bg-sky-600 hover:bg-sky-700'}`} 
                   onClick={handlePriceAssist}
                   disabled={priceAssistLoading}
                 >
-                  {priceAssistLoading ? '⏳ Calculating...' : copy.priceAssistLabel}
+                  {priceAssistLoading ? '⏳...' : copy.priceAssistLabel}
                 </button>
-                <label htmlFor="upload-photo-input" className="cursor-pointer rounded-2xl border border-dashed border-slate-300 px-4 py-2 text-sm font-semibold text-slate-900">
+                <label htmlFor="upload-photo-input" className="cursor-pointer rounded-xl md:rounded-2xl border border-dashed border-slate-300 px-3 md:px-4 py-2 text-xs md:text-sm font-semibold text-slate-900">
                   {copy.uploadPhotoLabel}
                   <input type="file" name="upload-photo" id="upload-photo-input" accept="image/*" className="hidden" onChange={(event) => {
                     const file = event.target.files?.[0];
                     if (file) handleUploadImage(file);
                   }} />
                 </label>
-                <label htmlFor="vision-helper-input" className="cursor-pointer rounded-2xl border border-dashed border-slate-300 px-4 py-2 text-sm font-semibold text-slate-900">
+                <label htmlFor="vision-helper-input" className="cursor-pointer rounded-xl md:rounded-2xl border border-dashed border-slate-300 px-3 md:px-4 py-2 text-xs md:text-sm font-semibold text-slate-900">
                   {copy.visionHelperLabel}
                   <input type="file" name="vision-helper" id="vision-helper-input" accept="image/*" className="hidden" onChange={(event) => {
                     const file = event.target.files?.[0];
@@ -4550,13 +4886,13 @@ export function AppView() {
           <div className="flex items-center gap-8">
             {/* Logo */}
             <div
-              className="group flex cursor-pointer items-center gap-3 h-12 sm:h-16 md:h-20"
+              className="group flex cursor-pointer items-center gap-3 h-14 md:h-20"
               onClick={() => setActivePage('home')}
             >
               <img
                 src="/Intelli_Wheels.png"
                 alt="IntelliWheels"
-                className="h-12 sm:h-16 md:h-20 w-auto object-contain object-center transition-transform group-hover:scale-105"
+                className="h-14 md:h-20 w-auto object-contain object-center transition-transform group-hover:scale-105"
               />
             </div>
 
@@ -4567,6 +4903,7 @@ export function AppView() {
                 { key: 'listings', label: copy.navCatalog },
                 { key: 'dealers', label: copy.navDealers },
                 { key: 'favorites', label: copy.navFavorites },
+                { key: 'messages', label: copy.navMessages, badge: unreadMessageCount },
                 { key: 'addListing', label: copy.navAddListing },
                 { key: 'chatbot', label: copy.navChatbot },
                 { key: 'myListings', label: copy.navMyListings },
@@ -4578,11 +4915,17 @@ export function AppView() {
                 <button
                   key={item.key}
                   onClick={() => setActivePage(item.key as PageKey)}
-                  className={`rounded-xl px-4 py-2 text-xl font-semibold transition-all ${activePage === item.key
+                  className={`relative rounded-xl px-4 py-2 text-xl font-semibold transition-all ${activePage === item.key
                     ? 'bg-slate-100/10 text-indigo-500 shadow-sm ring-1 ring-inset ring-slate-200/10 dark:text-indigo-400'
                     : `text-slate-500 hover:bg-slate-100/5 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200`
                     }`}
                 >
+                  {item.label}
+                  {'badge' in item && (item as any).badge > 0 && (
+                    <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs text-white">
+                      {(item as any).badge > 9 ? '9+' : (item as any).badge}
+                    </span>
+                  )}
                   {item.label}
                 </button>
               ))}
@@ -4758,6 +5101,7 @@ export function AppView() {
                 { key: 'listings', label: copy.navCatalog },
                 { key: 'dealers', label: copy.navDealers },
                 { key: 'favorites', label: copy.navFavorites },
+                { key: 'messages', label: copy.navMessages, badge: unreadMessageCount },
                 { key: 'addListing', label: copy.navAddListing },
                 { key: 'chatbot', label: copy.navChatbot },
                 { key: 'myListings', label: copy.navMyListings },
@@ -4766,10 +5110,15 @@ export function AppView() {
                 <button
                   key={item.key}
                   onClick={() => { setActivePage(item.key as PageKey); setNavMenuOpen(false); }}
-                  className={`block w-full rounded-xl px-4 py-3 text-left font-semibold ${activePage === item.key ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/20 dark:text-indigo-400' : 'text-slate-600 hover:bg-slate-50 dark:text-slate-300'
+                  className={`relative block w-full rounded-xl px-4 py-3 text-left font-semibold ${activePage === item.key ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/20 dark:text-indigo-400' : 'text-slate-600 hover:bg-slate-50 dark:text-slate-300'
                     }`}
                 >
                   {item.label}
+                  {'badge' in item && (item as any).badge > 0 && (
+                    <span className="absolute top-2 right-4 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs text-white">
+                      {(item as any).badge > 9 ? '9+' : (item as any).badge}
+                    </span>
+                  )}
                 </button>
               ))}
             </div>

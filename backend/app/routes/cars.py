@@ -43,6 +43,9 @@ def car_row_to_dict(row):
         d['regionalSpec'] = d['regional_spec']
     if d.get('payment_type'):
         d['paymentType'] = d['payment_type']
+    # Map owner_id to user_id for messaging compatibility
+    if d.get('owner_id') is not None:
+        d['user_id'] = d['owner_id']
     return d
 
 @bp.route('', methods=['GET'])

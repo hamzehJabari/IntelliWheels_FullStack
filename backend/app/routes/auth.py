@@ -87,7 +87,7 @@ def get_user_from_token(token):
             
             # PostgreSQL: use NOW() for UTC comparison (simpler)
             row = db.execute('''
-                SELECT u.id, u.username, u.email, u.role, u.created_at
+                SELECT u.id, u.username, u.email, u.role, u.created_at, u.phone
                 FROM users u
                 JOIN user_sessions s ON u.id = s.user_id
                 WHERE s.token = %s AND (s.expires_at IS NULL OR s.expires_at > NOW())
@@ -95,7 +95,7 @@ def get_user_from_token(token):
         else:
             # SQLite: use CURRENT_TIMESTAMP (already UTC)
             row = db.execute('''
-                SELECT u.id, u.username, u.email, u.role, u.created_at
+                SELECT u.id, u.username, u.email, u.role, u.created_at, u.phone
                 FROM users u
                 JOIN user_sessions s ON u.id = s.user_id
                 WHERE s.token = ? AND (s.expires_at IS NULL OR s.expires_at > CURRENT_TIMESTAMP)
@@ -119,12 +119,20 @@ def get_user_from_token(token):
         except Exception:
             pass  # Column doesn't exist yet, default to False
         
+        # Get phone safely
+        phone = None
+        try:
+            phone = row['phone'] if 'phone' in row.keys() else None
+        except Exception:
+            pass
+        
         return {
             'id': row['id'],
             'username': row['username'],
             'email': row['email'],
             'role': row['role'],
             'is_admin': is_admin,
+            'phone': phone,
             'created_at': row['created_at']
         }
     return None
@@ -285,6 +293,90 @@ def verify_session():
     if user:
         return jsonify({'success': True, 'authenticated': True, 'user': user})
     return jsonify({'success': False, 'authenticated': False, 'error': 'Invalid or expired token'}), 401
+
+
+@bp.route('/profile', methods=['PUT', 'PATCH'])
+@rate_limit(max_requests=10, window_seconds=60)
+def update_profile():
+    """Update user profile (username, email, phone, password)."""
+    token = request.headers.get('Authorization', '').replace('Bearer ', '')
+    user = get_user_from_token(token)
+    
+    if not user:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+    
+    data = request.get_json() or {}
+    db = get_db()
+    updates = []
+    params = []
+    
+    # Update username if provided
+    if 'username' in data and data['username']:
+        username = sanitize_string(data['username'])
+        valid, error = validate_username(username)
+        if not valid:
+            return jsonify({'success': False, 'error': error}), 400
+        updates.append('username = ?')
+        params.append(username)
+    
+    # Update email if provided
+    if 'email' in data and data['email']:
+        email = sanitize_string(data['email'].lower())
+        valid, error = validate_email(email)
+        if not valid:
+            return jsonify({'success': False, 'error': error}), 400
+        updates.append('email = ?')
+        params.append(email)
+    
+    # Update phone if provided
+    if 'phone' in data:
+        phone = sanitize_string(data['phone']) if data['phone'] else None
+        updates.append('phone = ?')
+        params.append(phone)
+    
+    # Update password if provided (requires current_password)
+    if 'password' in data and data['password']:
+        current_password = data.get('current_password', '')
+        
+        # Verify current password
+        if is_postgres():
+            row = db.execute('SELECT password_hash FROM users WHERE id = %s', (user['id'],)).fetchone()
+        else:
+            row = db.execute('SELECT password_hash FROM users WHERE id = ?', (user['id'],)).fetchone()
+        
+        if not row or not check_password_hash(row['password_hash'], current_password):
+            return jsonify({'success': False, 'error': 'Current password is incorrect'}), 400
+        
+        valid, error = validate_password(data['password'])
+        if not valid:
+            return jsonify({'success': False, 'error': error}), 400
+        
+        password_hash = generate_password_hash(data['password'], method='pbkdf2:sha256:260000')
+        updates.append('password_hash = ?')
+        params.append(password_hash)
+    
+    if not updates:
+        return jsonify({'success': False, 'error': 'No fields to update'}), 400
+    
+    params.append(user['id'])
+    
+    try:
+        query = f"UPDATE users SET {', '.join(updates)} WHERE id = ?"
+        if is_postgres():
+            # Convert ? to %s for PostgreSQL
+            query = query.replace('?', '%s')
+        db.execute(query, tuple(params))
+        db.commit()
+        
+        # Return updated user
+        updated_user = get_user_from_token(token)
+        return jsonify({'success': True, 'user': updated_user})
+    except Exception as e:
+        error_str = str(e).lower()
+        if 'unique' in error_str or 'duplicate' in error_str:
+            return jsonify({'success': False, 'error': 'Username or email already exists'}), 409
+        print(f"Profile update error: {e}")
+        return jsonify({'success': False, 'error': 'Update failed'}), 500
 
 
 # ============================================

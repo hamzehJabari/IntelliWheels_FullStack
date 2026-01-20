@@ -1,7 +1,7 @@
 'use client';
 
 import { useAuth } from '@/context/AuthContext';
-import { fetchCarById, fetchCarReviews, submitReview, deleteReview, fetchFavorites, addFavorite, removeFavorite, requestCallback } from '@/lib/api';
+import { fetchCarById, fetchCarReviews, submitReview, deleteReview, fetchFavorites, addFavorite, removeFavorite, requestCallback, sendMessage } from '@/lib/api';
 import { STORAGE_KEYS } from '@/lib/config';
 import { Car, Review, ReviewStats } from '@/lib/types';
 import { useRouter } from 'next/navigation';
@@ -48,6 +48,11 @@ export function CarDetailView({ carId }: CarDetailViewProps) {
   const [reviewSubmitting, setReviewSubmitting] = useState(false);
   const [reviewError, setReviewError] = useState<string | null>(null);
   const [showReviewForm, setShowReviewForm] = useState(false);
+  
+  // Message seller state
+  const [showMessageForm, setShowMessageForm] = useState(false);
+  const [messageText, setMessageText] = useState('');
+  const [messageSending, setMessageSending] = useState(false);
   
   const apiHost = useMemo(() => {
     const base = process.env.NEXT_PUBLIC_API_BASE_URL ?? '';
@@ -742,9 +747,67 @@ export function CarDetailView({ carId }: CarDetailViewProps) {
           </div>
           <div className="flex flex-col gap-4">
             <div className={`rounded-3xl border p-6 shadow-sm ${isDark ? 'border-slate-700 bg-slate-800' : 'border-slate-100 bg-white'}`}>
-              <p className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-slate-900'}`}>Seller actions</p>
-              <p className={`mt-2 text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>Ready to discuss this car? Reach out to the IntelliWheels concierge team.</p>
+              <p className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-slate-900'}`}>Contact Seller</p>
+              <p className={`mt-2 text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>Interested in this {car?.make} {car?.model}? Send a message to the seller.</p>
               <div className="mt-4 space-y-2">
+                {/* Message Seller Button */}
+                {car?.owner_id && car.owner_id !== user?.id && (
+                  <button
+                    className={`w-full rounded-2xl py-2 text-sm font-semibold text-white ${isDark ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-emerald-600 hover:bg-emerald-700'}`}
+                    onClick={() => {
+                      if (!token) {
+                        showToast('Please sign in to message the seller', 'info');
+                        return;
+                      }
+                      setShowMessageForm(true);
+                    }}
+                  >
+                    💬 Message Seller
+                  </button>
+                )}
+                {showMessageForm && (
+                  <div className={`mt-4 rounded-2xl border p-4 ${isDark ? 'border-slate-600 bg-slate-700' : 'border-slate-100 bg-white'}`}>
+                    <h4 className={`mb-2 text-sm font-semibold ${isDark ? 'text-white' : 'text-slate-900'}`}>Send a message</h4>
+                    <form
+                      onSubmit={async (e) => {
+                        e.preventDefault();
+                        if (!messageText.trim() || !car?.owner_id) return;
+                        setMessageSending(true);
+                        try {
+                          const resp = await sendMessage(car.owner_id, messageText.trim(), car.id, token);
+                          if (resp.success) {
+                            showToast('Message sent! Check your Messages page for replies.', 'success');
+                            setMessageText('');
+                            setShowMessageForm(false);
+                          } else {
+                            showToast('Failed to send message', 'error');
+                          }
+                        } catch (err) {
+                          console.error('Message send failed', err);
+                          showToast('Failed to send message', 'error');
+                        } finally {
+                          setMessageSending(false);
+                        }
+                      }}
+                    >
+                      <textarea 
+                        value={messageText} 
+                        onChange={(e) => setMessageText(e.target.value)} 
+                        placeholder={`Hi, I'm interested in your ${car?.make} ${car?.model}...`}
+                        rows={3}
+                        className={`w-full mb-3 rounded-lg border px-3 py-2 text-sm ${isDark ? 'border-slate-500 bg-slate-600 text-white placeholder-slate-400' : 'border-slate-300 bg-white text-slate-900 placeholder-slate-400'}`} 
+                      />
+                      <div className="flex items-center gap-2">
+                        <button type="submit" disabled={messageSending || !messageText.trim()} className={`rounded-2xl px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 ${isDark ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-emerald-600 hover:bg-emerald-700'}`}>
+                          {messageSending ? 'Sending...' : 'Send Message'}
+                        </button>
+                        <button type="button" onClick={() => setShowMessageForm(false)} className={`rounded-2xl border px-4 py-2 text-sm font-semibold ${isDark ? 'border-slate-500 text-slate-300 hover:bg-slate-600' : 'border-slate-200 text-slate-900 hover:bg-slate-50'}`}>
+                          Cancel
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                )}
                 <button
                   className={`w-full rounded-2xl py-2 text-sm font-semibold text-white ${isDark ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-sky-600 hover:bg-sky-700'}`}
                   onClick={() => setShowCallbackForm(true)}
@@ -800,7 +863,6 @@ export function CarDetailView({ carId }: CarDetailViewProps) {
                     )}
                   </div>
                 )}
-                <button className={`w-full rounded-2xl border py-2 text-sm font-semibold ${isDark ? 'border-slate-600 text-slate-300 hover:bg-slate-700' : 'border-slate-200 text-slate-900 hover:bg-slate-50'}`}>Add to watchlist</button>
                 {car.owner_id ? (
                   <button
                     className={`w-full rounded-2xl border py-2 text-sm font-semibold ${isDark ? 'border-slate-600 text-slate-300 hover:bg-slate-700' : 'border-slate-200 text-slate-900 hover:bg-slate-50'}`}

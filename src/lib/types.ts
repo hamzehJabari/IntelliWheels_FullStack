@@ -57,6 +57,8 @@ export interface Car {
   odometerKm?: number;
   specs?: CarSpecs;
   owner_id?: number;
+  user_id?: number;
+  owner_username?: string;
   created_at?: string;
   updated_at?: string;
   // New fields
@@ -91,6 +93,9 @@ export interface UserProfile extends AuthPayload {
   currency?: CurrencyCode;
   created_at?: string;
   is_admin?: boolean;
+  phone?: string;
+  show_phone?: boolean;
+  show_email?: boolean;
 }
 
 // Dealer application type
