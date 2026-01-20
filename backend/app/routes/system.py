@@ -125,7 +125,7 @@ def debug_verify(token):
                 'expires_at': str(session_raw['expires_at']) if session_raw else None
             } if session_raw else None,
             'db_now_utc': str(now_result['now_utc']) if now_result else None,
-            'db_now_local': str(now_result.get('now_local', 'N/A')) if now_result and is_postgres() else 'N/A',
+            'db_now_local': str(now_result['now_local']) if now_result and is_postgres() else 'N/A',
             'user_found_with_expiry_check': user_row is not None,
             'user_data': {
                 'id': user_row['id'],

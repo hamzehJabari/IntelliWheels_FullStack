@@ -14,58 +14,60 @@ def ensure_messages_tables():
     """Create messages tables if they don't exist."""
     db = get_db()
     
-    if is_postgres():
-        # PostgreSQL
-        db.execute('''
-            CREATE TABLE IF NOT EXISTS conversations (
-                id SERIAL PRIMARY KEY,
-                user1_id INTEGER NOT NULL REFERENCES users(id),
-                user2_id INTEGER NOT NULL REFERENCES users(id),
-                listing_id INTEGER REFERENCES listings(id),
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                UNIQUE(user1_id, user2_id, listing_id)
-            )
-        ''')
-        db.execute('''
-            CREATE TABLE IF NOT EXISTS user_messages (
-                id SERIAL PRIMARY KEY,
-                conversation_id INTEGER NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
-                sender_id INTEGER NOT NULL REFERENCES users(id),
-                content TEXT NOT NULL,
-                is_read BOOLEAN DEFAULT FALSE,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        ''')
-    else:
-        # SQLite
-        db.execute('''
-            CREATE TABLE IF NOT EXISTS conversations (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user1_id INTEGER NOT NULL,
-                user2_id INTEGER NOT NULL,
-                listing_id INTEGER,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                UNIQUE(user1_id, user2_id, listing_id),
-                FOREIGN KEY (user1_id) REFERENCES users(id),
-                FOREIGN KEY (user2_id) REFERENCES users(id),
-                FOREIGN KEY (listing_id) REFERENCES listings(id)
-            )
-        ''')
-        db.execute('''
-            CREATE TABLE IF NOT EXISTS user_messages (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                conversation_id INTEGER NOT NULL,
-                sender_id INTEGER NOT NULL,
-                content TEXT NOT NULL,
-                is_read BOOLEAN DEFAULT 0,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE,
-                FOREIGN KEY (sender_id) REFERENCES users(id)
-            )
-        ''')
-    db.commit()
+    try:
+        if is_postgres():
+            # PostgreSQL - don't use foreign key to listings since it may not exist
+            db.execute('''
+                CREATE TABLE IF NOT EXISTS conversations (
+                    id SERIAL PRIMARY KEY,
+                    user1_id INTEGER NOT NULL REFERENCES users(id),
+                    user2_id INTEGER NOT NULL REFERENCES users(id),
+                    listing_id INTEGER,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(user1_id, user2_id, listing_id)
+                )
+            ''')
+            db.execute('''
+                CREATE TABLE IF NOT EXISTS user_messages (
+                    id SERIAL PRIMARY KEY,
+                    conversation_id INTEGER NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+                    sender_id INTEGER NOT NULL REFERENCES users(id),
+                    content TEXT NOT NULL,
+                    is_read BOOLEAN DEFAULT FALSE,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+        else:
+            # SQLite
+            db.execute('''
+                CREATE TABLE IF NOT EXISTS conversations (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user1_id INTEGER NOT NULL,
+                    user2_id INTEGER NOT NULL,
+                    listing_id INTEGER,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(user1_id, user2_id, listing_id),
+                    FOREIGN KEY (user1_id) REFERENCES users(id),
+                    FOREIGN KEY (user2_id) REFERENCES users(id)
+                )
+            ''')
+            db.execute('''
+                CREATE TABLE IF NOT EXISTS user_messages (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    conversation_id INTEGER NOT NULL,
+                    sender_id INTEGER NOT NULL,
+                    content TEXT NOT NULL,
+                    is_read BOOLEAN DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE,
+                    FOREIGN KEY (sender_id) REFERENCES users(id)
+                )
+            ''')
+        db.commit()
+    except Exception as e:
+        print(f"[Messages] Table creation error (may already exist): {e}")
 
 
 @bp.route('/conversations', methods=['GET'])
