@@ -77,6 +77,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const storedToken = typeof window !== 'undefined' ? localStorage.getItem(STORAGE_KEYS.token) : null;
     const storedUser = typeof window !== 'undefined' ? localStorage.getItem(STORAGE_KEYS.user) : null;
 
+    console.log('[Auth] Initial load - storedToken:', storedToken ? `${storedToken.substring(0, 10)}... (len=${storedToken.length})` : 'null');
+    console.log('[Auth] Initial load - storedUser:', storedUser ? 'exists' : 'null');
+
     if (storedToken) {
       setToken(storedToken);
       if (storedUser) {
@@ -103,30 +106,37 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       skipNextValidation.current = false;
       setSessionValidated(true);
       setLoading(false);
+      console.log('[Auth] Skipped validation - fresh login');
       return;
     }
     async function validateSession() {
       if (!token) {
         // No token after initial check means guest user
+        console.log('[Auth] No token to validate - guest user');
         setSessionValidated(false);
         setLoading(false);
         return;
       }
+      console.log('[Auth] Validating session for token:', token.substring(0, 10) + '...');
       try {
         const response = await verifySession(token);
+        console.log('[Auth] Verify response:', response);
         if (response.success && response.authenticated) {
           if (response.user) {
             setUser(response.user);
             localStorage.setItem(STORAGE_KEYS.user, JSON.stringify(response.user));
           }
           setSessionValidated(true);
+          console.log('[Auth] Session validated successfully');
         } else {
           // Token is invalid/expired - silently logout
+          console.log('[Auth] Session invalid - logging out');
           setSessionValidated(false);
           await handleLogout();
         }
       } catch (err) {
         // Token validation failed - silently logout
+        console.error('[Auth] Validation error:', err);
         setSessionValidated(false);
         await handleLogout();
       } finally {
@@ -138,6 +148,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, [token, initialCheckDone]);
 
   const persistAuth = useCallback((authToken: string, profile: UserProfile) => {
+    console.log('[Auth] persistAuth called with token:', authToken.substring(0, 10) + '...');
     // Mark to skip the next validation - we know the token is valid (just received from server)
     skipNextValidation.current = true;
     setSessionValidated(true);
@@ -145,6 +156,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setUser(profile);
     localStorage.setItem(STORAGE_KEYS.token, authToken);
     localStorage.setItem(STORAGE_KEYS.user, JSON.stringify(profile));
+    console.log('[Auth] Token saved to localStorage. Verifying...');
+    const verifyToken = localStorage.getItem(STORAGE_KEYS.token);
+    console.log('[Auth] Verification - token in localStorage:', verifyToken ? `${verifyToken.substring(0, 10)}... (len=${verifyToken.length})` : 'NULL!');
   }, []);
 
   const fetchProfileForToken = useCallback(async (authToken: string, fallback?: UserProfile | null) => {
@@ -164,8 +178,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       setLoading(true);
       setError(null);
+      console.log('[Auth] Login attempt for:', username);
       const response = await loginUser(username, password);
+      console.log('[Auth] Login response:', { success: response.success, hasToken: !!response.token, error: response.error });
       if (response.success && response.token) {
+        console.log('[Auth] Login successful, token received:', response.token.substring(0, 10) + '...');
         const profile = await fetchProfileForToken(response.token, response.user);
         if (!profile) {
           setError('Unable to load profile details');
@@ -177,6 +194,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setError(response.error || 'Unable to login');
       return false;
     } catch (err: any) {
+      console.error('[Auth] Login error:', err);
       setError(err.message || 'Unable to login');
       return false;
     } finally {
@@ -261,6 +279,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   const handleLogout = useCallback(async () => {
+    console.log('[Auth] handleLogout called');
     try {
       if (token) {
         await logoutUser(token);
@@ -273,6 +292,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setSessionValidated(false);
       localStorage.removeItem(STORAGE_KEYS.token);
       localStorage.removeItem(STORAGE_KEYS.user);
+      console.log('[Auth] Logout complete - token cleared');
     }
   }, [token]);
 
