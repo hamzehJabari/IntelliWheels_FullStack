@@ -16,7 +16,7 @@ def ensure_messages_tables():
     
     try:
         if is_postgres():
-            # PostgreSQL - don't use foreign key to listings since it may not exist
+            # PostgreSQL - listing_id references cars table (no FK constraint for flexibility)
             db.execute('''
                 CREATE TABLE IF NOT EXISTS conversations (
                     id SERIAL PRIMARY KEY,
@@ -85,13 +85,13 @@ def get_conversations():
                 SELECT c.id, c.user1_id, c.user2_id, c.listing_id, c.updated_at,
                        CASE WHEN c.user1_id = %s THEN u2.username ELSE u1.username END as other_username,
                        CASE WHEN c.user1_id = %s THEN c.user2_id ELSE c.user1_id END as other_user_id,
-                       l.make, l.model, l.year,
+                       car.make, car.model, car.year,
                        (SELECT content FROM user_messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) as last_message,
                        (SELECT COUNT(*) FROM user_messages WHERE conversation_id = c.id AND sender_id != %s AND is_read = FALSE) as unread_count
                 FROM conversations c
                 JOIN users u1 ON c.user1_id = u1.id
                 JOIN users u2 ON c.user2_id = u2.id
-                LEFT JOIN listings l ON c.listing_id = l.id
+                LEFT JOIN cars car ON c.listing_id = car.id
                 WHERE c.user1_id = %s OR c.user2_id = %s
                 ORDER BY c.updated_at DESC
             ''', (user['id'], user['id'], user['id'], user['id'], user['id'])).fetchall()
@@ -100,13 +100,13 @@ def get_conversations():
                 SELECT c.id, c.user1_id, c.user2_id, c.listing_id, c.updated_at,
                        CASE WHEN c.user1_id = ? THEN u2.username ELSE u1.username END as other_username,
                        CASE WHEN c.user1_id = ? THEN c.user2_id ELSE c.user1_id END as other_user_id,
-                       l.make, l.model, l.year,
+                       car.make, car.model, car.year,
                        (SELECT content FROM user_messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) as last_message,
                        (SELECT COUNT(*) FROM user_messages WHERE conversation_id = c.id AND sender_id != ? AND is_read = 0) as unread_count
                 FROM conversations c
                 JOIN users u1 ON c.user1_id = u1.id
                 JOIN users u2 ON c.user2_id = u2.id
-                LEFT JOIN listings l ON c.listing_id = l.id
+                LEFT JOIN cars car ON c.listing_id = car.id
                 WHERE c.user1_id = ? OR c.user2_id = ?
                 ORDER BY c.updated_at DESC
             ''', (user['id'], user['id'], user['id'], user['id'], user['id'])).fetchall()
