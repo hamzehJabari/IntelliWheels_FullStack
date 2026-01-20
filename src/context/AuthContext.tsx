@@ -94,6 +94,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     if (!initialCheckDone) {
       return;
     }
+    // Skip validation if session is already validated (e.g., just logged in)
+    if (sessionValidated) {
+      setLoading(false);
+      return;
+    }
     async function validateSession() {
       if (!token) {
         // No token after initial check means guest user - loading already set to false
@@ -128,6 +133,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, [token, initialCheckDone]);
 
   const persistAuth = useCallback((authToken: string, profile: UserProfile) => {
+    // Set sessionValidated FIRST to prevent the validation effect from running
+    // We know the token is valid because we just received it from the server
+    setSessionValidated(true);
     setToken(authToken);
     setUser(profile);
     localStorage.setItem(STORAGE_KEYS.token, authToken);
