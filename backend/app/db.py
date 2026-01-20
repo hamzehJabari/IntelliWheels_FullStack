@@ -50,8 +50,11 @@ class PostgresCursorWrapper:
         # Handle AUTOINCREMENT -> SERIAL (already handled in CREATE)
         # Handle json_extract -> PostgreSQL JSON operators
         sql = self._convert_json_extract(sql)
-        # Handle CURRENT_TIMESTAMP
-        sql = sql.replace('CURRENT_TIMESTAMP', 'NOW()')
+        # Handle CURRENT_TIMESTAMP -> NOW() ONLY for non-CREATE TABLE statements
+        # PostgreSQL supports CURRENT_TIMESTAMP as a default in CREATE TABLE,
+        # but NOW() as a default causes errors
+        if 'CREATE TABLE' not in sql.upper():
+            sql = sql.replace('CURRENT_TIMESTAMP', 'NOW()')
         # Convert INSERT OR IGNORE to PostgreSQL ON CONFLICT (for any remaining cases)
         if 'INSERT OR IGNORE' in sql.upper():
             sql = sql.replace('INSERT OR IGNORE', 'INSERT')
