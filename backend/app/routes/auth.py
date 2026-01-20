@@ -108,7 +108,11 @@ def get_user_from_token(token):
             if admin_row:
                 is_admin = bool(admin_row['is_admin']) if admin_row['is_admin'] else False
         except Exception:
-            pass  # Column doesn't exist yet, default to False
+            # Column doesn't exist yet, default to False - MUST rollback in PostgreSQL!
+            try:
+                db.rollback()
+            except:
+                pass
         
         # Get phone safely (column may not exist in SQLite)
         phone = None
@@ -120,7 +124,11 @@ def get_user_from_token(token):
             if phone_row:
                 phone = phone_row['phone']
         except Exception:
-            pass  # Column doesn't exist
+            # Column doesn't exist - MUST rollback in PostgreSQL!
+            try:
+                db.rollback()
+            except:
+                pass
         
         return {
             'id': row['id'],

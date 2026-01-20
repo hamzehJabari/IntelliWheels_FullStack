@@ -989,9 +989,9 @@ export function AppView() {
   );
   const handleOpenDealer = useCallback(
     (dealerId: number) => {
-      router.push(`/dealers/${dealerId}`);
+      router.push(`/dealers/${dealerId}?from=${currentPage}`);
     },
-    [router]
+    [router, currentPage]
   );
   const inputFieldClass = resolvedTheme === 'dark'
     ? 'rounded-2xl border border-slate-600 bg-slate-700 p-3 text-white placeholder-slate-400 focus:border-sky-500 focus:outline-none'

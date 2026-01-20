@@ -11,21 +11,24 @@ bp = Blueprint('messages', __name__, url_prefix='/api/messages')
 
 
 def ensure_messages_tables():
-    """Create messages tables if they don't exist."""
+    """Create messages tables if they don't exist.
+    Note: Production PostgreSQL already has the tables with buyer_id/seller_id columns.
+    This function is mostly for SQLite local dev.
+    """
     db = get_db()
     
     try:
         if is_postgres():
-            # PostgreSQL - listing_id references cars table (no FK constraint for flexibility)
+            # PostgreSQL - production already has tables with buyer_id/seller_id
             db.execute('''
                 CREATE TABLE IF NOT EXISTS conversations (
                     id SERIAL PRIMARY KEY,
-                    user1_id INTEGER NOT NULL REFERENCES users(id),
-                    user2_id INTEGER NOT NULL REFERENCES users(id),
+                    buyer_id INTEGER NOT NULL REFERENCES users(id),
+                    seller_id INTEGER NOT NULL REFERENCES users(id),
                     listing_id INTEGER,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    UNIQUE(user1_id, user2_id, listing_id)
+                    UNIQUE(buyer_id, seller_id, listing_id)
                 )
             ''')
             db.execute('''
@@ -86,18 +89,19 @@ def get_conversations():
     
     try:
         if is_postgres():
+            # PostgreSQL uses buyer_id/seller_id columns
             rows = db.execute('''
-                SELECT c.id, c.user1_id, c.user2_id, c.listing_id, c.updated_at,
-                       CASE WHEN c.user1_id = %s THEN u2.username ELSE u1.username END as other_username,
-                       CASE WHEN c.user1_id = %s THEN c.user2_id ELSE c.user1_id END as other_user_id,
+                SELECT c.id, c.buyer_id, c.seller_id, c.listing_id, c.updated_at,
+                       CASE WHEN c.buyer_id = %s THEN u2.username ELSE u1.username END as other_username,
+                       CASE WHEN c.buyer_id = %s THEN c.seller_id ELSE c.buyer_id END as other_user_id,
                        car.make, car.model, car.year,
                        (SELECT content FROM user_messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) as last_message,
                        (SELECT COUNT(*) FROM user_messages WHERE conversation_id = c.id AND sender_id != %s AND is_read = FALSE) as unread_count
                 FROM conversations c
-                JOIN users u1 ON c.user1_id = u1.id
-                JOIN users u2 ON c.user2_id = u2.id
+                JOIN users u1 ON c.buyer_id = u1.id
+                JOIN users u2 ON c.seller_id = u2.id
                 LEFT JOIN cars car ON c.listing_id = car.id
-                WHERE c.user1_id = %s OR c.user2_id = %s
+                WHERE c.buyer_id = %s OR c.seller_id = %s
                 ORDER BY c.updated_at DESC
             ''', (user['id'], user['id'], user['id'], user['id'], user['id'])).fetchall()
         else:
@@ -151,8 +155,9 @@ def get_messages(conversation_id):
     try:
         # Verify user is part of conversation
         if is_postgres():
+            # PostgreSQL uses buyer_id/seller_id
             conv = db.execute('''
-                SELECT * FROM conversations WHERE id = %s AND (user1_id = %s OR user2_id = %s)
+                SELECT * FROM conversations WHERE id = %s AND (buyer_id = %s OR seller_id = %s)
             ''', (conversation_id, user['id'], user['id'])).fetchone()
         else:
             conv = db.execute('''
@@ -256,25 +261,31 @@ def send_message():
         return jsonify({'success': False, 'error': 'Failed to validate recipient'}), 500
     
     try:
-        # Ensure consistent ordering (lower id is always user1)
-        user1_id = min(user['id'], recipient_id)
-        user2_id = max(user['id'], recipient_id)
+        # For PostgreSQL: buyer_id = sender (person initiating contact), seller_id = recipient
+        # For SQLite: user1_id = min(id), user2_id = max(id) for consistent ordering
+        buyer_id = user['id']  # The person sending the message
+        seller_id = recipient_id  # The person receiving (usually car owner)
         
         # Find or create conversation
         if is_postgres():
+            # Check for existing conversation in either direction
             if listing_id:
                 conv = db.execute('''
-                    SELECT id FROM conversations WHERE user1_id = %s AND user2_id = %s AND listing_id = %s
-                ''', (user1_id, user2_id, listing_id)).fetchone()
+                    SELECT id FROM conversations 
+                    WHERE ((buyer_id = %s AND seller_id = %s) OR (buyer_id = %s AND seller_id = %s))
+                    AND listing_id = %s
+                ''', (buyer_id, seller_id, seller_id, buyer_id, listing_id)).fetchone()
             else:
                 conv = db.execute('''
-                    SELECT id FROM conversations WHERE user1_id = %s AND user2_id = %s AND listing_id IS NULL
-                ''', (user1_id, user2_id)).fetchone()
+                    SELECT id FROM conversations 
+                    WHERE ((buyer_id = %s AND seller_id = %s) OR (buyer_id = %s AND seller_id = %s))
+                    AND listing_id IS NULL
+                ''', (buyer_id, seller_id, seller_id, buyer_id)).fetchone()
             
             if not conv:
                 cursor = db.execute('''
-                    INSERT INTO conversations (user1_id, user2_id, listing_id) VALUES (%s, %s, %s) RETURNING id
-                ''', (user1_id, user2_id, listing_id))
+                    INSERT INTO conversations (buyer_id, seller_id, listing_id) VALUES (%s, %s, %s) RETURNING id
+                ''', (buyer_id, seller_id, listing_id))
                 conv_id = cursor.fetchone()['id']
             else:
                 conv_id = conv['id']
@@ -289,6 +300,10 @@ def send_message():
                 UPDATE conversations SET updated_at = CURRENT_TIMESTAMP WHERE id = %s
             ''', (conv_id,))
         else:
+            # SQLite uses consistent ordering: lower id = user1_id
+            user1_id = min(user['id'], recipient_id)
+            user2_id = max(user['id'], recipient_id)
+            
             if listing_id:
                 conv = db.execute('''
                     SELECT id FROM conversations WHERE user1_id = ? AND user2_id = ? AND listing_id = ?
@@ -345,10 +360,11 @@ def get_unread_count():
     
     try:
         if is_postgres():
+            # PostgreSQL uses buyer_id/seller_id
             row = db.execute('''
                 SELECT COUNT(*) as count FROM user_messages m
                 JOIN conversations c ON m.conversation_id = c.id
-                WHERE (c.user1_id = %s OR c.user2_id = %s) AND m.sender_id != %s AND m.is_read = FALSE
+                WHERE (c.buyer_id = %s OR c.seller_id = %s) AND m.sender_id != %s AND m.is_read = FALSE
             ''', (user['id'], user['id'], user['id'])).fetchone()
         else:
             row = db.execute('''

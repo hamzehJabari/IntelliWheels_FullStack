@@ -3,17 +3,33 @@
 import { useAuth } from '@/context/AuthContext';
 import { fetchDealerById } from '@/lib/api';
 import { DealerDetail } from '@/lib/types';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 
 interface DealerDetailViewProps {
   dealerId: string;
 }
 
+// Helper to navigate back with fallback to listings
+const handleGoBack = (router: ReturnType<typeof useRouter>, searchParams: URLSearchParams) => {
+  const from = searchParams.get('from');
+  if (from) {
+    // If we have a 'from' parameter, navigate there
+    router.push(`/?view=${from}`);
+  } else if (typeof window !== 'undefined' && window.history.length > 2) {
+    // If we have browser history, go back
+    router.back();
+  } else {
+    // Fallback to listings
+    router.push('/?view=listings');
+  }
+};
+
 export function DealerDetailView({ dealerId }: DealerDetailViewProps) {
   const numericId = Number(dealerId);
   const { token, formatPrice } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [dealer, setDealer] = useState<DealerDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -71,9 +87,9 @@ export function DealerDetailView({ dealerId }: DealerDetailViewProps) {
           <button
             type="button"
             className="mt-6 w-full rounded-2xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white"
-            onClick={() => router.push('/')}
+            onClick={() => handleGoBack(router, searchParams)}
           >
-            Go to listings
+            Go back
           </button>
         </div>
       </div>
@@ -86,9 +102,9 @@ export function DealerDetailView({ dealerId }: DealerDetailViewProps) {
         <button
           type="button"
           className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm"
-          onClick={() => router.push('/')}
+          onClick={() => handleGoBack(router, searchParams)}
         >
-          ← Back to listings
+          ← Back
         </button>
         <div className="overflow-hidden rounded-3xl border border-slate-100 bg-white shadow">
           <div className="h-72 w-full bg-slate-100">
@@ -139,7 +155,7 @@ export function DealerDetailView({ dealerId }: DealerDetailViewProps) {
                     <button
                       type="button"
                       className="flex-1 rounded-2xl bg-slate-900/10 py-2 text-sm font-semibold text-slate-900"
-                      onClick={() => router.push(`/cars/${car.id}`)}
+                      onClick={() => router.push(`/cars/${car.id}?from=dealer-${dealer.id}`)}
                     >
                       View car
                     </button>

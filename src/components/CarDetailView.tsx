@@ -17,8 +17,14 @@ interface CarDetailViewProps {
 const handleGoBack = (router: ReturnType<typeof useRouter>, searchParams: URLSearchParams) => {
   const from = searchParams.get('from');
   if (from) {
-    // If we have a 'from' parameter, navigate there
-    router.push(`/?view=${from}`);
+    // Check if coming from a dealer page (format: dealer-{id})
+    if (from.startsWith('dealer-')) {
+      const dealerId = from.replace('dealer-', '');
+      router.push(`/dealers/${dealerId}`);
+    } else {
+      // Navigate to the specified view (listings, favorites, myListings, etc.)
+      router.push(`/?view=${from}`);
+    }
   } else if (typeof window !== 'undefined' && window.history.length > 2) {
     // If we have browser history, go back
     router.back();
