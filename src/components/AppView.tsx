@@ -160,7 +160,7 @@ const TRANSLATIONS = {
     searchPlaceholder: 'Search make, model, year',
     semanticPlaceholder: 'e.g. Luxury hybrid SUV under 150k',
     // Home page translations
-    heroTitle: 'Find Your Perfect Ride with AI',
+    heroTitle: 'Find Your Perfect Car with AI',
     heroSubtitle: 'Jordan\'s smartest automotive marketplace powered by artificial intelligence',
     heroCta: 'Explore Catalog',
     heroSecondaryCta: 'Meet Our AI',

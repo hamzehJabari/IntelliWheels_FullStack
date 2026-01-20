@@ -96,7 +96,7 @@ def get_conversations():
                        CASE WHEN c.buyer_id = %s THEN c.seller_id ELSE c.buyer_id END as other_user_id,
                        car.make, car.model, car.year,
                        (SELECT content FROM user_messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) as last_message,
-                       (SELECT COUNT(*) FROM user_messages WHERE conversation_id = c.id AND sender_id != %s AND is_read = FALSE) as unread_count
+                       (SELECT COUNT(*) FROM user_messages WHERE conversation_id = c.id AND sender_id != %s AND read = FALSE) as unread_count
                 FROM conversations c
                 JOIN users u1 ON c.buyer_id = u1.id
                 JOIN users u2 ON c.seller_id = u2.id
@@ -174,7 +174,7 @@ def get_messages(conversation_id):
         # Get messages
         if is_postgres():
             rows = db.execute('''
-                SELECT m.id, m.sender_id, m.content, m.is_read, m.created_at, u.username as sender_username
+                SELECT m.id, m.sender_id, m.content, m.read, m.created_at, u.username as sender_username
                 FROM user_messages m
                 JOIN users u ON m.sender_id = u.id
                 WHERE m.conversation_id = %s
@@ -183,8 +183,8 @@ def get_messages(conversation_id):
             
             # Mark messages as read
             db.execute('''
-                UPDATE user_messages SET is_read = TRUE 
-                WHERE conversation_id = %s AND sender_id != %s AND is_read = FALSE
+                UPDATE user_messages SET read = TRUE 
+                WHERE conversation_id = %s AND sender_id != %s AND read = FALSE
             ''', (conversation_id, user['id']))
         else:
             rows = db.execute('''
@@ -205,12 +205,14 @@ def get_messages(conversation_id):
         
         messages = []
         for row in rows:
+            # Handle both 'read' (PostgreSQL) and 'is_read' (SQLite) column names
+            is_read_value = row.get('read') if 'read' in row.keys() else row.get('is_read')
             messages.append({
                 'id': row['id'],
                 'sender_id': row['sender_id'],
                 'sender_username': row['sender_username'],
                 'content': row['content'],
-                'is_read': bool(row['is_read']),
+                'is_read': bool(is_read_value),
                 'created_at': row['created_at'],
                 'is_mine': row['sender_id'] == user['id']
             })
@@ -364,11 +366,11 @@ def get_unread_count():
     
     try:
         if is_postgres():
-            # PostgreSQL uses buyer_id/seller_id
+            # PostgreSQL uses buyer_id/seller_id and 'read' column
             row = db.execute('''
                 SELECT COUNT(*) as count FROM user_messages m
                 JOIN conversations c ON m.conversation_id = c.id
-                WHERE (c.buyer_id = %s OR c.seller_id = %s) AND m.sender_id != %s AND m.is_read = FALSE
+                WHERE (c.buyer_id = %s OR c.seller_id = %s) AND m.sender_id != %s AND m.read = FALSE
             ''', (user['id'], user['id'], user['id'])).fetchone()
         else:
             row = db.execute('''
