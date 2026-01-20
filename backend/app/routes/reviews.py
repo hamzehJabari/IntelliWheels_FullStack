@@ -33,6 +33,10 @@ def get_car_reviews(car_id):
         db.commit()
     except Exception as e:
         print(f"Reviews table creation note: {e}")
+        try:
+            db.rollback()
+        except:
+            pass
     
     try:
         # Get reviews with user info - use LEFT JOIN to handle missing users gracefully
@@ -130,6 +134,10 @@ def add_review(car_id):
     except Exception as idx_err:
         # Index might already exist or table structure differs
         print(f"Reviews index note: {idx_err}")
+        try:
+            db.rollback()
+        except:
+            pass
     
     # Check if car exists
     car = db.execute('SELECT id FROM cars WHERE id = ?', (car_id,)).fetchone()

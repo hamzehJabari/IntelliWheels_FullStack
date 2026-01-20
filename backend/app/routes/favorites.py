@@ -34,6 +34,10 @@ def ensure_favorites_table():
         db.commit()
     except Exception as e:
         print(f"[Favorites] Table creation note: {e}")
+        try:
+            db.rollback()
+        except:
+            pass
 
 
 @bp.route('', methods=['GET'])

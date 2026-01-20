@@ -248,4 +248,8 @@ def request_callback():
         return jsonify({'success': True})
     except Exception as e:
         print('Request callback error:', e)
+        try:
+            db.rollback()
+        except:
+            pass
         return jsonify({'success': False, 'error': str(e)}), 500

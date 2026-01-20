@@ -68,6 +68,11 @@ def ensure_messages_tables():
         db.commit()
     except Exception as e:
         print(f"[Messages] Table creation error (may already exist): {e}")
+        # Rollback to clear aborted transaction state in PostgreSQL
+        try:
+            db.rollback()
+        except:
+            pass
 
 
 @bp.route('/conversations', methods=['GET'])
