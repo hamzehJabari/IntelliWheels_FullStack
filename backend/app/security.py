@@ -247,7 +247,7 @@ def require_auth():
 def token_required(f):
     """
     Decorator that requires a valid authentication token.
-    Passes the current_user dict as the first argument to the decorated function.
+    Sets g.current_user for the decorated function.
     """
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -267,6 +267,9 @@ def token_required(f):
                 'error': 'Invalid or expired token'
             }), 401
         
-        return f(current_user, *args, **kwargs)
+        # Set g.current_user so route functions can access it
+        g.current_user = current_user
+        
+        return f(*args, **kwargs)
     
     return decorated_function
