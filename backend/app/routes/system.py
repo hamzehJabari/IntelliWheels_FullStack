@@ -65,8 +65,8 @@ def health_check():
     
     return jsonify({
         'status': 'healthy',
-        'version': '2.0.4',  # Fixed: user_messages.read instead of is_read for PostgreSQL
-        'build_id': '20260120-fix5-read-column',
+        'version': '2.0.6',  # Fixed: IndexError for SQLite row access
+        'build_id': '20260120-fix7-indexerror',
         'ai_enabled': ai_configured,
         'ai_working': gemini_working,
         'ai_model': active_model,

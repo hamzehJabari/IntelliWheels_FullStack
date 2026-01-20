@@ -123,7 +123,14 @@ def get_conversations():
         conversations = []
         for row in rows:
             # PostgreSQL uses car_id, SQLite uses listing_id
-            car_id = row.get('car_id') or row.get('listing_id')
+            # SQLite Row raises IndexError, PostgresRowWrapper may raise KeyError
+            try:
+                car_id = row['car_id']
+            except (KeyError, IndexError, TypeError):
+                try:
+                    car_id = row['listing_id']
+                except (KeyError, IndexError, TypeError):
+                    car_id = None
             conversations.append({
                 'id': row['id'],
                 'other_user_id': row['other_user_id'],
@@ -206,7 +213,14 @@ def get_messages(conversation_id):
         messages = []
         for row in rows:
             # Handle both 'read' (PostgreSQL) and 'is_read' (SQLite) column names
-            is_read_value = row.get('read') if 'read' in row.keys() else row.get('is_read')
+            # SQLite Row raises IndexError, PostgresRowWrapper may raise KeyError
+            try:
+                is_read_value = row['read']
+            except (KeyError, IndexError, TypeError):
+                try:
+                    is_read_value = row['is_read']
+                except (KeyError, IndexError, TypeError):
+                    is_read_value = False
             messages.append({
                 'id': row['id'],
                 'sender_id': row['sender_id'],
