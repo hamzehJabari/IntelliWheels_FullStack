@@ -1,8 +1,38 @@
 # IntelliWheels FullStack
 
-This repository contains the full stack application for IntelliWheels - an intelligent automotive marketplace.
+**AI-Powered Automotive Marketplace for Jordan & GCC**
 
-## Structure
+[![Next.js](https://img.shields.io/badge/Next.js-15-black)](https://nextjs.org/)
+[![React](https://img.shields.io/badge/React-19-blue)](https://react.dev/)
+[![Flask](https://img.shields.io/badge/Flask-3.0-green)](https://flask.palletsprojects.com/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5-blue)](https://www.typescriptlang.org/)
+[![License](https://img.shields.io/badge/License-Proprietary-red)]()
+
+> Transform your car buying experience with AI-powered assistance, vision analysis, and fair price estimation.
+
+## 🌟 Features
+
+- 🤖 **AI Chatbot** - 24/7 bilingual assistant (Arabic/English)
+- 📸 **Vision Analysis** - Identify cars from photos
+- 💰 **Price Estimator** - ML-based fair market pricing
+- 🔍 **Semantic Search** - Natural language car search
+- ✅ **Verified Dealers** - Trusted dealer network
+- 🌐 **Bilingual** - Full RTL Arabic support
+- 💱 **Multi-Currency** - JOD, USD, EUR support
+
+## 📚 Documentation
+
+| Document | Description |
+|----------|-------------|
+| [Full Documentation](./docs/FULL_DOCUMENTATION.md) | Complete technical documentation |
+| [Visual Diagrams](./docs/VISUAL_DIAGRAMS.md) | Architecture & flow diagrams |
+| [Business Plan](./docs/BUSINESS_PLAN.md) | Business strategy & financials |
+| [Business Readiness](./docs/BUSINESS_READINESS_CHECKLIST.md) | Launch checklist |
+| [Terms of Service](./docs/legal/TERMS_OF_SERVICE.md) | User agreement |
+| [Privacy Policy](./docs/legal/PRIVACY_POLICY.md) | Data handling policy |
+| [Dealer Agreement](./docs/legal/DEALER_AGREEMENT.md) | Dealer partner terms |
+
+## 📁 Structure
 
 - **/**: The Next.js React application (Root).
 - **backend/**: The Flask Python API.
@@ -82,3 +112,41 @@ To enable persistent storage:
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `NEXT_PUBLIC_API_URL` | Yes | Backend API URL (e.g., `https://intelliwheels.onrender.com/api`) |
+
+## 🚀 Pre-Launch Checklist
+
+Before going to production, complete these steps:
+
+### Legal & Business
+- [ ] Register company (LLC in Jordan)
+- [ ] Reserve trade name "IntelliWheels"
+- [ ] Open business bank account
+- [ ] Complete Terms of Service (customize template)
+- [ ] Complete Privacy Policy (customize template)
+- [ ] Complete Dealer Agreement (customize template)
+
+### Technical
+- [ ] Purchase domain (intelliwheels.com or .jo)
+- [ ] Configure SSL certificates (auto via Vercel/Render)
+- [ ] Enable database backups (Render PostgreSQL)
+- [ ] Set up error monitoring (Sentry recommended)
+- [ ] Set up uptime monitoring (UptimeRobot)
+- [ ] Complete security audit
+- [ ] Load test for 1000+ concurrent users
+
+### Operations
+- [ ] Set up support email (support@intelliwheels.com)
+- [ ] Set up WhatsApp Business
+- [ ] Create social media accounts
+- [ ] Prepare dealer onboarding materials
+- [ ] Train support team
+
+See [Business Readiness Checklist](./docs/BUSINESS_READINESS_CHECKLIST.md) for complete details.
+
+## 📄 License
+
+This project is proprietary software. All rights reserved.
+
+## 📞 Contact
+
+For inquiries: [your-email@example.com]
