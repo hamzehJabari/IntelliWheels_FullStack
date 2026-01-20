@@ -205,6 +205,10 @@ def get_my_listings_analytics():
         
     except Exception as e:
         print(f"My listings analytics error: {e}")
+        try:
+            db.rollback()
+        except:
+            pass
         return jsonify({
             'success': True,
             'analytics': {

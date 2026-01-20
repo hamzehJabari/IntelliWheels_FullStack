@@ -84,6 +84,10 @@ def get_car_reviews(car_id):
         return jsonify(result)
     except Exception as e:
         print(f"Get reviews error: {e}")
+        try:
+            db.rollback()
+        except:
+            pass
         # Return empty reviews rather than 500 error
         return jsonify({
             'success': True,
@@ -217,6 +221,10 @@ def delete_review(review_id):
         return jsonify({'success': True, 'message': 'Review deleted'})
     except Exception as e:
         print(f"Delete review error: {e}")
+        try:
+            db.rollback()
+        except:
+            pass
         return jsonify({'success': False, 'error': 'Failed to delete review'}), 500
 
 

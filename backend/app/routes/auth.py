@@ -91,6 +91,10 @@ def get_user_from_token(token):
             ''', (token,)).fetchone()
     except Exception as e:
         print(f"[Auth] Error fetching user: {e}")
+        try:
+            db.rollback()
+        except:
+            pass
         return None
     
     if row:
@@ -229,6 +233,10 @@ def login():
             db.commit()
         except Exception as e:
             print(f"[Auth Login] ERROR creating session: {e}")
+            try:
+                db.rollback()
+            except:
+                pass
             return jsonify({'success': False, 'error': 'Failed to create session'}), 500
 
         # Safely check is_admin column
@@ -268,6 +276,10 @@ def logout():
             db.commit()
         except Exception as e:
             print(f"[Auth Logout] Error: {e}")
+            try:
+                db.rollback()
+            except:
+                pass
     return jsonify({'success': True})
 
 @bp.route('/verify', methods=['GET'])
@@ -401,6 +413,10 @@ def forgot_password():
         db.commit()
     except Exception as e:
         print(f"[Password Reset] Error storing token: {e}")
+        try:
+            db.rollback()
+        except:
+            pass
         return jsonify({'success': False, 'error': 'Failed to create reset token'}), 500
     
     # Send reset email
@@ -466,6 +482,10 @@ def reset_password():
             ''', (reset_token,)).fetchone()
     except Exception as e:
         print(f"[Password Reset] Query error: {e}")
+        try:
+            db.rollback()
+        except:
+            pass
         return jsonify({'success': False, 'error': 'Invalid or expired reset token'}), 400
     
     if not reset_row:

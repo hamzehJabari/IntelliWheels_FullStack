@@ -132,6 +132,10 @@ def get_conversations():
         return jsonify({'success': True, 'conversations': conversations})
     except Exception as e:
         print(f"Error fetching conversations: {e}")
+        try:
+            db.rollback()
+        except:
+            pass
         return jsonify({'success': False, 'error': 'Failed to fetch conversations'}), 500
 
 
@@ -205,6 +209,10 @@ def get_messages(conversation_id):
         return jsonify({'success': True, 'messages': messages})
     except Exception as e:
         print(f"Error fetching messages: {e}")
+        try:
+            db.rollback()
+        except:
+            pass
         return jsonify({'success': False, 'error': 'Failed to fetch messages'}), 500
 
 
@@ -301,6 +309,10 @@ def send_message():
         })
     except Exception as e:
         print(f"Error sending message: {e}")
+        try:
+            db.rollback()
+        except:
+            pass
         return jsonify({'success': False, 'error': 'Failed to send message'}), 500
 
 

@@ -227,6 +227,10 @@ def create_car():
         return jsonify({'success': True, 'id': cursor.lastrowid}), 201
     except Exception as e:
         print(f"Create car error: {e}")
+        try:
+            db.rollback()
+        except:
+            pass
         return jsonify({'success': False, 'error': 'Failed to create listing'}), 500
 
 
@@ -377,6 +381,10 @@ def update_car(id):
         return jsonify({'success': True, 'car': car_row_to_dict(updated_car)})
     except Exception as e:
         print(f"Update car error: {e}")
+        try:
+            db.rollback()
+        except:
+            pass
         return jsonify({'success': False, 'error': 'Failed to update listing'}), 500
 
 
@@ -403,5 +411,9 @@ def delete_car(id):
         return jsonify({'success': True, 'message': 'Listing deleted'})
     except Exception as e:
         print(f"Delete car error: {e}")
+        try:
+            db.rollback()
+        except:
+            pass
         return jsonify({'success': False, 'error': 'Failed to delete listing'}), 500
 
