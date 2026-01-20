@@ -37,23 +37,49 @@ async function apiRequest<T = any>(path: string, options: RequestOptions<T> = {}
     fallback,
   } = options;
 
-  // 🔥 AUTO-TOKEN FIX: If no token was passed, try to grab it from localStorage
-  // This ensures API calls always have the token if the user is logged in
+  // ---------------------------------------------------------
+  // 🔍 DEBUG & AUTO-AUTH LOGIC
+  // ---------------------------------------------------------
+  
+  // 1. If no token provided, hunt for it in LocalStorage
   if (!token && typeof window !== 'undefined') {
-    const storedToken = localStorage.getItem(STORAGE_KEYS.token);
+    // Try the config key first (intelliwheels-token)
+    let storedToken = localStorage.getItem(STORAGE_KEYS.token);
+    
+    // Fallback: Try common key names if the config key failed
+    if (!storedToken) storedToken = localStorage.getItem('token');
+    if (!storedToken) storedToken = localStorage.getItem('authToken');
+    if (!storedToken) storedToken = localStorage.getItem('intelliwheels-token');
+
     if (storedToken) {
       token = storedToken;
+    } else {
+      // Log only for protected routes to help debug
+      if (path.includes('/my-listings') || path.includes('/verify') || path.includes('/favorites') || path.includes('/messages')) {
+        console.warn(`[API] ⚠️ No token found for protected route: ${path}`);
+        console.warn(`[API] Checked keys: ${STORAGE_KEYS.token}, token, authToken, intelliwheels-token`);
+        console.warn(`[API] localStorage keys:`, Object.keys(localStorage));
+      }
     }
   }
 
+  // 2. Prepare Headers
   const finalHeaders = new Headers(headers ?? {});
-  // Only set Content-Type for non-GET requests that have a body
+  
   if (!isFormData && method !== 'GET' && body !== undefined) {
     finalHeaders.set('Content-Type', 'application/json');
   }
+
+  // 3. Attach the Token (The most important part)
   if (token) {
+    // Remove any existing header to prevent duplicates/conflicts
+    if (finalHeaders.has('Authorization')) finalHeaders.delete('Authorization');
     finalHeaders.set('Authorization', `Bearer ${token}`);
   }
+
+  // ---------------------------------------------------------
+  // 🚀 EXECUTE REQUEST
+  // ---------------------------------------------------------
 
   let response: Response;
   try {
@@ -95,6 +121,10 @@ async function apiRequest<T = any>(path: string, options: RequestOptions<T> = {}
   }
 
   if (!response.ok) {
+    // Log 401 errors for debugging
+    if (response.status === 401) {
+      console.error(`[API] ⛔ 401 Unauthorized for ${path}. Token sent: ${token ? 'YES (Length: ' + token.length + ')' : 'NO'}`);
+    }
     const message = (data as any)?.error || response.statusText || 'Request failed';
     throw new Error(message);
   }
