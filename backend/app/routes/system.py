@@ -78,6 +78,66 @@ def health_check():
     })
 
 # TEMPORARY DEBUG - REMOVE AFTER FIXING
+@bp.route('/debug-verify/<token>')
+def debug_verify(token):
+    """TEMPORARY: Debug why token verification fails. REMOVE AFTER DEBUGGING!"""
+    from ..db import is_postgres
+    db = get_db()
+    
+    try:
+        # First, check if token exists at all
+        if is_postgres():
+            session_raw = db.execute('SELECT token, user_id, expires_at FROM user_sessions WHERE token = %s', (token,)).fetchone()
+        else:
+            session_raw = db.execute('SELECT token, user_id, expires_at FROM user_sessions WHERE token = ?', (token,)).fetchone()
+        
+        # Check current time
+        if is_postgres():
+            now_result = db.execute("SELECT NOW() AT TIME ZONE 'UTC' as now_utc, NOW() as now_local").fetchone()
+        else:
+            now_result = db.execute("SELECT CURRENT_TIMESTAMP as now_utc").fetchone()
+        
+        # Now try the actual query from get_user_from_token
+        if is_postgres():
+            user_row = db.execute('''
+                SELECT u.id, u.username, s.token, s.expires_at
+                FROM users u
+                JOIN user_sessions s ON u.id = s.user_id
+                WHERE s.token = %s AND (s.expires_at IS NULL OR s.expires_at > (NOW() AT TIME ZONE 'UTC'))
+            ''', (token,)).fetchone()
+        else:
+            user_row = db.execute('''
+                SELECT u.id, u.username, s.token, s.expires_at
+                FROM users u
+                JOIN user_sessions s ON u.id = s.user_id
+                WHERE s.token = ? AND (s.expires_at IS NULL OR s.expires_at > CURRENT_TIMESTAMP)
+            ''', (token,)).fetchone()
+        
+        return jsonify({
+            'is_postgres': is_postgres(),
+            'token_input': token,
+            'token_input_len': len(token),
+            'session_found': session_raw is not None,
+            'session_data': {
+                'token': session_raw['token'] if session_raw else None,
+                'token_len': len(session_raw['token']) if session_raw else None,
+                'user_id': session_raw['user_id'] if session_raw else None,
+                'expires_at': str(session_raw['expires_at']) if session_raw else None
+            } if session_raw else None,
+            'db_now_utc': str(now_result['now_utc']) if now_result else None,
+            'db_now_local': str(now_result.get('now_local', 'N/A')) if now_result and is_postgres() else 'N/A',
+            'user_found_with_expiry_check': user_row is not None,
+            'user_data': {
+                'id': user_row['id'],
+                'username': user_row['username']
+            } if user_row else None
+        })
+    except Exception as e:
+        import traceback
+        return jsonify({
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        }), 500
 @bp.route('/debug-sessions')
 def debug_sessions():
     """TEMPORARY: Public debug endpoint to check sessions. REMOVE AFTER DEBUGGING!"""
