@@ -110,11 +110,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           // Only mark session as validated on successful verification
           setSessionValidated(true);
         } else {
+          // Token is invalid/expired - silently logout (expected behavior)
           setSessionValidated(false);
           await handleLogout();
         }
       } catch (err) {
-        console.error('Session validation failed', err);
+        // Token validation failed (401, network error, etc.) - this is expected
+        // when user has an expired token. Silently logout without console spam.
         setSessionValidated(false);
         await handleLogout();
       } finally {
