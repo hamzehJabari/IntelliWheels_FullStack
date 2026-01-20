@@ -9,6 +9,7 @@ interface AuthContextValue {
   user: UserProfile | null;
   token: string | null;
   loading: boolean;
+  sessionValidated: boolean;
   error: string | null;
   login: (username: string, password: string) => Promise<boolean>;
   signup: (username: string, email: string, password: string) => Promise<boolean>;
@@ -32,6 +33,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [sessionValidated, setSessionValidated] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [currency, setCurrencyState] = useState<CurrencyCode>('JOD');
 
@@ -95,6 +97,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     async function validateSession() {
       if (!token) {
         // No token after initial check means guest user - loading already set to false
+        setSessionValidated(false);
         return;
       }
       try {
@@ -104,11 +107,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             setUser(response.user);
             localStorage.setItem(STORAGE_KEYS.user, JSON.stringify(response.user));
           }
+          // Only mark session as validated on successful verification
+          setSessionValidated(true);
         } else {
+          setSessionValidated(false);
           await handleLogout();
         }
       } catch (err) {
         console.error('Session validation failed', err);
+        setSessionValidated(false);
         await handleLogout();
       } finally {
         setLoading(false);
@@ -248,6 +255,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     } finally {
       setToken(null);
       setUser(null);
+      setSessionValidated(false);
       localStorage.removeItem(STORAGE_KEYS.token);
       localStorage.removeItem(STORAGE_KEYS.user);
     }
@@ -291,6 +299,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     user,
     token,
     loading,
+    sessionValidated,
     error,
     login: handleLogin,
     signup: handleSignup,

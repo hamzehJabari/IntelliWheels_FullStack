@@ -763,7 +763,7 @@ interface VisionSuggestion extends VisionAttributes {
 }
 
 export function AppView() {
-  const { user, token, loading: authLoading, login, signup, loginWithGoogle, requestPasswordReset, resetUserPassword, logout, updateMyProfile, refreshProfile, error: authError, clearError, currency, setCurrency, formatPrice, convertCurrency } = useAuth();
+  const { user, token, loading: authLoading, sessionValidated, login, signup, loginWithGoogle, requestPasswordReset, resetUserPassword, logout, updateMyProfile, refreshProfile, error: authError, clearError, currency, setCurrency, formatPrice, convertCurrency } = useAuth();
   const [mounted, setMounted] = useState(false);
   const [activePage, setActivePage] = useState<PageKey>('home');
   const [serviceMode, setServiceMode] = useState<ServiceMode>('marketplace');
@@ -1258,9 +1258,9 @@ export function AppView() {
   }, [token, requireAuth]);
 
   useEffect(() => {
-    // Wait until auth loading completes before fetching protected data
-    // This prevents 401 errors from stale tokens that haven't been validated yet
-    if (authLoading) {
+    // Wait until session is validated before fetching protected data
+    // This prevents 401 errors from stale/expired tokens
+    if (authLoading || !sessionValidated) {
       return;
     }
     if (!token) {
@@ -1305,11 +1305,11 @@ export function AppView() {
       }
     }
     loadUnreadCount();
-  }, [token, authLoading]);
+  }, [token, authLoading, sessionValidated]);
 
   // Load my listings analytics when on myListings page
   useEffect(() => {
-    if (authLoading || !token || activePage !== 'myListings') {
+    if (authLoading || !sessionValidated || !token || activePage !== 'myListings') {
       return;
     }
     async function loadMyListingsAnalytics() {
@@ -1326,11 +1326,11 @@ export function AppView() {
       }
     }
     loadMyListingsAnalytics();
-  }, [token, activePage, authLoading]);
+  }, [token, activePage, authLoading, sessionValidated]);
 
   // Load conversations when on messages page
   useEffect(() => {
-    if (authLoading || !token || activePage !== 'messages') {
+    if (authLoading || !sessionValidated || !token || activePage !== 'messages') {
       return;
     }
     async function loadConversations() {
@@ -1347,11 +1347,11 @@ export function AppView() {
       }
     }
     loadConversations();
-  }, [token, activePage, authLoading]);
+  }, [token, activePage, authLoading, sessionValidated]);
 
   // Load messages for active conversation
   useEffect(() => {
-    if (authLoading || !token || !activeConversationId) {
+    if (authLoading || !sessionValidated || !token || !activeConversationId) {
       return;
     }
     async function loadMessages() {
@@ -1370,10 +1370,10 @@ export function AppView() {
       }
     }
     loadMessages();
-  }, [token, activeConversationId, authLoading]);
+  }, [token, activeConversationId, authLoading, sessionValidated]);
 
   useEffect(() => {
-    if (authLoading || !token) {
+    if (authLoading || !sessionValidated || !token) {
       setAnalyticsData(null);
       return;
     }
@@ -1388,10 +1388,10 @@ export function AppView() {
       }
     }
     loadAnalytics();
-  }, [token, analyticsFilter, authLoading]);
+  }, [token, analyticsFilter, authLoading, sessionValidated]);
 
   useEffect(() => {
-    if (authLoading || !token) {
+    if (authLoading || !sessionValidated || !token) {
       setDealers([]);
       setDealersLoading(false);
       return;
@@ -1418,11 +1418,11 @@ export function AppView() {
     return () => {
       cancelled = true;
     };
-  }, [token, authLoading]);
+  }, [token, authLoading, sessionValidated]);
 
   // ------- Admin: Fetch Dealer Applications
   useEffect(() => {
-    if (authLoading || activePage !== 'admin' || !user?.is_admin || !token) return;
+    if (authLoading || !sessionValidated || activePage !== 'admin' || !user?.is_admin || !token) return;
     
     let cancelled = false;
     async function loadApplications() {
@@ -1447,7 +1447,7 @@ export function AppView() {
     return () => {
       cancelled = true;
     };
-  }, [activePage, token, user?.is_admin, adminFilter, authLoading]);
+  }, [activePage, token, user?.is_admin, adminFilter, authLoading, sessionValidated]);
 
   // ------- Admin: Handle Approve/Reject
   const handleApproveApplication = useCallback(async (application: DealerApplication) => {
