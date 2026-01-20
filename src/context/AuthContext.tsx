@@ -96,46 +96,37 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     // Don't run until initial localStorage check is complete
     if (!initialCheckDone) {
-      console.log('[Auth] Waiting for initial check');
       return;
     }
     // Skip validation if we just authenticated (ref avoids stale closure issues)
     if (skipNextValidation.current) {
-      console.log('[Auth] Skipping validation - fresh login');
       skipNextValidation.current = false;
+      setSessionValidated(true);
       setLoading(false);
       return;
     }
     async function validateSession() {
-      console.log('[Auth] validateSession called, token:', token ? 'exists' : 'null');
       if (!token) {
-        // No token after initial check means guest user - loading already set to false
+        // No token after initial check means guest user
         setSessionValidated(false);
         setLoading(false);
         return;
       }
       try {
-        console.log('[Auth] Calling verifySession API...');
         const response = await verifySession(token);
-        console.log('[Auth] verifySession response:', response);
         if (response.success && response.authenticated) {
           if (response.user) {
             setUser(response.user);
             localStorage.setItem(STORAGE_KEYS.user, JSON.stringify(response.user));
           }
-          // Only mark session as validated on successful verification
-          console.log('[Auth] Session validated successfully');
           setSessionValidated(true);
         } else {
-          // Token is invalid/expired - silently logout (expected behavior)
-          console.log('[Auth] Session invalid, logging out');
+          // Token is invalid/expired - silently logout
           setSessionValidated(false);
           await handleLogout();
         }
       } catch (err) {
-        // Token validation failed (401, network error, etc.) - this is expected
-        // when user has an expired token. Silently logout without console spam.
-        console.log('[Auth] Session validation error:', err);
+        // Token validation failed - silently logout
         setSessionValidated(false);
         await handleLogout();
       } finally {
@@ -148,7 +139,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const persistAuth = useCallback((authToken: string, profile: UserProfile) => {
     // Mark to skip the next validation - we know the token is valid (just received from server)
-    console.log('[Auth] persistAuth called, setting skipNextValidation=true');
     skipNextValidation.current = true;
     setSessionValidated(true);
     setToken(authToken);

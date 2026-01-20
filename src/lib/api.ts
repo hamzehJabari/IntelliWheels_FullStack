@@ -1,4 +1,4 @@
-import { API_BASE_URL } from './config';
+import { API_BASE_URL, STORAGE_KEYS } from './config';
 import {
 // REMOVED: import { MOCK_CARS } from './mockData' - no synthetic data fallbacks
   AnalyticsInsights,
@@ -27,7 +27,7 @@ interface RequestOptions<TResponse = any> {
 }
 
 async function apiRequest<T = any>(path: string, options: RequestOptions<T> = {}): Promise<T> {
-  const {
+  let {
     method = 'GET',
     token,
     body,
@@ -36,6 +36,15 @@ async function apiRequest<T = any>(path: string, options: RequestOptions<T> = {}
     isFormData,
     fallback,
   } = options;
+
+  // 🔥 AUTO-TOKEN FIX: If no token was passed, try to grab it from localStorage
+  // This ensures API calls always have the token if the user is logged in
+  if (!token && typeof window !== 'undefined') {
+    const storedToken = localStorage.getItem(STORAGE_KEYS.token);
+    if (storedToken) {
+      token = storedToken;
+    }
+  }
 
   const finalHeaders = new Headers(headers ?? {});
   // Only set Content-Type for non-GET requests that have a body
