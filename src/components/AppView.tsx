@@ -312,6 +312,41 @@ const TRANSLATIONS = {
     loadingDealers: 'Loading dealers...',
     noListings: 'No listings match your filters yet.',
     noFavorites: 'No favorites yet.',
+    // Add Listing Form
+    formRequiredInfo: 'Required Information',
+    formVehicleSpecs: 'Vehicle Specifications (Optional)',
+    formAdditionalDetails: 'Additional Details (Optional)',
+    formMakeLabel: 'Make',
+    formModelLabel: 'Model',
+    formYearLabel: 'Year',
+    formPriceLabel: 'Price',
+    formYearPlaceholder: 'e.g. 2023',
+    formPricePlaceholder: 'e.g. 25000',
+    formBodyStylePlaceholder: 'Body style (Sedan, SUV, etc.)',
+    formHorsepowerPlaceholder: 'Horsepower',
+    formEnginePlaceholder: 'Engine (e.g. 2.0L Turbo)',
+    formFuelEconomyPlaceholder: 'Fuel economy (e.g. 12km/L)',
+    formImageUrlPlaceholder: 'Image URL (or upload below)',
+    formTrimPlaceholder: 'Trim (SE, Sport, etc.)',
+    formExteriorColorPlaceholder: 'Exterior Color',
+    formInteriorColorPlaceholder: 'Interior Color',
+    formCityPlaceholder: 'City',
+    formNeighborhoodPlaceholder: 'Neighborhood',
+    formDescriptionPlaceholder: 'Description',
+    // My Listings
+    myListingsTitle: 'My Listings',
+    myListingsSubtitle: 'Manage and edit your posted vehicles',
+    myListingsEmpty: 'You haven\'t posted any listings yet.',
+    myListingsCreateFirst: 'Create your first listing',
+    myListingsEdit: 'Edit',
+    myListingsDelete: 'Delete',
+    myListingsDeleting: 'Deleting...',
+    myListingsConfirmDelete: 'Are you sure you want to delete this listing?',
+    // Price display
+    priceFrom: 'from',
+    priceTo: 'to',
+    priceRange: 'Price Range',
+    priceEstimated: 'Estimated Price',
   },
   ar: {
     tagline: 'منصة سيارات ذكية',
@@ -524,6 +559,41 @@ const TRANSLATIONS = {
     loadingDealers: 'جاري تحميل الوكلاء...',
     noListings: 'لا توجد إعلانات تطابق الفلاتر المحددة.',
     noFavorites: 'لا توجد مفضلات بعد.',
+    // Add Listing Form - نموذج الإضافة
+    formRequiredInfo: 'المعلومات المطلوبة',
+    formVehicleSpecs: 'مواصفات السيارة (اختياري)',
+    formAdditionalDetails: 'تفاصيل إضافية (اختياري)',
+    formMakeLabel: 'الشركة',
+    formModelLabel: 'الموديل',
+    formYearLabel: 'السنة',
+    formPriceLabel: 'السعر',
+    formYearPlaceholder: 'مثال: 2023',
+    formPricePlaceholder: 'مثال: 25000',
+    formBodyStylePlaceholder: 'نوع الهيكل (سيدان، SUV، إلخ)',
+    formHorsepowerPlaceholder: 'قوة المحرك',
+    formEnginePlaceholder: 'المحرك (مثال: 2.0L تيربو)',
+    formFuelEconomyPlaceholder: 'استهلاك الوقود (مثال: 12 كم/لتر)',
+    formImageUrlPlaceholder: 'رابط الصورة (أو ارفع أدناه)',
+    formTrimPlaceholder: 'الفئة (SE، Sport، إلخ)',
+    formExteriorColorPlaceholder: 'لون خارجي',
+    formInteriorColorPlaceholder: 'لون داخلي',
+    formCityPlaceholder: 'المدينة',
+    formNeighborhoodPlaceholder: 'الحي',
+    formDescriptionPlaceholder: 'الوصف',
+    // My Listings - سياراتي المعروضة
+    myListingsTitle: 'سياراتي المعروضة',
+    myListingsSubtitle: 'إدارة وتعديل السيارات التي عرضتها',
+    myListingsEmpty: 'لم تقم بعرض أي سيارات بعد.',
+    myListingsCreateFirst: 'أنشئ أول إعلان لك',
+    myListingsEdit: 'تعديل',
+    myListingsDelete: 'حذف',
+    myListingsDeleting: 'جاري الحذف...',
+    myListingsConfirmDelete: 'هل أنت متأكد من حذف هذا الإعلان؟',
+    // Price display
+    priceFrom: 'من',
+    priceTo: 'إلى',
+    priceRange: 'نطاق السعر',
+    priceEstimated: 'السعر المقدر',
   },
 } as const;
 
@@ -1395,14 +1465,16 @@ export function AppView() {
   };
 
   const hydrateFromVision = (attributes: VisionSuggestion) => {
+    // Only fill empty fields - never override user-entered data
     setListingForm((prev) => ({
       ...prev,
-      make: attributes.make || prev.make,
-      model: attributes.model || prev.model,
-      year: attributes.year ? String(attributes.year) : prev.year,
-      bodyStyle: attributes.bodyStyle || prev.bodyStyle,
-      price: attributes.estimatedPrice ? String(attributes.estimatedPrice) : prev.price,
-      description: attributes.conditionDescription || prev.description,
+      make: prev.make || attributes.make || '',
+      model: prev.model || attributes.model || '',
+      year: prev.year || (attributes.year ? String(attributes.year) : ''),
+      bodyStyle: prev.bodyStyle || attributes.bodyStyle || '',
+      // Never override price - user might have used Price Assist
+      price: prev.price || (attributes.estimatedPrice ? String(attributes.estimatedPrice) : ''),
+      description: prev.description || attributes.conditionDescription || '',
     }));
   };
 
@@ -1536,12 +1608,16 @@ export function AppView() {
     });
   };
 
+  const [priceAssistLoading, setPriceAssistLoading] = useState(false);
+
   const handlePriceAssist = async () => {
     if (!requireAuth()) return;
     if (!listingForm.make || !listingForm.model || !listingForm.year) {
       showToast('Add make, model, and year first', 'info');
       return;
     }
+    setPriceAssistLoading(true);
+    showToast('Calculating fair price...', 'info');
     const payload: PriceEstimatePayload = {
       make: listingForm.make,
       model: listingForm.model,
@@ -1559,12 +1635,15 @@ export function AppView() {
           range: response.range,
         });
         handleListingInput('price', String(Math.round(response.estimate)));
+        showToast(`Price estimated: ${response.currency} ${Math.round(response.estimate).toLocaleString()}`, 'success');
       } else {
         const errorMessage = (response as { error?: string }).error;
         showToast(errorMessage || 'Unable to generate estimate', 'error');
       }
     } catch (err: any) {
       showToast(err.message || 'Unable to generate estimate', 'error');
+    } finally {
+      setPriceAssistLoading(false);
     }
   };
 
@@ -2140,7 +2219,7 @@ export function AppView() {
         <p className={`mt-3 line-clamp-3 text-sm ${resolvedTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>{car.description}</p>
       )}
       <button
-        className="mt-4 w-full rounded-xl bg-sky-600 py-2 text-sm font-semibold text-white hover:bg-sky-700"
+        className={`mt-4 w-full rounded-xl py-2 text-sm font-semibold text-white ${resolvedTheme === 'dark' ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-sky-600 hover:bg-sky-700'}`}
         onClick={() => handleOpenCarDetails(car.id)}
       >
         {copy.listingViewDetails}
@@ -4086,13 +4165,13 @@ export function AppView() {
             )}
 
             {myListings.length === 0 && (
-              <div className="rounded-3xl border border-dashed border-slate-200 bg-slate-50 p-8 text-center">
-                <p className="text-slate-500 mb-4">No personal listings yet.</p>
+              <div className={`rounded-3xl border border-dashed p-8 text-center ${resolvedTheme === 'dark' ? 'border-slate-600 bg-slate-800' : 'border-slate-200 bg-slate-50'}`}>
+                <p className={`mb-4 ${resolvedTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>{copy.myListingsEmpty}</p>
                 <button
                   onClick={() => setActivePage('addListing')}
                   className="rounded-2xl bg-emerald-600 px-6 py-3 text-sm font-semibold text-white hover:bg-emerald-700"
                 >
-                  Create Your First Listing
+                  {copy.myListingsCreateFirst}
                 </button>
               </div>
             )}
@@ -4107,11 +4186,11 @@ export function AppView() {
               <div className={`rounded-2xl border p-4 ${resolvedTheme === 'dark' ? 'border-indigo-500/30 bg-indigo-900/20' : 'border-indigo-200 bg-indigo-50/50'}`}>
                 <div className="flex items-center gap-2 mb-3">
                   <span className="text-indigo-500">★</span>
-                  <p className={`text-sm font-semibold ${resolvedTheme === 'dark' ? 'text-indigo-300' : 'text-indigo-700'}`}>Required Information</p>
+                  <p className={`text-sm font-semibold ${resolvedTheme === 'dark' ? 'text-indigo-300' : 'text-indigo-700'}`}>{copy.formRequiredInfo}</p>
                 </div>
                 <div className="grid gap-4 md:grid-cols-2">
                   <div>
-                    <label className={`text-xs font-medium ${resolvedTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>Make <span className="text-red-500">*</span></label>
+                    <label className={`text-xs font-medium ${resolvedTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>{copy.formMakeLabel} <span className="text-red-500">*</span></label>
                     <select
                       name="listing-make"
                       id="listing-make"
@@ -4127,7 +4206,7 @@ export function AppView() {
                     </select>
                   </div>
                   <div>
-                    <label className={`text-xs font-medium ${resolvedTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>Model <span className="text-red-500">*</span></label>
+                    <label className={`text-xs font-medium ${resolvedTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>{copy.formModelLabel} <span className="text-red-500">*</span></label>
                     <select
                       name="listing-model"
                       id="listing-model"
@@ -4144,13 +4223,13 @@ export function AppView() {
                     </select>
                   </div>
                   <div>
-                    <label className={`text-xs font-medium ${resolvedTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>Year <span className="text-red-500">*</span></label>
-                    <input name="listing-year" id="listing-year" value={listingForm.year} onChange={(event) => handleListingInput('year', event.target.value)} placeholder="e.g. 2023" className={inputFieldClass} required type="number" min="1900" max={new Date().getFullYear() + 2} />
+                    <label className={`text-xs font-medium ${resolvedTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>{copy.formYearLabel} <span className="text-red-500">*</span></label>
+                    <input name="listing-year" id="listing-year" value={listingForm.year} onChange={(event) => handleListingInput('year', event.target.value)} placeholder={copy.formYearPlaceholder} className={inputFieldClass} required type="number" min="1900" max={new Date().getFullYear() + 2} />
                   </div>
                   <div>
-                    <label className={`text-xs font-medium ${resolvedTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>Price <span className="text-red-500">*</span></label>
+                    <label className={`text-xs font-medium ${resolvedTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>{copy.formPriceLabel} <span className="text-red-500">*</span></label>
                     <div className="flex gap-2">
-                      <input name="listing-price" id="listing-price" value={listingForm.price} onChange={(event) => handleListingInput('price', event.target.value)} placeholder="e.g. 25000" className={`flex-1 ${inputFieldClass}`} required type="number" min="0" />
+                      <input name="listing-price" id="listing-price" value={listingForm.price} onChange={(event) => handleListingInput('price', event.target.value)} placeholder={copy.formPricePlaceholder} className={`flex-1 ${inputFieldClass}`} required type="number" min="0" />
                       <select name="listing-currency" id="listing-currency" value={listingForm.currency} onChange={(event) => handleListingInput('currency', event.target.value)} className={`w-24 ${inputFieldClass}`}>
                         {CURRENCY_OPTIONS.map((currency) => (
                           <option key={currency} value={currency}>{currency}</option>
@@ -4163,10 +4242,10 @@ export function AppView() {
               
               {/* Optional Basic Details */}
               <div className={`rounded-2xl border p-4 ${resolvedTheme === 'dark' ? 'border-slate-600 bg-slate-800/50' : 'border-slate-200 bg-slate-50/50'}`}>
-                <p className={`mb-3 text-sm font-semibold ${resolvedTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>Vehicle Specifications (Optional)</p>
+                <p className={`mb-3 text-sm font-semibold ${resolvedTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>{copy.formVehicleSpecs}</p>
                 <div className="grid gap-4 md:grid-cols-2">
-                  <input name="listing-bodystyle" id="listing-bodystyle" value={listingForm.bodyStyle} onChange={(event) => handleListingInput('bodyStyle', event.target.value)} placeholder="Body style (Sedan, SUV, etc.)" className={inputFieldClass} />
-                  <input name="listing-horsepower" id="listing-horsepower" value={listingForm.horsepower} onChange={(event) => handleListingInput('horsepower', event.target.value)} placeholder="Horsepower" className={inputFieldClass} type="number" min="0" />
+                  <input name="listing-bodystyle" id="listing-bodystyle" value={listingForm.bodyStyle} onChange={(event) => handleListingInput('bodyStyle', event.target.value)} placeholder={copy.formBodyStylePlaceholder} className={inputFieldClass} />
+                  <input name="listing-horsepower" id="listing-horsepower" value={listingForm.horsepower} onChange={(event) => handleListingInput('horsepower', event.target.value)} placeholder={copy.formHorsepowerPlaceholder} className={inputFieldClass} type="number" min="0" />
                   {availableEngineOptions.length > 0 ? (
                     <select
                       name="listing-engine"
@@ -4182,9 +4261,9 @@ export function AppView() {
                       ))}
                     </select>
                   ) : (
-                    <input name="listing-engine" id="listing-engine" value={listingForm.engine} onChange={(event) => handleListingInput('engine', event.target.value)} placeholder="Engine (e.g. 2.0L Turbo)" className={inputFieldClass} />
+                    <input name="listing-engine" id="listing-engine" value={listingForm.engine} onChange={(event) => handleListingInput('engine', event.target.value)} placeholder={copy.formEnginePlaceholder} className={inputFieldClass} />
                   )}
-                  <input name="listing-fueleconomy" id="listing-fueleconomy" value={listingForm.fuelEconomy} onChange={(event) => handleListingInput('fuelEconomy', event.target.value)} placeholder="Fuel economy (e.g. 12km/L)" className={inputFieldClass} />
+                  <input name="listing-fueleconomy" id="listing-fueleconomy" value={listingForm.fuelEconomy} onChange={(event) => handleListingInput('fuelEconomy', event.target.value)} placeholder={copy.formFuelEconomyPlaceholder} className={inputFieldClass} />
                   <input
                     name="listing-odometer"
                     id="listing-odometer"
@@ -4195,13 +4274,13 @@ export function AppView() {
                     type="number"
                     min="0"
                   />
-                  <input name="listing-image" id="listing-image" value={listingForm.image} onChange={(event) => handleListingInput('image', event.target.value)} placeholder="Image URL (or upload below)" className={inputFieldClass} />
+                  <input name="listing-image" id="listing-image" value={listingForm.image} onChange={(event) => handleListingInput('image', event.target.value)} placeholder={copy.formImageUrlPlaceholder} className={inputFieldClass} />
                 </div>
               </div>
               
               {/* Additional Vehicle Details */}
               <div className={`rounded-2xl border p-4 ${resolvedTheme === 'dark' ? 'border-slate-600 bg-slate-800/50' : 'border-slate-200 bg-slate-50/50'}`}>
-                <p className={`mb-3 text-sm font-semibold ${resolvedTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>Additional Details (Optional)</p>
+                <p className={`mb-3 text-sm font-semibold ${resolvedTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>{copy.formAdditionalDetails}</p>
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                   <select name="listing-category" value={listingForm.category} onChange={(e) => handleListingInput('category', e.target.value)} className={inputFieldClass}>
                     {CATEGORY_OPTIONS.filter(c => c.value !== 'all').map(opt => (
@@ -4233,19 +4312,24 @@ export function AppView() {
                       <option key={opt.value} value={opt.value}>{opt.label}</option>
                     ))}
                   </select>
-                  <input name="listing-trim" value={listingForm.trim} onChange={(e) => handleListingInput('trim', e.target.value)} placeholder="Trim (SE, Sport, etc.)" className={inputFieldClass} />
-                  <input name="listing-exteriorcolor" value={listingForm.exteriorColor} onChange={(e) => handleListingInput('exteriorColor', e.target.value)} placeholder="Exterior Color" className={inputFieldClass} />
-                  <input name="listing-interiorcolor" value={listingForm.interiorColor} onChange={(e) => handleListingInput('interiorColor', e.target.value)} placeholder="Interior Color" className={inputFieldClass} />
-                  <input name="listing-city" value={listingForm.city} onChange={(e) => handleListingInput('city', e.target.value)} placeholder="City" className={inputFieldClass} />
-                  <input name="listing-neighborhood" value={listingForm.neighborhood} onChange={(e) => handleListingInput('neighborhood', e.target.value)} placeholder="Neighborhood" className={inputFieldClass} />
+                  <input name="listing-trim" value={listingForm.trim} onChange={(e) => handleListingInput('trim', e.target.value)} placeholder={copy.formTrimPlaceholder} className={inputFieldClass} />
+                  <input name="listing-exteriorcolor" value={listingForm.exteriorColor} onChange={(e) => handleListingInput('exteriorColor', e.target.value)} placeholder={copy.formExteriorColorPlaceholder} className={inputFieldClass} />
+                  <input name="listing-interiorcolor" value={listingForm.interiorColor} onChange={(e) => handleListingInput('interiorColor', e.target.value)} placeholder={copy.formInteriorColorPlaceholder} className={inputFieldClass} />
+                  <input name="listing-city" value={listingForm.city} onChange={(e) => handleListingInput('city', e.target.value)} placeholder={copy.formCityPlaceholder} className={inputFieldClass} />
+                  <input name="listing-neighborhood" value={listingForm.neighborhood} onChange={(e) => handleListingInput('neighborhood', e.target.value)} placeholder={copy.formNeighborhoodPlaceholder} className={inputFieldClass} />
                 </div>
               </div>
               
-              <textarea name="listing-description" id="listing-description" value={listingForm.description} onChange={(event) => handleListingInput('description', event.target.value)} placeholder="Description" className={`h-32 w-full ${inputFieldClass}`}
+              <textarea name="listing-description" id="listing-description" value={listingForm.description} onChange={(event) => handleListingInput('description', event.target.value)} placeholder={copy.formDescriptionPlaceholder} className={`h-32 w-full ${inputFieldClass}`}
               />
               <div className="flex flex-wrap gap-3">
-                <button type="button" className="rounded-2xl bg-sky-600 px-4 py-2 text-sm font-semibold text-white" onClick={handlePriceAssist}>
-                  {copy.priceAssistLabel}
+                <button 
+                  type="button" 
+                  className={`rounded-2xl px-4 py-2 text-sm font-semibold text-white ${priceAssistLoading ? 'bg-slate-400 cursor-not-allowed' : 'bg-sky-600 hover:bg-sky-700'}`} 
+                  onClick={handlePriceAssist}
+                  disabled={priceAssistLoading}
+                >
+                  {priceAssistLoading ? '⏳ Calculating...' : copy.priceAssistLabel}
                 </button>
                 <label htmlFor="upload-photo-input" className="cursor-pointer rounded-2xl border border-dashed border-slate-300 px-4 py-2 text-sm font-semibold text-slate-900">
                   {copy.uploadPhotoLabel}
@@ -4594,9 +4678,11 @@ export function AppView() {
           <div className="border-t border-slate-100 bg-white/95 px-4 py-4 backdrop-blur-xl dark:border-slate-800 dark:bg-slate-900/95 md:hidden">
             <div className="space-y-1">
               {[
+                { key: 'home', label: copy.navHome },
                 { key: 'listings', label: copy.navCatalog },
                 { key: 'dealers', label: copy.navDealers },
                 { key: 'favorites', label: copy.navFavorites },
+                { key: 'addListing', label: copy.navAddListing },
                 { key: 'chatbot', label: copy.navChatbot },
                 { key: 'myListings', label: copy.navMyListings },
                 { key: 'profile', label: copy.navProfile },
@@ -4614,8 +4700,8 @@ export function AppView() {
           </div>
         )}
       </header>
-      <div className="mx-auto max-w-7xl space-y-8 px-4 py-10">
-        <main className={`rounded-3xl ${mainSurfaceClass} p-6 shadow-lg`}>
+      <div className="mx-auto max-w-7xl space-y-4 sm:space-y-8 px-2 sm:px-4 py-4 sm:py-10">
+        <main className={`rounded-xl sm:rounded-3xl ${mainSurfaceClass} p-3 sm:p-6 shadow-lg`}>
           {authLoading ? <p className="text-center text-slate-500">Loading account...</p> : renderContent()}
         </main>
       </div>

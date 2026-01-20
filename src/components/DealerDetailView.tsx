@@ -71,9 +71,9 @@ export function DealerDetailView({ dealerId }: DealerDetailViewProps) {
           <button
             type="button"
             className="mt-6 w-full rounded-2xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white"
-            onClick={() => router.back()}
+            onClick={() => router.push('/')}
           >
-            Go back
+            Go to listings
           </button>
         </div>
       </div>
@@ -86,9 +86,9 @@ export function DealerDetailView({ dealerId }: DealerDetailViewProps) {
         <button
           type="button"
           className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm"
-          onClick={() => router.back()}
+          onClick={() => router.push('/')}
         >
-          ← Back
+          ← Back to listings
         </button>
         <div className="overflow-hidden rounded-3xl border border-slate-100 bg-white shadow">
           <div className="h-72 w-full bg-slate-100">

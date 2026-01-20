@@ -361,9 +361,9 @@ export function CarDetailView({ carId }: CarDetailViewProps) {
           <button
             type="button"
             className="mt-6 w-full rounded-2xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white"
-            onClick={() => router.back()}
+            onClick={() => router.push('/')}
           >
-            Go back
+            Go to listings
           </button>
         </div>
       </div>
@@ -376,7 +376,7 @@ export function CarDetailView({ carId }: CarDetailViewProps) {
         <button
           type="button"
           className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm"
-          onClick={() => router.back()}
+          onClick={() => router.push('/')}
         >
           ← Back to listings
         </button>
@@ -615,7 +615,7 @@ export function CarDetailView({ carId }: CarDetailViewProps) {
                         value={reviewComment}
                         onChange={(e) => setReviewComment(e.target.value)}
                         placeholder="Share your thoughts about this car..."
-                        className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                        className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
                         rows={3}
                         maxLength={1000}
                       />
