@@ -78,20 +78,42 @@ def get_user_from_token(token):
                 (token,)
             ).fetchone()
             if session_check:
-                print(f"[Auth Token] Session found: user_id={session_check['user_id']}, expires={session_check['expires_at']}")
+                # Get current server time for comparison debugging
+                server_time = db.execute("SELECT NOW() as now, NOW() AT TIME ZONE 'UTC' as utc_now").fetchone()
+                print(f"[Auth Token] Session found: user_id={session_check['user_id']}")
+                print(f"[Auth Token] expires_at={session_check['expires_at']}")
+                print(f"[Auth Token] server NOW()={server_time['now']}, UTC NOW={server_time['utc_now']}")
+                
+                # Check if session is expired
+                expires_at = session_check['expires_at']
+                if expires_at:
+                    # Compare in Python to debug
+                    from datetime import datetime, timezone
+                    utc_now = datetime.now(timezone.utc).replace(tzinfo=None)  # Make naive for comparison
+                    if hasattr(expires_at, 'replace'):
+                        expires_naive = expires_at.replace(tzinfo=None) if expires_at.tzinfo else expires_at
+                    else:
+                        expires_naive = expires_at
+                    print(f"[Auth Token] Python UTC now (naive): {utc_now}")
+                    print(f"[Auth Token] expires_at (naive): {expires_naive}")
+                    print(f"[Auth Token] Is expired? {utc_now > expires_naive if expires_naive else 'N/A'}")
             else:
                 print(f"[Auth Token] NO session found for token {token[:10]}...")
                 # List all sessions for debugging
                 all_sessions = db.execute('SELECT token, user_id FROM user_sessions LIMIT 5').fetchall()
                 print(f"[Auth Token] All sessions in DB: {[(s['token'][:10] + '...', s['user_id']) for s in all_sessions]}")
             
-            # PostgreSQL: use NOW() for UTC comparison (simpler)
+            # PostgreSQL: Use explicit UTC comparison
+            # Store expires_at as naive UTC, compare against current UTC time
             row = db.execute('''
                 SELECT u.id, u.username, u.email, u.role, u.created_at, u.phone
                 FROM users u
                 JOIN user_sessions s ON u.id = s.user_id
-                WHERE s.token = %s AND (s.expires_at IS NULL OR s.expires_at > NOW())
+                WHERE s.token = %s AND (s.expires_at IS NULL OR s.expires_at > (NOW() AT TIME ZONE 'UTC'))
             ''', (token,)).fetchone()
+            
+            if not row and session_check:
+                print(f"[Auth Token] Session exists but JOIN query returned NULL - likely timezone/expiry issue")
         else:
             # SQLite: use CURRENT_TIMESTAMP (already UTC)
             row = db.execute('''
@@ -171,9 +193,10 @@ def signup():
         )
         user_id = cursor.lastrowid
         
-        # Create session with UTC timestamp
+        # Create session with naive UTC timestamp (for TIMESTAMP column compatibility)
         token = generate_token()
-        expires_at = datetime.now(timezone.utc) + timedelta(days=7)
+        expires_at_utc = datetime.now(timezone.utc) + timedelta(days=7)
+        expires_at = expires_at_utc.replace(tzinfo=None)  # Strip timezone for PostgreSQL TIMESTAMP
         db.execute(
             'INSERT INTO user_sessions (token, user_id, expires_at) VALUES (?, ?, ?)',
             (token, user_id, expires_at)
@@ -222,10 +245,14 @@ def login():
     # Use constant-time comparison via check_password_hash
     if user and check_password_hash(user['password_hash'], password):
         token = generate_token()
-        expires_at = datetime.now(timezone.utc) + timedelta(days=7)
+        # Calculate expiry time - store as naive UTC datetime for PostgreSQL compatibility
+        expires_at_utc = datetime.now(timezone.utc) + timedelta(days=7)
+        # Convert to naive datetime (strip timezone info) since our column is TIMESTAMP not TIMESTAMPTZ
+        expires_at = expires_at_utc.replace(tzinfo=None)
         
         # Insert new session (cleanup old sessions later via cron if needed)
-        print(f"[Auth Login] Creating session for user_id={user['id']}, token={token[:10]}..., expires={expires_at}")
+        print(f"[Auth Login] Creating session for user_id={user['id']}, token={token[:10]}...")
+        print(f"[Auth Login] expires_at (naive UTC): {expires_at}")
         try:
             db.execute(
                 'INSERT INTO user_sessions (token, user_id, expires_at) VALUES (?, ?, ?)',
@@ -240,7 +267,7 @@ def login():
                 (token,)
             ).fetchone()
             if verify_row:
-                print(f"[Auth Login] VERIFIED: Session exists in DB - user_id={verify_row['user_id']}")
+                print(f"[Auth Login] VERIFIED: Session exists in DB - user_id={verify_row['user_id']}, expires={verify_row['expires_at']}")
             else:
                 print(f"[Auth Login] WARNING: Session NOT found after commit!")
                 
@@ -575,7 +602,8 @@ def google_auth():
     
     # Create session
     token = generate_token()
-    expires_at = datetime.now(timezone.utc) + timedelta(days=7)
+    expires_at_utc = datetime.now(timezone.utc) + timedelta(days=7)
+    expires_at = expires_at_utc.replace(tzinfo=None)  # Strip timezone for PostgreSQL TIMESTAMP
     db.execute(
         'INSERT INTO user_sessions (token, user_id, expires_at) VALUES (?, ?, ?)',
         (token, user_id, expires_at)
