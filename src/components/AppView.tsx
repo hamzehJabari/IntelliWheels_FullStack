@@ -983,15 +983,15 @@ export function AppView() {
   const handleOpenCarDetails = useCallback(
     (carId: number) => {
       // Pass current page as 'from' so the back button knows where to return
-      router.push(`/cars/${carId}?from=${currentPage}`);
+      router.push(`/cars/${carId}?from=${activePage}`);
     },
-    [router, currentPage]
+    [router, activePage]
   );
   const handleOpenDealer = useCallback(
     (dealerId: number) => {
-      router.push(`/dealers/${dealerId}?from=${currentPage}`);
+      router.push(`/dealers/${dealerId}?from=${activePage}`);
     },
-    [router, currentPage]
+    [router, activePage]
   );
   const inputFieldClass = resolvedTheme === 'dark'
     ? 'rounded-2xl border border-slate-600 bg-slate-700 p-3 text-white placeholder-slate-400 focus:border-sky-500 focus:outline-none'

@@ -19,16 +19,16 @@ def ensure_messages_tables():
     
     try:
         if is_postgres():
-            # PostgreSQL - production already has tables with buyer_id/seller_id
+            # PostgreSQL - production already has tables with buyer_id/seller_id/car_id columns
             db.execute('''
                 CREATE TABLE IF NOT EXISTS conversations (
                     id SERIAL PRIMARY KEY,
                     buyer_id INTEGER NOT NULL REFERENCES users(id),
                     seller_id INTEGER NOT NULL REFERENCES users(id),
-                    listing_id INTEGER,
+                    car_id INTEGER,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    UNIQUE(buyer_id, seller_id, listing_id)
+                    UNIQUE(buyer_id, seller_id, car_id)
                 )
             ''')
             db.execute('''
@@ -89,9 +89,9 @@ def get_conversations():
     
     try:
         if is_postgres():
-            # PostgreSQL uses buyer_id/seller_id columns
+            # PostgreSQL uses buyer_id/seller_id/car_id columns
             rows = db.execute('''
-                SELECT c.id, c.buyer_id, c.seller_id, c.listing_id, c.updated_at,
+                SELECT c.id, c.buyer_id, c.seller_id, c.car_id, c.updated_at,
                        CASE WHEN c.buyer_id = %s THEN u2.username ELSE u1.username END as other_username,
                        CASE WHEN c.buyer_id = %s THEN c.seller_id ELSE c.buyer_id END as other_user_id,
                        car.make, car.model, car.year,
@@ -100,7 +100,7 @@ def get_conversations():
                 FROM conversations c
                 JOIN users u1 ON c.buyer_id = u1.id
                 JOIN users u2 ON c.seller_id = u2.id
-                LEFT JOIN cars car ON c.listing_id = car.id
+                LEFT JOIN cars car ON c.car_id = car.id
                 WHERE c.buyer_id = %s OR c.seller_id = %s
                 ORDER BY c.updated_at DESC
             ''', (user['id'], user['id'], user['id'], user['id'], user['id'])).fetchall()
@@ -122,11 +122,13 @@ def get_conversations():
         
         conversations = []
         for row in rows:
+            # PostgreSQL uses car_id, SQLite uses listing_id
+            car_id = row.get('car_id') or row.get('listing_id')
             conversations.append({
                 'id': row['id'],
                 'other_user_id': row['other_user_id'],
                 'other_username': row['other_username'],
-                'listing_id': row['listing_id'],
+                'listing_id': car_id,  # Keep as listing_id for API compatibility
                 'listing_title': f"{row['make']} {row['model']} {row['year']}" if row['make'] else None,
                 'last_message': row['last_message'],
                 'unread_count': row['unread_count'] or 0,
@@ -268,23 +270,23 @@ def send_message():
         
         # Find or create conversation
         if is_postgres():
-            # Check for existing conversation in either direction
+            # Check for existing conversation in either direction (PostgreSQL uses car_id)
             if listing_id:
                 conv = db.execute('''
                     SELECT id FROM conversations 
                     WHERE ((buyer_id = %s AND seller_id = %s) OR (buyer_id = %s AND seller_id = %s))
-                    AND listing_id = %s
+                    AND car_id = %s
                 ''', (buyer_id, seller_id, seller_id, buyer_id, listing_id)).fetchone()
             else:
                 conv = db.execute('''
                     SELECT id FROM conversations 
                     WHERE ((buyer_id = %s AND seller_id = %s) OR (buyer_id = %s AND seller_id = %s))
-                    AND listing_id IS NULL
+                    AND car_id IS NULL
                 ''', (buyer_id, seller_id, seller_id, buyer_id)).fetchone()
             
             if not conv:
                 cursor = db.execute('''
-                    INSERT INTO conversations (buyer_id, seller_id, listing_id) VALUES (%s, %s, %s) RETURNING id
+                    INSERT INTO conversations (buyer_id, seller_id, car_id) VALUES (%s, %s, %s) RETURNING id
                 ''', (buyer_id, seller_id, listing_id))
                 conv_id = cursor.fetchone()['id']
             else:

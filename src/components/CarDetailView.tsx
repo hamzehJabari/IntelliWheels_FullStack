@@ -851,19 +851,19 @@ export function CarDetailView({ carId }: CarDetailViewProps) {
                             const payload = { name: cbName || user?.username, phone: cbPhone, message: cbMessage, preferred_time: cbPreferredTime };
                             const resp = await requestCallback(numericId, payload, token);
                             if (resp.success) {
-                              setCbSuccess('Callback request submitted — we will contact you shortly.');
+                              showToast('Callback request submitted — we will contact you shortly.', 'success');
                               setCbName('');
                               setCbPhone('');
                               setCbMessage('');
                               setCbPreferredTime('');
                               setShowCallbackForm(false);
                             } else {
-                              setCbSuccess('Failed to submit callback request.');
+                              showToast(resp.error || 'Failed to submit callback request.', 'error');
                               console.error('Callback error', resp.error);
                             }
                           } catch (err) {
                             console.error('Callback submission failed', err);
-                            setCbSuccess('Failed to submit callback request.');
+                            showToast('Failed to submit callback request.', 'error');
                           } finally {
                             setCbSubmitting(false);
                           }
