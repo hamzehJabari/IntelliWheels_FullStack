@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify, current_app
-from ..db import get_db
+from ..db import get_db, is_postgres
 from ..security import sanitize_string, sanitize_search_query, validate_text_field, validate_integer, validate_float, require_auth
 import json
 
@@ -52,6 +52,8 @@ def car_row_to_dict(row):
 def get_cars():
     db = get_db()
     args = request.args
+    postgres = is_postgres()
+    ph = '%s' if postgres else '?'
     
     base_query = "FROM cars WHERE 1=1"
     params = []
@@ -60,35 +62,35 @@ def get_cars():
     make = args.get('make')
     if make and make != 'all':
         make = sanitize_string(make)[:50]  # Limit length
-        base_query += " AND make = ?"
+        base_query += f" AND make = {ph}"
         params.append(make)
     
     # Category filter
     category = args.get('category')
     if category and category != 'all':
         category = sanitize_string(category)[:20]
-        base_query += " AND (category = ? OR category IS NULL)"
+        base_query += f" AND (category = {ph} OR category IS NULL)"
         params.append(category)
     
     # Condition filter
     condition = args.get('condition')
     if condition and condition != 'all':
         condition = sanitize_string(condition)[:20]
-        base_query += " AND condition = ?"
+        base_query += f" AND condition = {ph}"
         params.append(condition)
     
     # Transmission filter
     transmission = args.get('transmission')
     if transmission and transmission != 'all':
         transmission = sanitize_string(transmission)[:20]
-        base_query += " AND transmission = ?"
+        base_query += f" AND transmission = {ph}"
         params.append(transmission)
     
     # Fuel type filter
     fuel_type = args.get('fuelType')
     if fuel_type and fuel_type != 'all':
         fuel_type = sanitize_string(fuel_type)[:20]
-        base_query += " AND fuel_type = ?"
+        base_query += f" AND fuel_type = {ph}"
         params.append(fuel_type)
     
     # Sanitize search query
@@ -96,12 +98,20 @@ def get_cars():
     if search:
         search = sanitize_search_query(search)[:100]  # Limit length
         search_pattern = f"%{search}%"
-        base_query += " AND (make LIKE ? ESCAPE '\\' OR model LIKE ? ESCAPE '\\')"
+        base_query += f" AND (make LIKE {ph} ESCAPE '\\' OR model LIKE {ph} ESCAPE '\\')"
         params.extend([search_pattern, search_pattern])
 
     # Get total count first
-    count_cursor = db.execute(f"SELECT COUNT(*) as total {base_query}", params)
-    total = count_cursor.fetchone()['total']
+    try:
+        count_cursor = db.execute(f"SELECT COUNT(*) as total {base_query}", params)
+        total = count_cursor.fetchone()['total']
+    except Exception as e:
+        print(f"Count query error: {e}")
+        try:
+            db.rollback()
+        except:
+            pass
+        return jsonify({'success': False, 'error': 'Database error'}), 500
 
     # Validate pagination parameters - default to 1000 (effectively all) if not specified
     try:
@@ -111,11 +121,19 @@ def get_cars():
         limit = 1000
         offset = 0
     
-    query = f"SELECT * {base_query} ORDER BY created_at DESC LIMIT ? OFFSET ?"
+    query = f"SELECT * {base_query} ORDER BY created_at DESC LIMIT {ph} OFFSET {ph}"
     params.extend([limit, offset])
 
-    cursor = db.execute(query, params)
-    cars = [car_row_to_dict(row) for row in cursor.fetchall()]
+    try:
+        cursor = db.execute(query, params)
+        cars = [car_row_to_dict(row) for row in cursor.fetchall()]
+    except Exception as e:
+        print(f"Cars query error: {e}")
+        try:
+            db.rollback()
+        except:
+            pass
+        return jsonify({'success': False, 'error': 'Database error'}), 500
     
     return jsonify({'success': True, 'cars': cars, 'total': total})
 
@@ -126,10 +144,19 @@ def get_car(id):
         return jsonify({'success': False, 'error': 'Invalid car ID'}), 400
         
     db = get_db()
-    row = db.execute("SELECT * FROM cars WHERE id = ?", (id,)).fetchone()
-    if row:
-        return jsonify({'success': True, 'car': car_row_to_dict(row)})
-    return jsonify({'success': False, 'error': 'Car not found'}), 404
+    try:
+        ph = '%s' if is_postgres() else '?'
+        row = db.execute(f"SELECT * FROM cars WHERE id = {ph}", (id,)).fetchone()
+        if row:
+            return jsonify({'success': True, 'car': car_row_to_dict(row)})
+        return jsonify({'success': False, 'error': 'Car not found'}), 404
+    except Exception as e:
+        print(f"Get car error: {e}")
+        try:
+            db.rollback()
+        except:
+            pass
+        return jsonify({'success': False, 'error': 'Database error'}), 500
 
 @bp.route('', methods=['POST'])
 def create_car():
@@ -218,13 +245,22 @@ def create_car():
     
     db = get_db()
     try:
-        cursor = db.execute(
-            '''INSERT INTO cars (owner_id, make, model, year, price, currency, odometer_km, description, specs, image_url, video_url, gallery_images, media_gallery, category, condition, exterior_color, interior_color, transmission, fuel_type, regional_spec, payment_type, city, neighborhood, trim)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
-            (owner_id, make, model, year, price, currency, odometer_km, description, json.dumps(specs), image_url, video_url, json.dumps(gallery_images), json.dumps(media_gallery), category, condition, exterior_color, interior_color, transmission, fuel_type, regional_spec, payment_type, city, neighborhood, trim)
-        )
+        if is_postgres():
+            cursor = db.execute(
+                '''INSERT INTO cars (owner_id, make, model, year, price, currency, odometer_km, description, specs, image_url, video_url, gallery_images, media_gallery, category, condition, exterior_color, interior_color, transmission, fuel_type, regional_spec, payment_type, city, neighborhood, trim)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id''',
+                (owner_id, make, model, year, price, currency, odometer_km, description, json.dumps(specs), image_url, video_url, json.dumps(gallery_images), json.dumps(media_gallery), category, condition, exterior_color, interior_color, transmission, fuel_type, regional_spec, payment_type, city, neighborhood, trim)
+            )
+            new_id = cursor.fetchone()['id']
+        else:
+            cursor = db.execute(
+                '''INSERT INTO cars (owner_id, make, model, year, price, currency, odometer_km, description, specs, image_url, video_url, gallery_images, media_gallery, category, condition, exterior_color, interior_color, transmission, fuel_type, regional_spec, payment_type, city, neighborhood, trim)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+                (owner_id, make, model, year, price, currency, odometer_km, description, json.dumps(specs), image_url, video_url, json.dumps(gallery_images), json.dumps(media_gallery), category, condition, exterior_color, interior_color, transmission, fuel_type, regional_spec, payment_type, city, neighborhood, trim)
+            )
+            new_id = cursor.lastrowid
         db.commit()
-        return jsonify({'success': True, 'id': cursor.lastrowid}), 201
+        return jsonify({'success': True, 'id': new_id}), 201
     except Exception as e:
         print(f"Create car error: {e}")
         try:
@@ -242,9 +278,20 @@ def update_car(id):
         return jsonify({'success': False, 'error': 'Authentication required'}), 401
     
     db = get_db()
+    postgres = is_postgres()
+    ph = '%s' if postgres else '?'
     
     # Check if car exists and user owns it
-    car = db.execute("SELECT * FROM cars WHERE id = ?", (id,)).fetchone()
+    try:
+        car = db.execute(f"SELECT * FROM cars WHERE id = {ph}", (id,)).fetchone()
+    except Exception as e:
+        print(f"Update car fetch error: {e}")
+        try:
+            db.rollback()
+        except:
+            pass
+        return jsonify({'success': False, 'error': 'Database error'}), 500
+    
     if not car:
         return jsonify({'success': False, 'error': 'Car not found'}), 404
     
@@ -264,12 +311,12 @@ def update_car(id):
     
     if 'make' in data:
         make = sanitize_string(data['make'])[:50]
-        updates.append("make = ?")
+        updates.append(f"make = {ph}")
         params.append(make)
     
     if 'model' in data:
         model = sanitize_string(data['model'])[:100]
-        updates.append("model = ?")
+        updates.append(f"model = {ph}")
         params.append(model)
     
     if 'year' in data:
@@ -279,7 +326,7 @@ def update_car(id):
             if not valid:
                 return jsonify({'success': False, 'error': error}), 400
             year = int(year)
-        updates.append("year = ?")
+        updates.append(f"year = {ph}")
         params.append(year)
     
     if 'price' in data:
@@ -289,32 +336,32 @@ def update_car(id):
             if not valid:
                 return jsonify({'success': False, 'error': error}), 400
             price = float(price)
-        updates.append("price = ?")
+        updates.append(f"price = {ph}")
         params.append(price)
     
     if 'currency' in data:
         currency = sanitize_string(data['currency'])[:10]
-        updates.append("currency = ?")
+        updates.append(f"currency = {ph}")
         params.append(currency)
     
     if 'description' in data:
         description = sanitize_string(data['description'])[:5000]
-        updates.append("description = ?")
+        updates.append(f"description = {ph}")
         params.append(description)
     
     if 'specs' in data:
         specs = data['specs'] if isinstance(data['specs'], dict) else {}
-        updates.append("specs = ?")
+        updates.append(f"specs = {ph}")
         params.append(json.dumps(specs))
     
     if 'image' in data:
         image_url = sanitize_string(data['image'])[:500]
-        updates.append("image_url = ?")
+        updates.append(f"image_url = {ph}")
         params.append(image_url)
     
     if 'videoUrl' in data:
         video_url = sanitize_string(data['videoUrl'])[:500]
-        updates.append("video_url = ?")
+        updates.append(f"video_url = {ph}")
         params.append(video_url)
     
     if 'galleryImages' in data:
@@ -322,14 +369,14 @@ def update_car(id):
         if not isinstance(gallery_images, list):
             gallery_images = []
         gallery_images = [sanitize_string(url)[:500] for url in gallery_images if isinstance(url, str)]
-        updates.append("gallery_images = ?")
+        updates.append(f"gallery_images = {ph}")
         params.append(json.dumps(gallery_images))
     
     if 'mediaGallery' in data:
         media_gallery = data['mediaGallery']
         if not isinstance(media_gallery, list):
             media_gallery = []
-        updates.append("media_gallery = ?")
+        updates.append(f"media_gallery = {ph}")
         params.append(json.dumps(media_gallery))
     
     if 'odometerKm' in data:
@@ -339,7 +386,7 @@ def update_car(id):
             if not valid:
                 return jsonify({'success': False, 'error': error}), 400
             odometer_km = int(odometer_km)
-        updates.append("odometer_km = ?")
+        updates.append(f"odometer_km = {ph}")
         params.append(odometer_km)
     
     # Handle new optional fields in update
@@ -359,7 +406,7 @@ def update_car(id):
     for frontend_key, db_key, max_len in new_text_fields:
         if frontend_key in data:
             value = sanitize_string(data[frontend_key] or '')[:max_len]
-            updates.append(f"{db_key} = ?")
+            updates.append(f"{db_key} = {ph}")
             params.append(value if value else None)
     
     if not updates:
@@ -372,12 +419,12 @@ def update_car(id):
     params.append(id)
     
     try:
-        query = f"UPDATE cars SET {', '.join(updates)} WHERE id = ?"
+        query = f"UPDATE cars SET {', '.join(updates)} WHERE id = {ph}"
         db.execute(query, params)
         db.commit()
         
         # Return updated car
-        updated_car = db.execute("SELECT * FROM cars WHERE id = ?", (id,)).fetchone()
+        updated_car = db.execute(f"SELECT * FROM cars WHERE id = {ph}", (id,)).fetchone()
         return jsonify({'success': True, 'car': car_row_to_dict(updated_car)})
     except Exception as e:
         print(f"Update car error: {e}")
@@ -396,9 +443,20 @@ def delete_car(id):
         return jsonify({'success': False, 'error': 'Authentication required'}), 401
     
     db = get_db()
+    postgres = is_postgres()
+    ph = '%s' if postgres else '?'
     
     # Check if car exists and user owns it
-    car = db.execute("SELECT * FROM cars WHERE id = ?", (id,)).fetchone()
+    try:
+        car = db.execute(f"SELECT * FROM cars WHERE id = {ph}", (id,)).fetchone()
+    except Exception as e:
+        print(f"Delete car fetch error: {e}")
+        try:
+            db.rollback()
+        except:
+            pass
+        return jsonify({'success': False, 'error': 'Database error'}), 500
+    
     if not car:
         return jsonify({'success': False, 'error': 'Car not found'}), 404
     
@@ -406,7 +464,7 @@ def delete_car(id):
         return jsonify({'success': False, 'error': 'Not authorized to delete this listing'}), 403
     
     try:
-        db.execute("DELETE FROM cars WHERE id = ?", (id,))
+        db.execute(f"DELETE FROM cars WHERE id = {ph}", (id,))
         db.commit()
         return jsonify({'success': True, 'message': 'Listing deleted'})
     except Exception as e:
