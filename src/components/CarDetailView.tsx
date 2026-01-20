@@ -4,7 +4,7 @@ import { useAuth } from '@/context/AuthContext';
 import { fetchCarById, fetchCarReviews, submitReview, deleteReview, fetchFavorites, addFavorite, removeFavorite, requestCallback, sendMessage } from '@/lib/api';
 import { STORAGE_KEYS } from '@/lib/config';
 import { Car, Review, ReviewStats } from '@/lib/types';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 type ThemeMode = 'light' | 'dark' | 'system';
@@ -13,10 +13,26 @@ interface CarDetailViewProps {
   carId: string;
 }
 
+// Helper to navigate back with fallback to catalog
+const handleGoBack = (router: ReturnType<typeof useRouter>, searchParams: URLSearchParams) => {
+  const from = searchParams.get('from');
+  if (from) {
+    // If we have a 'from' parameter, navigate there
+    router.push(`/?view=${from}`);
+  } else if (typeof window !== 'undefined' && window.history.length > 2) {
+    // If we have browser history, go back
+    router.back();
+  } else {
+    // Fallback to catalog
+    router.push('/?view=listings');
+  }
+};
+
 export function CarDetailView({ carId }: CarDetailViewProps) {
   const numericId = Number(carId);
   const { token, user, formatPrice } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [car, setCar] = useState<Car | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -404,7 +420,7 @@ export function CarDetailView({ carId }: CarDetailViewProps) {
           <button
             type="button"
             className={`mt-6 w-full rounded-2xl px-4 py-2 text-sm font-semibold text-white ${isDark ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-slate-900'}`}
-            onClick={() => router.back()}
+            onClick={() => handleGoBack(router, searchParams)}
           >
             Go back
           </button>
@@ -431,7 +447,7 @@ export function CarDetailView({ carId }: CarDetailViewProps) {
         <button
           type="button"
           className={`rounded-full border px-4 py-2 text-sm font-semibold shadow-sm ${isDark ? 'border-slate-600 bg-slate-800 text-slate-200 hover:bg-slate-700' : 'border-slate-200 bg-white text-slate-700'}`}
-          onClick={() => router.back()}
+          onClick={() => handleGoBack(router, searchParams)}
         >
           ← Back to listings
         </button>

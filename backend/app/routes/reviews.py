@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify
-from ..db import get_db
+from ..db import get_db, is_postgres
 from ..security import sanitize_string, validate_text_field, require_auth
 import json
 
@@ -16,20 +16,36 @@ def get_car_reviews(car_id):
     
     # Ensure reviews table exists
     try:
-        db.execute('''
-            CREATE TABLE IF NOT EXISTS reviews (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                car_id INTEGER NOT NULL,
-                user_id INTEGER NOT NULL,
-                rating INTEGER NOT NULL CHECK(rating >= 1 AND rating <= 5),
-                comment TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (car_id) REFERENCES cars (id) ON DELETE CASCADE,
-                FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
-                UNIQUE(car_id, user_id)
-            )
-        ''')
+        if is_postgres():
+            db.execute('''
+                CREATE TABLE IF NOT EXISTS reviews (
+                    id SERIAL PRIMARY KEY,
+                    car_id INTEGER NOT NULL,
+                    user_id INTEGER NOT NULL,
+                    rating INTEGER NOT NULL CHECK(rating >= 1 AND rating <= 5),
+                    comment TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (car_id) REFERENCES cars (id) ON DELETE CASCADE,
+                    FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+                    UNIQUE(car_id, user_id)
+                )
+            ''')
+        else:
+            db.execute('''
+                CREATE TABLE IF NOT EXISTS reviews (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    car_id INTEGER NOT NULL,
+                    user_id INTEGER NOT NULL,
+                    rating INTEGER NOT NULL CHECK(rating >= 1 AND rating <= 5),
+                    comment TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (car_id) REFERENCES cars (id) ON DELETE CASCADE,
+                    FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+                    UNIQUE(car_id, user_id)
+                )
+            ''')
         db.commit()
     except Exception as e:
         print(f"Reviews table creation note: {e}")
@@ -41,14 +57,24 @@ def get_car_reviews(car_id):
     try:
         # Get reviews with user info - use LEFT JOIN to handle missing users gracefully
         print(f"[Reviews] Fetching reviews for car_id: {car_id}")
-        cursor = db.execute('''
-            SELECT r.id, r.car_id, r.user_id, r.rating, r.comment, r.created_at, r.updated_at,
-                   COALESCE(u.username, 'Anonymous') as user_name
-            FROM reviews r
-            LEFT JOIN users u ON r.user_id = u.id
-            WHERE r.car_id = ?
-            ORDER BY r.created_at DESC
-        ''', (car_id,))
+        if is_postgres():
+            cursor = db.execute('''
+                SELECT r.id, r.car_id, r.user_id, r.rating, r.comment, r.created_at, r.updated_at,
+                       COALESCE(u.username, 'Anonymous') as user_name
+                FROM reviews r
+                LEFT JOIN users u ON r.user_id = u.id
+                WHERE r.car_id = %s
+                ORDER BY r.created_at DESC
+            ''', (car_id,))
+        else:
+            cursor = db.execute('''
+                SELECT r.id, r.car_id, r.user_id, r.rating, r.comment, r.created_at, r.updated_at,
+                       COALESCE(u.username, 'Anonymous') as user_name
+                FROM reviews r
+                LEFT JOIN users u ON r.user_id = u.id
+                WHERE r.car_id = ?
+                ORDER BY r.created_at DESC
+            ''', (car_id,))
         
         reviews = []
         for row in cursor.fetchall():
@@ -66,10 +92,16 @@ def get_car_reviews(car_id):
             reviews.append(review_data)
         
         # Calculate average rating
-        avg_cursor = db.execute('''
-            SELECT AVG(rating) as avg_rating, COUNT(*) as count
-            FROM reviews WHERE car_id = ?
-        ''', (car_id,))
+        if is_postgres():
+            avg_cursor = db.execute('''
+                SELECT AVG(rating) as avg_rating, COUNT(*) as count
+                FROM reviews WHERE car_id = %s
+            ''', (car_id,))
+        else:
+            avg_cursor = db.execute('''
+                SELECT AVG(rating) as avg_rating, COUNT(*) as count
+                FROM reviews WHERE car_id = ?
+            ''', (car_id,))
         stats = avg_cursor.fetchone()
         
         result = {
@@ -144,24 +176,40 @@ def add_review(car_id):
             pass
     
     # Check if car exists
-    car = db.execute('SELECT id FROM cars WHERE id = ?', (car_id,)).fetchone()
+    if is_postgres():
+        car = db.execute('SELECT id FROM cars WHERE id = %s', (car_id,)).fetchone()
+    else:
+        car = db.execute('SELECT id FROM cars WHERE id = ?', (car_id,)).fetchone()
     if not car:
         return jsonify({'success': False, 'error': 'Car not found'}), 404
     
     try:
         # Check if user already has a review for this car
-        existing = db.execute(
-            'SELECT id FROM reviews WHERE car_id = ? AND user_id = ?',
-            (car_id, user['id'])
-        ).fetchone()
+        if is_postgres():
+            existing = db.execute(
+                'SELECT id FROM reviews WHERE car_id = %s AND user_id = %s',
+                (car_id, user['id'])
+            ).fetchone()
+        else:
+            existing = db.execute(
+                'SELECT id FROM reviews WHERE car_id = ? AND user_id = ?',
+                (car_id, user['id'])
+            ).fetchone()
         
         if existing:
             # Update existing review
-            db.execute('''
-                UPDATE reviews 
-                SET rating = ?, comment = ?, updated_at = CURRENT_TIMESTAMP
-                WHERE id = ?
-            ''', (rating, comment, existing['id']))
+            if is_postgres():
+                db.execute('''
+                    UPDATE reviews 
+                    SET rating = %s, comment = %s, updated_at = CURRENT_TIMESTAMP
+                    WHERE id = %s
+                ''', (rating, comment, existing['id']))
+            else:
+                db.execute('''
+                    UPDATE reviews 
+                    SET rating = ?, comment = ?, updated_at = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                ''', (rating, comment, existing['id']))
             db.commit()
             update_car_rating(db, car_id)
             return jsonify({
@@ -171,16 +219,24 @@ def add_review(car_id):
             }), 200
         else:
             # Insert new review
-            cursor = db.execute('''
-                INSERT INTO reviews (car_id, user_id, rating, comment)
-                VALUES (?, ?, ?, ?)
-            ''', (car_id, user['id'], rating, comment))
+            if is_postgres():
+                cursor = db.execute('''
+                    INSERT INTO reviews (car_id, user_id, rating, comment)
+                    VALUES (%s, %s, %s, %s) RETURNING id
+                ''', (car_id, user['id'], rating, comment))
+                review_id = cursor.fetchone()['id']
+            else:
+                cursor = db.execute('''
+                    INSERT INTO reviews (car_id, user_id, rating, comment)
+                    VALUES (?, ?, ?, ?)
+                ''', (car_id, user['id'], rating, comment))
+                review_id = cursor.lastrowid
             db.commit()
             update_car_rating(db, car_id)
             return jsonify({
                 'success': True,
                 'message': 'Review submitted successfully',
-                'review_id': cursor.lastrowid
+                'review_id': review_id
             }), 201
     except Exception as e:
         import traceback
@@ -202,7 +258,10 @@ def delete_review(review_id):
     db = get_db()
     
     # Get review and check ownership
-    review = db.execute('SELECT * FROM reviews WHERE id = ?', (review_id,)).fetchone()
+    if is_postgres():
+        review = db.execute('SELECT * FROM reviews WHERE id = %s', (review_id,)).fetchone()
+    else:
+        review = db.execute('SELECT * FROM reviews WHERE id = ?', (review_id,)).fetchone()
     if not review:
         return jsonify({'success': False, 'error': 'Review not found'}), 404
     
@@ -212,7 +271,10 @@ def delete_review(review_id):
     car_id = review['car_id']
     
     try:
-        db.execute('DELETE FROM reviews WHERE id = ?', (review_id,))
+        if is_postgres():
+            db.execute('DELETE FROM reviews WHERE id = %s', (review_id,))
+        else:
+            db.execute('DELETE FROM reviews WHERE id = ?', (review_id,))
         db.commit()
         
         # Update car's average rating
@@ -236,14 +298,24 @@ def get_my_reviews():
         return jsonify({'success': False, 'error': 'Authentication required'}), 401
     
     db = get_db()
-    cursor = db.execute('''
-        SELECT r.id, r.car_id, r.rating, r.comment, r.created_at,
-               c.make, c.model, c.year, c.image_url
-        FROM reviews r
-        JOIN cars c ON r.car_id = c.id
-        WHERE r.user_id = ?
-        ORDER BY r.created_at DESC
-    ''', (user['id'],))
+    if is_postgres():
+        cursor = db.execute('''
+            SELECT r.id, r.car_id, r.rating, r.comment, r.created_at,
+                   c.make, c.model, c.year, c.image_url
+            FROM reviews r
+            JOIN cars c ON r.car_id = c.id
+            WHERE r.user_id = %s
+            ORDER BY r.created_at DESC
+        ''', (user['id'],))
+    else:
+        cursor = db.execute('''
+            SELECT r.id, r.car_id, r.rating, r.comment, r.created_at,
+                   c.make, c.model, c.year, c.image_url
+            FROM reviews r
+            JOIN cars c ON r.car_id = c.id
+            WHERE r.user_id = ?
+            ORDER BY r.created_at DESC
+        ''', (user['id'],))
     
     reviews = []
     for row in cursor.fetchall():
@@ -266,17 +338,29 @@ def get_my_reviews():
 
 def update_car_rating(db, car_id):
     """Update the car's rating and review count based on all reviews."""
-    cursor = db.execute('''
-        SELECT AVG(rating) as avg_rating, COUNT(*) as count
-        FROM reviews WHERE car_id = ?
-    ''', (car_id,))
+    if is_postgres():
+        cursor = db.execute('''
+            SELECT AVG(rating) as avg_rating, COUNT(*) as count
+            FROM reviews WHERE car_id = %s
+        ''', (car_id,))
+    else:
+        cursor = db.execute('''
+            SELECT AVG(rating) as avg_rating, COUNT(*) as count
+            FROM reviews WHERE car_id = ?
+        ''', (car_id,))
     stats = cursor.fetchone()
     
     avg_rating = round(stats['avg_rating'], 1) if stats['avg_rating'] else None
     review_count = stats['count']
     
-    db.execute('''
-        UPDATE cars SET rating = ?, reviews = ?, updated_at = CURRENT_TIMESTAMP
-        WHERE id = ?
-    ''', (avg_rating, review_count, car_id))
+    if is_postgres():
+        db.execute('''
+            UPDATE cars SET rating = %s, reviews = %s, updated_at = CURRENT_TIMESTAMP
+            WHERE id = %s
+        ''', (avg_rating, review_count, car_id))
+    else:
+        db.execute('''
+            UPDATE cars SET rating = ?, reviews = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        ''', (avg_rating, review_count, car_id))
     db.commit()

@@ -1,5 +1,5 @@
 from flask import Blueprint, jsonify, request
-from ..db import get_db
+from ..db import get_db, is_postgres
 from .auth import get_user_from_token
 from .cars import car_row_to_dict
 
@@ -244,10 +244,16 @@ def request_callback():
 
     db = get_db()
     try:
-        db.execute(
-            'INSERT INTO callbacks (car_id, user_id, name, phone, message, preferred_time) VALUES (?, ?, ?, ?, ?, ?)',
-            (car_id, user_id, name, phone, message, preferred_time)
-        )
+        if is_postgres():
+            db.execute(
+                'INSERT INTO callbacks (car_id, user_id, name, phone, message, preferred_time) VALUES (%s, %s, %s, %s, %s, %s)',
+                (car_id, user_id, name, phone, message, preferred_time)
+            )
+        else:
+            db.execute(
+                'INSERT INTO callbacks (car_id, user_id, name, phone, message, preferred_time) VALUES (?, ?, ?, ?, ?, ?)',
+                (car_id, user_id, name, phone, message, preferred_time)
+            )
         db.commit()
         return jsonify({'success': True})
     except Exception as e:

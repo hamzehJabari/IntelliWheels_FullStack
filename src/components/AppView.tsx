@@ -982,9 +982,10 @@ export function AppView() {
   }, [language, serviceMode]);
   const handleOpenCarDetails = useCallback(
     (carId: number) => {
-      router.push(`/cars/${carId}`);
+      // Pass current page as 'from' so the back button knows where to return
+      router.push(`/cars/${carId}?from=${currentPage}`);
     },
-    [router]
+    [router, currentPage]
   );
   const handleOpenDealer = useCallback(
     (dealerId: number) => {
