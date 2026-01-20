@@ -138,6 +138,41 @@ def debug_verify(token):
             'error': str(e),
             'traceback': traceback.format_exc()
         }), 500
+
+@bp.route('/debug-tables')
+def debug_tables():
+    """TEMPORARY: Debug table existence. REMOVE AFTER DEBUGGING!"""
+    from ..db import is_postgres
+    db = get_db()
+    
+    try:
+        results = {}
+        
+        if is_postgres():
+            # List all tables in PostgreSQL
+            tables = db.execute("""
+                SELECT tablename FROM pg_catalog.pg_tables 
+                WHERE schemaname = 'public'
+            """).fetchall()
+            results['all_tables'] = [t['tablename'] for t in tables]
+            
+            # Check for specific tables
+            for table in ['users', 'user_sessions', 'cars', 'favorites', 'conversations', 'user_messages', 'listings']:
+                try:
+                    count = db.execute(f'SELECT COUNT(*) as c FROM {table}').fetchone()
+                    results[f'{table}_count'] = count['c'] if count else 0
+                except Exception as e:
+                    results[f'{table}_error'] = str(e)
+        else:
+            # SQLite
+            tables = db.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
+            results['all_tables'] = [t['name'] for t in tables]
+        
+        return jsonify(results)
+    except Exception as e:
+        import traceback
+        return jsonify({'error': str(e), 'traceback': traceback.format_exc()}), 500
+
 @bp.route('/debug-sessions')
 def debug_sessions():
     """TEMPORARY: Public debug endpoint to check sessions. REMOVE AFTER DEBUGGING!"""
