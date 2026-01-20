@@ -1,14 +1,40 @@
 from flask import Blueprint, request, jsonify
 import os
-from ..db import get_db
+from ..db import get_db, is_postgres
 from .auth import get_user_from_token
 from .cars import car_row_to_dict
 
 bp = Blueprint('favorites', __name__, url_prefix='/api/favorites')
 
-def is_postgres():
-    """Check if we're using PostgreSQL based on DATABASE_URL."""
-    return bool(os.environ.get('DATABASE_URL'))
+
+def ensure_favorites_table():
+    """Create favorites table if it doesn't exist."""
+    db = get_db()
+    try:
+        if is_postgres():
+            db.execute('''
+                CREATE TABLE IF NOT EXISTS favorites (
+                    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    car_id INTEGER NOT NULL REFERENCES cars(id) ON DELETE CASCADE,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (user_id, car_id)
+                )
+            ''')
+        else:
+            db.execute('''
+                CREATE TABLE IF NOT EXISTS favorites (
+                    user_id INTEGER NOT NULL,
+                    car_id INTEGER NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (user_id, car_id),
+                    FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+                    FOREIGN KEY (car_id) REFERENCES cars (id) ON DELETE CASCADE
+                )
+            ''')
+        db.commit()
+    except Exception as e:
+        print(f"[Favorites] Table creation note: {e}")
+
 
 @bp.route('', methods=['GET'])
 def get_favorites():
@@ -19,16 +45,33 @@ def get_favorites():
         return jsonify({'success': False, 'error': 'Authentication required'}), 401
 
     db = get_db()
-    cursor = db.execute('''
-        SELECT c.* 
-        FROM cars c
-        JOIN favorites f ON c.id = f.car_id
-        WHERE f.user_id = ?
-        ORDER BY f.created_at DESC
-    ''', (user['id'],))
+    ensure_favorites_table()
     
-    cars = [car_row_to_dict(row) for row in cursor.fetchall()]
-    return jsonify({'success': True, 'cars': cars})
+    try:
+        if is_postgres():
+            cursor = db.execute('''
+                SELECT c.* 
+                FROM cars c
+                JOIN favorites f ON c.id = f.car_id
+                WHERE f.user_id = %s
+                ORDER BY f.created_at DESC
+            ''', (user['id'],))
+        else:
+            cursor = db.execute('''
+                SELECT c.* 
+                FROM cars c
+                JOIN favorites f ON c.id = f.car_id
+                WHERE f.user_id = ?
+                ORDER BY f.created_at DESC
+            ''', (user['id'],))
+        
+        cars = [car_row_to_dict(row) for row in cursor.fetchall()]
+        return jsonify({'success': True, 'cars': cars})
+    except Exception as e:
+        print(f"[Favorites] Error getting favorites: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': True, 'cars': []})  # Return empty list on error
 
 @bp.route('', methods=['POST'])
 def add_favorite():
@@ -44,36 +87,20 @@ def add_favorite():
         return jsonify({'success': False, 'error': 'car_id required'}), 400
 
     db = get_db()
-    
-    # Ensure favorites table exists
-    try:
-        db.execute('''
-            CREATE TABLE IF NOT EXISTS favorites (
-                user_id INTEGER NOT NULL,
-                car_id INTEGER NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                PRIMARY KEY (user_id, car_id),
-                FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
-                FOREIGN KEY (car_id) REFERENCES cars (id) ON DELETE CASCADE
-            )
-        ''')
-        db.commit()
-    except Exception as e:
-        print(f"Favorites table creation note: {e}")
+    ensure_favorites_table()
 
     try:
         if is_postgres():
-            # PostgreSQL: use ON CONFLICT DO NOTHING
             db.execute(
                 'INSERT INTO favorites (user_id, car_id) VALUES (%s, %s) ON CONFLICT (user_id, car_id) DO NOTHING',
                 (user['id'], car_id)
             )
         else:
-            # SQLite: use INSERT OR IGNORE
             db.execute('INSERT OR IGNORE INTO favorites (user_id, car_id) VALUES (?, ?)', (user['id'], car_id))
         db.commit()
         return jsonify({'success': True})
     except Exception as e:
+        print(f"[Favorites] Error adding favorite: {e}")
         import traceback
         traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -86,6 +113,15 @@ def remove_favorite(car_id):
         return jsonify({'success': False, 'error': 'Authentication required'}), 401
 
     db = get_db()
-    db.execute('DELETE FROM favorites WHERE user_id = ? AND car_id = ?', (user['id'], car_id))
-    db.commit()
-    return jsonify({'success': True})
+    ensure_favorites_table()
+    
+    try:
+        if is_postgres():
+            db.execute('DELETE FROM favorites WHERE user_id = %s AND car_id = %s', (user['id'], car_id))
+        else:
+            db.execute('DELETE FROM favorites WHERE user_id = ? AND car_id = ?', (user['id'], car_id))
+        db.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        print(f"[Favorites] Error removing favorite: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
