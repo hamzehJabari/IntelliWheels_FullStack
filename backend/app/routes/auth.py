@@ -76,7 +76,7 @@ def get_user_from_token(token):
         if is_postgres():
             # PostgreSQL: Use explicit UTC comparison
             row = db.execute('''
-                SELECT u.id, u.username, u.email, u.role, u.created_at, u.phone
+                SELECT u.id, u.username, u.email, u.role, u.created_at
                 FROM users u
                 JOIN user_sessions s ON u.id = s.user_id
                 WHERE s.token = %s AND (s.expires_at IS NULL OR s.expires_at > (NOW() AT TIME ZONE 'UTC'))
@@ -84,7 +84,7 @@ def get_user_from_token(token):
         else:
             # SQLite: use CURRENT_TIMESTAMP (already UTC)
             row = db.execute('''
-                SELECT u.id, u.username, u.email, u.role, u.created_at, u.phone
+                SELECT u.id, u.username, u.email, u.role, u.created_at
                 FROM users u
                 JOIN user_sessions s ON u.id = s.user_id
                 WHERE s.token = ? AND (s.expires_at IS NULL OR s.expires_at > CURRENT_TIMESTAMP)
@@ -106,12 +106,17 @@ def get_user_from_token(token):
         except Exception:
             pass  # Column doesn't exist yet, default to False
         
-        # Get phone safely
+        # Get phone safely (column may not exist in SQLite)
         phone = None
         try:
-            phone = row['phone'] if 'phone' in row.keys() else None
+            if is_postgres():
+                phone_row = db.execute('SELECT phone FROM users WHERE id = %s', (row['id'],)).fetchone()
+            else:
+                phone_row = db.execute('SELECT phone FROM users WHERE id = ?', (row['id'],)).fetchone()
+            if phone_row:
+                phone = phone_row['phone']
         except Exception:
-            pass
+            pass  # Column doesn't exist
         
         return {
             'id': row['id'],
