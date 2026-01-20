@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { STORAGE_KEYS, CurrencyCode, CURRENCY_RATES, convertCurrency as convertCurrencyUtil, formatCurrency as formatCurrencyUtil, formatPrice as formatPriceUtil } from '@/lib/config';
 import { getProfile, loginUser, logoutUser, signupUser, updateProfile, verifySession, googleAuth, forgotPassword, resetPassword } from '@/lib/api';
 import { UserProfile } from '@/lib/types';
@@ -68,6 +68,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   // Track if we've done the initial localStorage check
   const [initialCheckDone, setInitialCheckDone] = useState(false);
+  
+  // Use a ref to track "skip validation" - this prevents stale closure issues
+  // When we just logged in, we don't need to re-validate the fresh token
+  const skipNextValidation = useRef(false);
 
   useEffect(() => {
     const storedToken = typeof window !== 'undefined' ? localStorage.getItem(STORAGE_KEYS.token) : null;
@@ -94,8 +98,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     if (!initialCheckDone) {
       return;
     }
-    // Skip validation if session is already validated (e.g., just logged in)
-    if (sessionValidated) {
+    // Skip validation if we just authenticated (ref avoids stale closure issues)
+    if (skipNextValidation.current) {
+      skipNextValidation.current = false;
       setLoading(false);
       return;
     }
@@ -103,6 +108,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       if (!token) {
         // No token after initial check means guest user - loading already set to false
         setSessionValidated(false);
+        setLoading(false);
         return;
       }
       try {
@@ -133,8 +139,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, [token, initialCheckDone]);
 
   const persistAuth = useCallback((authToken: string, profile: UserProfile) => {
-    // Set sessionValidated FIRST to prevent the validation effect from running
-    // We know the token is valid because we just received it from the server
+    // Mark to skip the next validation - we know the token is valid (just received from server)
+    skipNextValidation.current = true;
     setSessionValidated(true);
     setToken(authToken);
     setUser(profile);
