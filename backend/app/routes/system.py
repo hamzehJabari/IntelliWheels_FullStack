@@ -65,7 +65,8 @@ def health_check():
     
     return jsonify({
         'status': 'healthy',
-        'version': '2.0.0',
+        'version': '2.0.1',  # Updated to track deploy
+        'build_id': '20260120-fix2',
         'ai_enabled': ai_configured,
         'ai_working': gemini_working,
         'ai_model': active_model,

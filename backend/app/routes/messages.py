@@ -239,6 +239,22 @@ def send_message():
     if len(content) > 2000:
         return jsonify({'success': False, 'error': 'Message too long (max 2000 characters)'}), 400
     
+    # Validate recipient exists
+    try:
+        if is_postgres():
+            recipient = db.execute('SELECT id FROM users WHERE id = %s', (recipient_id,)).fetchone()
+        else:
+            recipient = db.execute('SELECT id FROM users WHERE id = ?', (recipient_id,)).fetchone()
+        if not recipient:
+            return jsonify({'success': False, 'error': 'Recipient not found'}), 404
+    except Exception as e:
+        print(f"[Messages] Error validating recipient: {e}")
+        try:
+            db.rollback()
+        except:
+            pass
+        return jsonify({'success': False, 'error': 'Failed to validate recipient'}), 500
+    
     try:
         # Ensure consistent ordering (lower id is always user1)
         user1_id = min(user['id'], recipient_id)
@@ -308,12 +324,14 @@ def send_message():
             'message': 'Message sent'
         })
     except Exception as e:
+        import traceback
         print(f"Error sending message: {e}")
+        traceback.print_exc()
         try:
             db.rollback()
         except:
             pass
-        return jsonify({'success': False, 'error': 'Failed to send message'}), 500
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 @bp.route('/unread-count', methods=['GET'])

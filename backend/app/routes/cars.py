@@ -262,12 +262,14 @@ def create_car():
         db.commit()
         return jsonify({'success': True, 'id': new_id}), 201
     except Exception as e:
+        import traceback
         print(f"Create car error: {e}")
+        traceback.print_exc()
         try:
             db.rollback()
         except:
             pass
-        return jsonify({'success': False, 'error': 'Failed to create listing'}), 500
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 @bp.route('/<int:id>', methods=['PATCH', 'PUT'])
