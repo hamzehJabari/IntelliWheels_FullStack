@@ -379,65 +379,16 @@ Be helpful, concise, and knowledgeable about cars."""
                 return {'text': "AI service temporarily unavailable. Please try again in a few minutes."}
             return {'text': f"I encountered an issue: {error_msg[:150]}"}
 
-    def _load_embeddings(self):
-        """Load pre-computed car embeddings from file."""
-        if hasattr(self, '_embeddings_cache') and self._embeddings_cache:
-            return self._embeddings_cache
-        
-        import numpy as np
-        base_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-        embeddings_path = os.path.join(base_dir, 'models', 'car_embeddings.json')
-        
-        if not os.path.exists(embeddings_path):
-            print(f"[Embeddings] File not found: {embeddings_path}")
-            return None
-        
-        try:
-            with open(embeddings_path, 'r') as f:
-                data = json.load(f)
-            
-            # Convert to numpy arrays for fast computation
-            self._embeddings_cache = {
-                item['car_id']: {
-                    'text': item['text'],
-                    'embedding': np.array(item['embedding'], dtype=np.float32)
-                }
-                for item in data
-            }
-            print(f"[Embeddings] Loaded {len(self._embeddings_cache)} car embeddings")
-            return self._embeddings_cache
-        except Exception as e:
-            print(f"[Embeddings] Error loading: {e}")
-            return None
-    
-    def _get_sentence_transformer(self):
-        """Lazy-load sentence transformer model."""
-        if hasattr(self, '_sentence_model') and self._sentence_model:
-            return self._sentence_model
-        
-        try:
-            from sentence_transformers import SentenceTransformer
-            self._sentence_model = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
-            print("[Semantic Search] Loaded SentenceTransformer model")
-            return self._sentence_model
-        except ImportError:
-            print("[Semantic Search] sentence-transformers not installed, falling back to keyword search")
-            return None
-        except Exception as e:
-            print(f"[Semantic Search] Error loading model: {e}")
-            return None
-
     def semantic_search(self, query, limit):
-        """Search cars using real transformer embeddings for true semantic similarity."""
+        """Search cars using semantic scoring - always returns results ranked by relevance."""
         import re
-        import numpy as np
         from ..db import get_db
         
         try:
             db = get_db()
-            print(f"[Semantic Search] Query: '{query}'")
+            print(f"[Semantic Search] Using shared DB connection")
             
-            # Get ALL cars from database
+            # Get ALL cars from database to score them
             cursor = db.execute("SELECT id, make, model, year, price, currency, image_url, specs FROM cars")
             all_cars = cursor.fetchall()
             print(f"[Semantic Search] Total cars in DB: {len(all_cars)}")
@@ -447,7 +398,7 @@ Be helpful, concise, and knowledgeable about cars."""
             
             query_lower = query.lower()
             
-            # Parse price constraints from query
+            # Parse price constraints from query (e.g., "under 50k", "below 100000")
             max_price = None
             min_price = None
             price_pattern = r'(?:under|below|less than|max|<)\s*(\d+)\s*k?'
@@ -455,7 +406,6 @@ Be helpful, concise, and knowledgeable about cars."""
             if price_match:
                 price_val = int(price_match.group(1))
                 max_price = price_val * 1000 if price_val < 1000 else price_val
-                print(f"[Semantic Search] Max price filter: {max_price}")
             
             min_price_pattern = r'(?:over|above|more than|min|>)\s*(\d+)\s*k?'
             min_price_match = re.search(min_price_pattern, query_lower)
@@ -463,53 +413,106 @@ Be helpful, concise, and knowledgeable about cars."""
                 price_val = int(min_price_match.group(1))
                 min_price = price_val * 1000 if price_val < 1000 else price_val
             
-            # Try to use transformer embeddings
-            embeddings_cache = self._load_embeddings()
-            model = self._get_sentence_transformer()
+            # Extract keywords, removing price-related and stop words
+            clean_query = re.sub(r'(?:under|below|less than|over|above|more than|max|min|<|>)\s*\d+\s*k?', '', query_lower)
+            stop_words = {'car', 'cars', 'the', 'a', 'an', 'and', 'or', 'with', 'for', 'find', 'show', 'me', 'i', 'want', 'need', 'looking', 'search'}
+            keywords = [w.strip() for w in clean_query.split() if len(w.strip()) > 1 and w.strip() not in stop_words]
             
+            # Define category mappings
+            luxury_makes = {'mercedes', 'bmw', 'audi', 'lexus', 'porsche', 'bentley', 'rolls-royce', 'maserati', 'jaguar', 'land rover', 'range rover', 'infiniti', 'cadillac', 'lincoln'}
+            economy_makes = {'toyota', 'honda', 'nissan', 'hyundai', 'kia', 'mazda', 'suzuki', 'mitsubishi', 'subaru'}
+            fuel_keywords = {'petrol': ['petrol', 'gasoline', 'gas'], 'diesel': ['diesel'], 'hybrid': ['hybrid'], 'electric': ['electric', 'ev', 'battery']}
+            body_keywords = {'suv': ['suv', 'crossover', '4x4'], 'sedan': ['sedan', 'saloon'], 'coupe': ['coupe', 'sports'], 'hatchback': ['hatchback', 'hatch'], 'truck': ['truck', 'pickup'], 'van': ['van', 'minivan']}
+            
+            # Score each car
             scored_cars = []
+            for row in all_cars:
+                score = 0.0
+                car_make = (row['make'] or '').lower()
+                car_model = (row['model'] or '').lower()
+                car_year = row['year'] or 0
+                car_price = row['price'] or 0
+                car_specs_raw = row['specs'] or ''
+                
+                # Parse specs JSON
+                try:
+                    car_specs = json.loads(car_specs_raw) if car_specs_raw else {}
+                except:
+                    car_specs = {}
+                car_specs_text = json.dumps(car_specs).lower() if car_specs else ''
+                
+                # Combined searchable text
+                searchable = f"{car_make} {car_model} {car_specs_text}"
+                
+                # Score direct keyword matches
+                for keyword in keywords:
+                    # Exact make match (highest score)
+                    if keyword == car_make:
+                        score += 50
+                    # Make contains keyword
+                    elif keyword in car_make:
+                        score += 30
+                    # Exact model match
+                    elif keyword == car_model:
+                        score += 45
+                    # Model contains keyword
+                    elif keyword in car_model:
+                        score += 25
+                    # Keyword in specs
+                    elif keyword in searchable:
+                        score += 10
+                    
+                    # Category matches
+                    if keyword == 'luxury' and car_make in luxury_makes:
+                        score += 40
+                    if keyword in ('economy', 'affordable', 'cheap', 'budget') and car_make in economy_makes:
+                        score += 35
+                    
+                    # Fuel type matches
+                    for fuel, terms in fuel_keywords.items():
+                        if keyword in terms and fuel in searchable:
+                            score += 20
+                    
+                    # Body type matches
+                    for body, terms in body_keywords.items():
+                        if keyword in terms and body in searchable:
+                            score += 20
+                
+                # Price range scoring (bonus for matching price constraints)
+                if max_price and car_price > 0:
+                    if car_price <= max_price:
+                        # Bonus for being under budget, more bonus for being closer to max
+                        ratio = car_price / max_price
+                        score += 15 * ratio  # Cars closer to budget get higher score
+                    else:
+                        score -= 20  # Penalty for over budget
+                
+                if min_price and car_price > 0:
+                    if car_price >= min_price:
+                        score += 10
+                    else:
+                        score -= 15  # Penalty for under minimum
+                
+                # If no keywords matched at all, give a small base score based on recency
+                if score == 0 and not keywords:
+                    # No specific search terms, rank by year (newer = better)
+                    score = min(car_year - 2000, 25) if car_year > 2000 else 5
+                
+                # Only include cars with positive scores, or all if no specific filters
+                if score > 0 or not keywords:
+                    scored_cars.append((score, row))
             
-            if model and embeddings_cache:
-                # === TRUE SEMANTIC SEARCH with embeddings ===
-                print("[Semantic Search] Using transformer embeddings")
-                
-                # Encode the query
-                query_embedding = model.encode(query, normalize_embeddings=True)
-                
-                for row in all_cars:
-                    car_id = row['id']
-                    car_price = row['price'] or 0
-                    
-                    # Get pre-computed embedding for this car
-                    car_data = embeddings_cache.get(car_id)
-                    if not car_data:
-                        continue
-                    
-                    # Compute cosine similarity (dot product since embeddings are normalized)
-                    similarity = float(np.dot(query_embedding, car_data['embedding']))
-                    
-                    # Apply price filters (hard filter, not scoring)
-                    if max_price and car_price > 0 and car_price > max_price:
-                        continue  # Skip cars over budget
-                    if min_price and car_price > 0 and car_price < min_price:
-                        continue  # Skip cars under minimum
-                    
-                    scored_cars.append((similarity, row))
-                
-                print(f"[Semantic Search] Computed similarities for {len(scored_cars)} cars")
-            else:
-                # === FALLBACK: keyword-based search ===
-                print("[Semantic Search] Falling back to keyword search")
-                scored_cars = self._keyword_search(all_cars, query_lower, max_price, min_price)
-            
-            # Sort by similarity/score descending
+            # Sort by score descending
             scored_cars.sort(key=lambda x: x[0], reverse=True)
+            
+            # If no cars matched well, return top cars by year
+            if not scored_cars:
+                scored_cars = [(10, row) for row in all_cars]
+                scored_cars.sort(key=lambda x: x[1]['year'] or 0, reverse=True)
             
             # Take top results
             top_results = scored_cars[:limit]
-            
-            if top_results:
-                print(f"[Semantic Search] Top result: similarity={top_results[0][0]:.3f}")
+            print(f"[Semantic Search] Returning {len(top_results)} results (top score: {top_results[0][0] if top_results else 0})")
             
             # Format results
             results = []
@@ -523,7 +526,7 @@ Be helpful, concise, and knowledgeable about cars."""
                         pass
                 
                 # Normalize similarity score to 0-1 range
-                similarity = round(min(score / max(max_score, 0.001), 1.0), 3)
+                similarity = round(min(score / max(max_score, 1), 1.0), 2)
                 
                 results.append({
                     "car": {
@@ -537,7 +540,7 @@ Be helpful, concise, and knowledgeable about cars."""
                         "description": specs.get('overview', f"{row['make']} {row['model']} {row['year']}")
                     },
                     "similarity": similarity,
-                    "score": round(score, 3)
+                    "score": score
                 })
             
             print(f"[Semantic Search] Results: {[(r['car']['make'], r['car']['model'], r['score']) for r in results]}")
@@ -548,60 +551,6 @@ Be helpful, concise, and knowledgeable about cars."""
             print(f"[Semantic Search] ERROR: {e}")
             traceback.print_exc()
             return []
-    
-    def _keyword_search(self, all_cars, query_lower, max_price, min_price):
-        """Fallback keyword-based search when embeddings aren't available."""
-        import re
-        
-        # Extract keywords
-        clean_query = re.sub(r'(?:under|below|less than|over|above|more than|max|min|<|>)\s*\d+\s*k?', '', query_lower)
-        stop_words = {'car', 'cars', 'the', 'a', 'an', 'and', 'or', 'with', 'for', 'find', 'show', 'me', 'i', 'want', 'need', 'looking', 'search'}
-        keywords = [w.strip() for w in clean_query.split() if len(w.strip()) > 1 and w.strip() not in stop_words]
-        
-        scored_cars = []
-        for row in all_cars:
-            score = 0.0
-            car_make = (row['make'] or '').lower()
-            car_model = (row['model'] or '').lower()
-            car_price = row['price'] or 0
-            car_specs_raw = row['specs'] or ''
-            
-            try:
-                car_specs = json.loads(car_specs_raw) if car_specs_raw else {}
-            except:
-                car_specs = {}
-            searchable = f"{car_make} {car_model} {json.dumps(car_specs).lower()}"
-            
-            # Score keyword matches
-            for keyword in keywords:
-                if keyword == car_make:
-                    score += 50
-                elif keyword in car_make:
-                    score += 30
-                elif keyword == car_model:
-                    score += 45
-                elif keyword in car_model:
-                    score += 25
-                elif keyword in searchable:
-                    score += 10
-            
-            # Apply price filters
-            if max_price and car_price > 0:
-                if car_price <= max_price:
-                    score += 15
-                else:
-                    score -= 20
-            
-            if min_price and car_price > 0:
-                if car_price >= min_price:
-                    score += 10
-                else:
-                    score -= 15
-            
-            if score > 0 or not keywords:
-                scored_cars.append((score, row))
-        
-        return scored_cars
 
     def analyze_image(self, image_base64):
         if not self.gemini_model:
