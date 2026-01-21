@@ -561,12 +561,13 @@ INPUT: Make, Model, Year, Specs
 ┌─────────────────────────┐    ┌─────────────────────────┐
 │       FRONTEND          │    │        BACKEND          │
 ├─────────────────────────┤    ├─────────────────────────┤
-│ • Next.js 15            │    │ • Python 3.11+          │
-│ • React 19              │    │ • Flask 3.0             │
+│ • Next.js 16            │    │ • Python 3.11+          │
+│ • React 19.2            │    │ • Flask 3.0             │
 │ • TypeScript 5          │    │ • Gunicorn              │
-│ • Tailwind CSS 4        │    │ • SQLAlchemy (ORM)      │
-│ • React Context API     │    │ • Flask-CORS            │
-│ • Dynamic Imports       │    │ • Flask-Swagger         │
+│ • Tailwind CSS 3.4      │    │ • Flask-CORS            │
+│ • React Context API     │    │ • Flask-Swagger         │
+│ • React Compiler        │    │ • sentence-transformers │
+│ • Leaflet Maps          │    │ • scikit-learn          │
 └─────────────────────────┘    └─────────────────────────┘
 
 ┌─────────────────────────┐    ┌─────────────────────────┐
@@ -582,7 +583,7 @@ INPUT: Make, Model, Year, Specs
 │      DEPLOYMENT         │    │     DEVELOPMENT         │
 ├─────────────────────────┤    ├─────────────────────────┤
 │ • Vercel (Frontend)     │    │ • ESLint                │
-│ • Render (Backend)      │    │ • Prettier              │
+│ • Render (Backend)      │    │ • TypeScript            │
 │ • Render PostgreSQL     │    │ • PostCSS               │
 │ • Cloudinary CDN        │    │ • dotenv                │
 └─────────────────────────┘    └─────────────────────────┘
@@ -599,14 +600,14 @@ src/
 │   ├── cars/[id]/page.tsx        # Car detail page
 │   └── dealers/[id]/page.tsx     # Dealer detail page
 ├── components/
-│   ├── AppView.tsx               # Main app shell (4800+ lines)
+│   ├── AppView.tsx               # Main app shell (5300+ lines)
 │   ├── CarDetailView.tsx         # Car detail component
-│   ├── DealerDetailView.tsx      # Dealer detail component
-│   └── DealerMap.tsx             # Google Maps integration
+│   ├── DealerDetailView.tsx      # Dealer profile component
+│   └── DealerMap.tsx             # Leaflet maps integration
 ├── context/
 │   └── AuthContext.tsx           # Authentication context
 ├── lib/
-│   ├── api.ts                    # API client functions
+│   ├── api.ts                    # API client (40+ functions)
 │   ├── config.ts                 # Configuration constants
 │   ├── types.ts                  # TypeScript interfaces
 │   ├── vehicleDatabase.ts        # Make/model reference data
@@ -630,14 +631,16 @@ backend/
 │   │   ├── dealers.py            # Dealer management & applications
 │   │   ├── favorites.py          # User favorites
 │   │   ├── listings.py           # User listings management
+│   │   ├── messages.py           # Buyer-seller messaging
 │   │   ├── reviews.py            # Review system
 │   │   └── system.py             # Health checks, stats
 │   ├── services/
-│   │   └── ai_service.py         # Gemini AI integration (770+ lines)
+│   │   └── ai_service.py         # Gemini AI integration (820+ lines)
 │   └── static/
 │       └── swagger.json          # API documentation
 ├── models/
 │   ├── fair_price_model.joblib   # Trained price prediction model
+│   ├── car_embeddings.json       # Pre-computed semantic embeddings
 │   └── train_price_model.py      # Model training script
 ├── data/
 │   └── cars.json                 # Sample car data
@@ -771,6 +774,12 @@ REVIEWS
 ├── GET    /reviews/car/:carId       Get reviews for car
 ├── POST   /reviews/car/:carId       Add review
 └── DELETE /reviews/:id              Delete review
+
+MESSAGES
+├── GET    /conversations            Get user's conversations
+├── GET    /messages/:conversationId Get messages in conversation
+├── POST   /messages                 Send a message
+└── GET    /messages/unread          Get unread message count
 
 AI FEATURES
 ├── POST   /chatbot                  AI chat conversation
