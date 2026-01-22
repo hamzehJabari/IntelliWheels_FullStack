@@ -4894,7 +4894,7 @@ export function AppView() {
       <div className="relative z-10 overflow-x-hidden">
       {renderToast()}
       <header className={`sticky top-0 z-50 border-b backdrop-blur-md transition-colors duration-300 ${headerSurfaceClass} ${subtleBorderClass}`}>
-        <div className="mx-auto flex h-16 sm:h-20 md:h-48 max-w-7xl items-center justify-between px-2 sm:px-4 lg:px-8">
+        <div className="mx-auto flex h-16 sm:h-20 md:h-40 max-w-7xl items-center justify-between px-2 sm:px-4 lg:px-8">
           <div className="flex items-center gap-8">
             {/* Logo */}
             <div
@@ -4904,7 +4904,7 @@ export function AppView() {
               <img
                 src={resolvedTheme === 'dark' ? '/IntelliWheels_Logo_Dark.png' : '/IntelliWheels_Logo_Light.png'}
                 alt="IntelliWheels"
-                className="block h-auto max-h-14 md:max-h-[180px] w-auto object-contain object-center transition-transform group-hover:scale-105 bg-transparent"
+                className="block h-auto max-h-16 md:max-h-[200px] md:max-w-[200px] w-auto object-contain object-center transition-transform group-hover:scale-105 bg-transparent"
               />
             </div>
 
