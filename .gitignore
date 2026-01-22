@@ -166,8 +166,21 @@ logs/
 docs/BUSINESS_PLAN.md
 docs/BUSINESS_READINESS_CHECKLIST.md
 docs/PITCH_DECK_OUTLINE.md
+docs/FUTURE_ROADMAP.md
+docs/STEP_BY_STEP_ACTION_PLAN.md
 docs/IntelliWheels_Pitch_Deck.pptx
 docs/IntelliWheels_Documentation.docx
+docs/IntelliWheels_Graduation_Discussion.pptx
+docs/*.docx
 docs/generate_documentation.py
 docs/generate_pitch_deck.py
+docs/convert_docs_to_word.py
+docs/generate_graduation_discussion.py
 docs/generated_images/
+docs/legal/*.docx
+
+# =============================================================================
+# ARCHIVES & ROOT ASSETS
+# =============================================================================
+*.zip
+/IntelliWheels_Logo_*.png
