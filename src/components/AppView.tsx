@@ -950,7 +950,7 @@ export function AppView() {
     backgroundRepeat: 'no-repeat',
   };
   const headerSurfaceClass = resolvedTheme === 'dark'
-    ? 'bg-white/95 border-b border-slate-200/60 text-slate-900'
+    ? 'bg-slate-950/95 border-b border-slate-700/60 text-slate-100'
     : 'bg-white/95 border-b border-slate-200/60 text-slate-900';
   const mainSurfaceClass = resolvedTheme === 'dark'
     ? 'border-slate-700 bg-slate-900/95 text-slate-100'
@@ -4898,13 +4898,13 @@ export function AppView() {
           <div className="flex items-center gap-8">
             {/* Logo */}
             <div
-              className="group flex cursor-pointer items-center gap-3 h-14 md:h-[180px] bg-transparent"
+              className="group flex cursor-pointer items-center gap-3 h-auto bg-transparent"
               onClick={() => setActivePage('home')}
             >
               <img
                 src={resolvedTheme === 'dark' ? '/IntelliWheels_Logo_Dark.png' : '/IntelliWheels_Logo_Light.png'}
                 alt="IntelliWheels"
-                className="h-14 md:h-[180px] w-auto object-contain object-center transition-transform group-hover:scale-105 bg-transparent"
+                className="block h-auto max-h-14 md:max-h-[180px] w-auto object-contain object-center transition-transform group-hover:scale-105 bg-transparent"
               />
             </div>
 
