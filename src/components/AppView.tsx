@@ -4904,7 +4904,7 @@ export function AppView() {
               <img
                 src={resolvedTheme === 'dark' ? '/IntelliWheels_Logo_Dark.png' : '/IntelliWheels_Logo_Light.png'}
                 alt="IntelliWheels"
-                className="h-14 md:h-20 w-auto object-contain object-center transition-transform group-hover:scale-105 bg-transparent"
+                className="h-24 md:h-30 w-auto object-contain object-center transition-transform group-hover:scale-105 bg-transparent"
               />
             </div>
 
