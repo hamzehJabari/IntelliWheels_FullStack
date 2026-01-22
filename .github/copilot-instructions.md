@@ -7,6 +7,10 @@ IntelliWheels is an AI-powered automotive marketplace for Jordan and the GCC reg
 - PostgreSQL database (production) / SQLite (development)
 - Cloudinary for image/video storage
 
+**Domain:** intelliwheels.co  
+**Team:** 3 Co-Founders (33.3% equity each)  
+**Funding Model:** Bootstrap (100% founder-owned)
+
 ## Tech Stack
 - **Frontend:** Next.js 16, React 19.2, TypeScript 5, Tailwind CSS 3.4, Leaflet Maps
 - **Backend:** Flask 3.0, Python 3.11+, Gunicorn, sentence-transformers, scikit-learn

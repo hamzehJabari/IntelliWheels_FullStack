@@ -4898,13 +4898,13 @@ export function AppView() {
           <div className="flex items-center gap-8">
             {/* Logo */}
             <div
-              className="group flex cursor-pointer items-center gap-3 h-14 md:h-20"
+              className="group flex cursor-pointer items-center gap-3 h-14 md:h-20 bg-transparent"
               onClick={() => setActivePage('home')}
             >
               <img
-                src="/Intelli_Wheels.png"
+                src={resolvedTheme === 'dark' ? '/IntelliWheels_Logo_Dark.png' : '/IntelliWheels_Logo_Light.png'}
                 alt="IntelliWheels"
-                className="h-14 md:h-20 w-auto object-contain object-center transition-transform group-hover:scale-105"
+                className="h-14 md:h-20 w-auto object-contain object-center transition-transform group-hover:scale-105 bg-transparent"
               />
             </div>
 

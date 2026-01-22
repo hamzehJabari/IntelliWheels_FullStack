@@ -11,6 +11,10 @@
 
 > Transform your car buying experience with AI-powered assistance, vision analysis, and fair price estimation.
 
+**🌐 Domain:** intelliwheels.co  
+**👥 Team:** 3 Co-Founders (33.3% equity each)  
+**📍 Location:** Amman, Jordan
+
 ## 🌟 Features
 
 - 🤖 **AI Chatbot** - 24/7 bilingual assistant (Arabic/English) powered by Google Gemini 2.5
@@ -29,9 +33,12 @@
 | Document | Description |
 |----------|-------------|
 | [Full Documentation](./docs/FULL_DOCUMENTATION.md) | Complete technical documentation |
+| [Step-by-Step Action Plan](./docs/STEP_BY_STEP_ACTION_PLAN.md) | **NEW** - Detailed launch checklist |
+| [Future Roadmap](./docs/FUTURE_ROADMAP.md) | Business expansion plan |
 | [Visual Diagrams](./docs/VISUAL_DIAGRAMS.md) | Architecture & flow diagrams |
 | [Business Plan](./docs/BUSINESS_PLAN.md) | Business strategy & financials |
 | [Business Readiness](./docs/BUSINESS_READINESS_CHECKLIST.md) | Launch checklist |
+| [Pitch Deck Outline](./docs/PITCH_DECK_OUTLINE.md) | Investor/presentation guide |
 | [Terms of Service](./docs/legal/TERMS_OF_SERVICE.md) | User agreement |
 | [Privacy Policy](./docs/legal/PRIVACY_POLICY.md) | Data handling policy |
 | [Dealer Agreement](./docs/legal/DEALER_AGREEMENT.md) | Dealer partner terms |
