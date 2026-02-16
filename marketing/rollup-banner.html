@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IntelliWheels Roll-Up Banner - 850x2000mm</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    /* Banner Dimensions: 850mm x 2000mm at 300 DPI = 10039px x 23622px */
+    /* For preview, we scale it down proportionally */
+    :root {
+      --banner-width: 850mm;
+      --banner-height: 2000mm;
+      --primary-dark: #020617;
+      --primary-blue: #0ea5e9;
+      --secondary-blue: #38bdf8;
+      --accent-indigo: #6366f1;
+      --accent-emerald: #10b981;
+      --text-white: #ffffff;
+      --text-light: #e2e8f0;
+      --text-muted: #94a3b8;
+      --gradient-dark: linear-gradient(180deg, #020617 0%, #0f172a 30%, #1e293b 60%, #0f172a 85%, #020617 100%);
+      --gradient-accent: linear-gradient(135deg, #0ea5e9 0%, #6366f1 50%, #10b981 100%);
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #1e293b;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .banner {
+      width: var(--banner-width);
+      height: var(--banner-height);
+      background: var(--gradient-dark);
+      position: relative;
+      overflow: hidden;
+      color: var(--text-white);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    }
+
+    /* Background decorative elements */
+    .bg-decoration {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      pointer-events: none;
+      overflow: hidden;
+    }
+
+    .bg-circle {
+      position: absolute;
+      border-radius: 50%;
+      opacity: 0.08;
+      background: var(--primary-blue);
+    }
+
+    .bg-circle-1 {
+      width: 600mm;
+      height: 600mm;
+      top: -200mm;
+      right: -200mm;
+    }
+
+    .bg-circle-2 {
+      width: 500mm;
+      height: 500mm;
+      bottom: 300mm;
+      left: -250mm;
+      background: var(--accent-indigo);
+    }
+
+    .bg-circle-3 {
+      width: 400mm;
+      height: 400mm;
+      bottom: -100mm;
+      right: -100mm;
+      background: var(--accent-emerald);
+    }
+
+    .bg-grid {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-image: 
+        linear-gradient(rgba(14, 165, 233, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(14, 165, 233, 0.03) 1px, transparent 1px);
+      background-size: 40mm 40mm;
+    }
+
+    /* Background car images */
+    .bg-car-image {
+      position: absolute;
+      opacity: 0.12;
+      filter: grayscale(30%) brightness(0.8);
+      z-index: 0;
+    }
+
+    .bg-car-1 {
+      width: 700mm;
+      height: auto;
+      top: 350mm;
+      right: -150mm;
+      transform: rotate(-10deg);
+    }
+
+    .bg-car-2 {
+      width: 600mm;
+      height: auto;
+      bottom: 600mm;
+      left: -180mm;
+      transform: rotate(8deg) scaleX(-1);
+    }
+
+    .bg-car-3 {
+      width: 500mm;
+      height: auto;
+      bottom: 150mm;
+      right: -100mm;
+      transform: rotate(-5deg);
+    }
+
+    /* Header Section */
+    .header {
+      padding: 80mm 60mm 40mm;
+      text-align: center;
+      width: 100%;
+      position: relative;
+      z-index: 2;
+    }
+
+    .logo-container {
+      margin-bottom: 30mm;
+    }
+
+    .logo {
+      width: 400mm;
+      height: auto;
+      max-height: 180mm;
+      object-fit: contain;
+      filter: drop-shadow(0 10px 30px rgba(14, 165, 233, 0.3));
+    }
+
+    /* Text-based logo fallback */
+    .logo-text {
+      font-size: 80mm;
+      font-weight: 900;
+      background: var(--gradient-accent);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      letter-spacing: -2mm;
+      display: none;
+    }
+
+    .logo-text-sub {
+      font-size: 28mm;
+      font-weight: 300;
+      color: var(--text-muted);
+      letter-spacing: 8mm;
+      text-transform: uppercase;
+      margin-top: 5mm;
+      display: none;
+    }
+
+    /* Show text logo when image fails */
+    .logo-container.no-image .logo { display: none; }
+    .logo-container.no-image .logo-text { display: block; }
+    .logo-container.no-image .logo-text-sub { display: block; }
+
+    .tagline {
+      font-size: 36mm;
+      font-weight: 600;
+      color: var(--text-light);
+      letter-spacing: 2mm;
+      text-transform: uppercase;
+      margin-top: 15mm;
+    }
+
+    .tagline-arabic {
+      font-size: 32mm;
+      font-weight: 500;
+      color: var(--text-muted);
+      margin-top: 10mm;
+      direction: rtl;
+    }
+
+    /* Headline Section */
+    .headline {
+      padding: 30mm 60mm;
+      text-align: center;
+      position: relative;
+      z-index: 2;
+    }
+
+    .headline h1 {
+      font-size: 72mm;
+      font-weight: 800;
+      line-height: 1.1;
+      background: var(--gradient-accent);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 20mm;
+    }
+
+    .headline p {
+      font-size: 32mm;
+      font-weight: 400;
+      color: var(--text-light);
+      max-width: 700mm;
+      margin: 0 auto;
+      line-height: 1.4;
+    }
+
+    /* Features Section */
+    .features {
+      padding: 40mm 50mm;
+      width: 100%;
+      position: relative;
+      z-index: 2;
+    }
+
+    .feature-card {
+      background: rgba(30, 41, 59, 0.8);
+      border: 1px solid rgba(14, 165, 233, 0.2);
+      border-radius: 20mm;
+      padding: 35mm 40mm;
+      margin-bottom: 25mm;
+      display: flex;
+      align-items: center;
+      gap: 30mm;
+      backdrop-filter: blur(10px);
+    }
+
+    .feature-icon {
+      width: 100mm;
+      height: 100mm;
+      border-radius: 25mm;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      font-size: 50mm;
+    }
+
+    .feature-icon.ai { background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); }
+    .feature-icon.vision { background: linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%); }
+    .feature-icon.price { background: linear-gradient(135deg, #10b981 0%, #34d399 100%); }
+    .feature-icon.dealers { background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%); }
+
+    .feature-content h3 {
+      font-size: 36mm;
+      font-weight: 700;
+      color: var(--text-white);
+      margin-bottom: 10mm;
+    }
+
+    .feature-content p {
+      font-size: 26mm;
+      font-weight: 400;
+      color: var(--text-muted);
+      line-height: 1.3;
+    }
+
+    /* Stats Section */
+    .stats {
+      padding: 30mm 50mm;
+      width: 100%;
+      position: relative;
+      z-index: 2;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 25mm;
+    }
+
+    .stat-card {
+      background: rgba(14, 165, 233, 0.1);
+      border: 1px solid rgba(14, 165, 233, 0.3);
+      border-radius: 15mm;
+      padding: 30mm 25mm;
+      text-align: center;
+    }
+
+    .stat-number {
+      font-size: 48mm;
+      font-weight: 800;
+      color: var(--secondary-blue);
+      display: block;
+    }
+
+    .stat-label {
+      font-size: 22mm;
+      font-weight: 500;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1mm;
+      margin-top: 8mm;
+    }
+
+    /* Why Choose Section */
+    .why-choose {
+      padding: 40mm 50mm;
+      text-align: center;
+      width: 100%;
+      position: relative;
+      z-index: 2;
+    }
+
+    .why-choose h2 {
+      font-size: 42mm;
+      font-weight: 700;
+      color: var(--text-white);
+      margin-bottom: 30mm;
+    }
+
+    .benefits-list {
+      text-align: left;
+      padding-left: 30mm;
+    }
+
+    .benefit-item {
+      font-size: 28mm;
+      font-weight: 500;
+      color: var(--text-light);
+      margin-bottom: 18mm;
+      display: flex;
+      align-items: center;
+      gap: 15mm;
+    }
+
+    .benefit-check {
+      width: 35mm;
+      height: 35mm;
+      background: var(--accent-emerald);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20mm;
+      flex-shrink: 0;
+    }
+
+    /* CTA Section */
+    .cta {
+      padding: 50mm 60mm;
+      text-align: center;
+      width: 100%;
+      position: relative;
+      z-index: 2;
+    }
+
+    .cta-box {
+      background: linear-gradient(135deg, rgba(14, 165, 233, 0.2) 0%, rgba(99, 102, 241, 0.2) 100%);
+      border: 2px solid rgba(14, 165, 233, 0.4);
+      border-radius: 30mm;
+      padding: 50mm 40mm;
+    }
+
+    .cta h2 {
+      font-size: 40mm;
+      font-weight: 700;
+      color: var(--text-white);
+      margin-bottom: 20mm;
+    }
+
+    .cta p {
+      font-size: 28mm;
+      color: var(--text-light);
+      margin-bottom: 30mm;
+    }
+
+    .cta-website {
+      font-size: 48mm;
+      font-weight: 800;
+      color: var(--secondary-blue);
+      letter-spacing: 1mm;
+    }
+
+    /* Footer Section */
+    .footer {
+      padding: 40mm 60mm 60mm;
+      width: 100%;
+      text-align: center;
+      position: relative;
+      z-index: 2;
+      margin-top: auto;
+    }
+
+    .footer-divider {
+      width: 200mm;
+      height: 2mm;
+      background: var(--gradient-accent);
+      margin: 0 auto 30mm;
+      border-radius: 1mm;
+    }
+
+    .footer-text {
+      font-size: 24mm;
+      font-weight: 400;
+      color: var(--text-muted);
+      margin-bottom: 15mm;
+    }
+
+    .footer-domain {
+      font-size: 36mm;
+      font-weight: 700;
+      color: var(--primary-blue);
+    }
+
+    .footer-region {
+      font-size: 22mm;
+      font-weight: 500;
+      color: var(--text-muted);
+      margin-top: 20mm;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10mm;
+    }
+
+    .footer-region span {
+      display: flex;
+      align-items: center;
+      gap: 5mm;
+    }
+
+    /* QR Code placeholder */
+    .qr-section {
+      margin-top: 30mm;
+    }
+
+    .qr-placeholder {
+      width: 120mm;
+      height: 120mm;
+      background: var(--text-white);
+      border-radius: 15mm;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--primary-dark);
+      font-size: 18mm;
+      font-weight: 600;
+      text-align: center;
+      padding: 10mm;
+    }
+
+    .qr-label {
+      font-size: 20mm;
+      color: var(--text-muted);
+      margin-top: 15mm;
+    }
+
+    /* Print styles for actual printing */
+    @media print {
+      body {
+        background: none;
+        padding: 0;
+      }
+      .banner {
+        box-shadow: none;
+      }
+    }
+
+    /* Responsive preview for screen */
+    @media screen and (max-width: 900px) {
+      .banner {
+        width: 100%;
+        height: auto;
+        min-height: 200vh;
+        padding: 20px;
+      }
+      
+      .bg-car-image { display: none; }
+      .header { padding: 40px 30px 20px; }
+      .logo { width: 250px; }
+      .logo-text { font-size: 36px; }
+      .logo-text-sub { font-size: 12px; letter-spacing: 3px; }
+      .tagline { font-size: 16px; letter-spacing: 1px; }
+      .tagline-arabic { font-size: 14px; }
+      .headline { padding: 20px 30px; }
+      .headline h1 { font-size: 32px; }
+      .headline p { font-size: 14px; }
+      .features { padding: 20px 25px; }
+      .feature-card { padding: 20px; margin-bottom: 15px; gap: 15px; border-radius: 12px; }
+      .feature-icon { width: 50px; height: 50px; font-size: 24px; border-radius: 12px; }
+      .feature-content h3 { font-size: 16px; margin-bottom: 5px; }
+      .feature-content p { font-size: 12px; }
+      .stats { padding: 15px 25px; }
+      .stats-grid { gap: 15px; }
+      .stat-card { padding: 15px; border-radius: 10px; }
+      .stat-number { font-size: 24px; }
+      .stat-label { font-size: 10px; margin-top: 4px; }
+      .why-choose { padding: 20px 25px; }
+      .why-choose h2 { font-size: 20px; margin-bottom: 15px; }
+      .benefit-item { font-size: 13px; margin-bottom: 10px; gap: 10px; }
+      .benefit-check { width: 20px; height: 20px; font-size: 10px; }
+      .cta { padding: 25px 30px; }
+      .cta-box { padding: 25px 20px; border-radius: 16px; }
+      .cta h2 { font-size: 18px; margin-bottom: 10px; }
+      .cta p { font-size: 12px; margin-bottom: 15px; }
+      .cta-website { font-size: 22px; }
+      .footer { padding: 20px 30px 30px; }
+      .footer-text { font-size: 11px; }
+      .footer-domain { font-size: 16px; }
+      .footer-region { font-size: 10px; }
+      .qr-placeholder { width: 60px; height: 60px; font-size: 8px; }
+      .qr-label { font-size: 10px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="banner">
+    <!-- Background Decorations -->
+    <div class="bg-decoration">
+      <div class="bg-grid"></div>
+      <div class="bg-circle bg-circle-1"></div>
+      <div class="bg-circle bg-circle-2"></div>
+      <div class="bg-circle bg-circle-3"></div>
+      <!-- Background car images from Unsplash -->
+      <img src="https://images.unsplash.com/photo-1494976388531-d1058494cdd8?w=1200&q=80" alt="" class="bg-car-image bg-car-1">
+      <img src="https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=1200&q=80" alt="" class="bg-car-image bg-car-2">
+      <img src="https://images.unsplash.com/photo-1544636331-e26879cd4d9b?w=1200&q=80" alt="" class="bg-car-image bg-car-3">
+    </div>
+
+    <!-- Header with Logo -->
+    <header class="header">
+      <div class="logo-container" id="logoContainer">
+        <!-- Using the logo from marketing folder -->
+        <img src="logo.png" 
+             onerror="this.onerror=null; this.parentElement.classList.add('no-image');"
+             alt="IntelliWheels Logo" class="logo">
+        <!-- Text fallback logo -->
+        <div class="logo-text">IntelliWheels</div>
+        <div class="logo-text-sub">Intelligent Automotive</div>
+      </div>
+      <p class="tagline">Your AI Car Expert</p>
+      <p class="tagline-arabic">خبير السيارات الذكي</p>
+    </header>
+
+    <!-- Main Headline -->
+    <section class="headline">
+      <h1>Find Your<br>Perfect Car<br>with AI</h1>
+      <p>Jordan's smartest automotive marketplace powered by artificial intelligence</p>
+    </section>
+
+    <!-- Features -->
+    <section class="features">
+      <div class="feature-card">
+        <div class="feature-icon ai">🤖</div>
+        <div class="feature-content">
+          <h3>AI-Powered Assistant</h3>
+          <p>24/7 intelligent chatbot for instant car advice in Arabic & English</p>
+        </div>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon vision">📸</div>
+        <div class="feature-content">
+          <h3>Vision Recognition</h3>
+          <p>Upload a photo and instantly identify any car's make, model & specs</p>
+        </div>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon price">💰</div>
+        <div class="feature-content">
+          <h3>Smart Price Estimator</h3>
+          <p>ML-powered fair market value analysis for confident buying</p>
+        </div>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon dealers">✅</div>
+        <div class="feature-content">
+          <h3>Verified Dealers</h3>
+          <p>Connect with trusted dealers across Jordan & GCC region</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Stats -->
+    <section class="stats">
+      <div class="stats-grid">
+        <div class="stat-card">
+          <span class="stat-number">1000+</span>
+          <span class="stat-label">Active Listings</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-number">100+</span>
+          <span class="stat-label">Verified Dealers</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-number">24/7</span>
+          <span class="stat-label">AI Support</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-number">🌍</span>
+          <span class="stat-label">Jordan & GCC</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Why Choose Us -->
+    <section class="why-choose">
+      <h2>Why IntelliWheels?</h2>
+      <div class="benefits-list">
+        <div class="benefit-item">
+          <div class="benefit-check">✓</div>
+          <span>Natural language search - describe your dream car</span>
+        </div>
+        <div class="benefit-item">
+          <div class="benefit-check">✓</div>
+          <span>Bilingual support - Arabic & English</span>
+        </div>
+        <div class="benefit-item">
+          <div class="benefit-check">✓</div>
+          <span>Fair pricing transparency with AI analysis</span>
+        </div>
+        <div class="benefit-item">
+          <div class="benefit-check">✓</div>
+          <span>Direct dealer communication</span>
+        </div>
+        <div class="benefit-item">
+          <div class="benefit-check">✓</div>
+          <span>Multi-currency: JOD, USD, EUR, SAR</span>
+        </div>
+        <div class="benefit-item">
+          <div class="benefit-check">✓</div>
+          <span>Real-time market analytics</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Call to Action -->
+    <section class="cta">
+      <div class="cta-box">
+        <h2>Ready to Find Your Dream Car?</h2>
+        <p>Join thousands of satisfied customers today</p>
+        <div class="cta-website">intelliwheels.co</div>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <div class="footer-divider"></div>
+      <p class="footer-text">AI-Powered Automotive Marketplace</p>
+      <p class="footer-domain">www.intelliwheels.co</p>
+      <p class="footer-region">
+        <span>🇯🇴 Jordan</span>
+        <span>•</span>
+        <span>🇸🇦 Saudi Arabia</span>
+        <span>•</span>
+        <span>🇦🇪 UAE</span>
+      </p>
+      
+      <!-- QR Code Section -->
+      <div class="qr-section">
+        <div class="qr-placeholder">
+          QR Code<br>Here
+        </div>
+        <p class="qr-label">Scan to visit</p>
+      </div>
+    </footer>
+  </div>
+</body>
+</html>

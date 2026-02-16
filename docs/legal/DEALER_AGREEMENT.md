@@ -310,11 +310,11 @@ This Agreement is in English. Arabic translation may be provided for convenience
 ## 16. Contact
 
 **Dealer Support:**  
-Email: dealers@intelliwheels.com  
+Email: dealers@intelliwheels.co  
 Phone: [INSERT PHONE]
 
 **General Inquiries:**  
-Email: support@intelliwheels.com
+Email: support@intelliwheels.co
 
 ---
 

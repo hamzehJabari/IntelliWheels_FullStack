@@ -204,7 +204,7 @@ Receive your data in a structured format.
 ### 7.6 Withdraw Consent
 Withdraw previously given consent at any time.
 
-**To exercise these rights, contact us at privacy@intelliwheels.com**
+**To exercise these rights, contact us at privacy@intelliwheels.co**
 
 ---
 
@@ -290,7 +290,7 @@ Continued use after changes constitutes acceptance.
 For privacy-related inquiries:
 
 **Data Protection Contact**  
-Email: privacy@intelliwheels.com  
+Email: privacy@intelliwheels.co  
 Address: [INSERT ADDRESS], Amman, Jordan
 
 ---
@@ -321,8 +321,8 @@ If you are in the EU/EEA, you have additional rights under GDPR, including the r
 For questions about this Privacy Policy:
 
 **IntelliWheels**  
-Email: privacy@intelliwheels.com  
-General: support@intelliwheels.com  
+Email: privacy@intelliwheels.co  
+General: support@intelliwheels.co  
 Address: [INSERT ADDRESS], Amman, Jordan  
 Phone: [INSERT PHONE]
 

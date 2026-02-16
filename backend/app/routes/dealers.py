@@ -14,7 +14,7 @@ SMTP_HOST = os.getenv('SMTP_HOST', '')
 SMTP_PORT = int(os.getenv('SMTP_PORT', '587'))
 SMTP_USER = os.getenv('SMTP_USER', '')
 SMTP_PASS = os.getenv('SMTP_PASS', '')
-ADMIN_EMAIL = os.getenv('ADMIN_EMAIL', 'admin@intelliwheels.com')
+ADMIN_EMAIL = os.getenv('ADMIN_EMAIL', 'admin@intelliwheels.co')
 
 def send_email(to_email, subject, body):
     """Send an email notification. Returns True if sent, False otherwise."""

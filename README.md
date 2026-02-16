@@ -245,7 +245,7 @@ Before going to production, complete these steps:
 - [ ] Customize Dealer Agreement (template in `docs/legal/`)
 
 ### Technical
-- [ ] Purchase domain (intelliwheels.com or .jo)
+- [ ] Purchase domain (intelliwheels.co) ✅
 - [ ] Configure SSL certificates (auto via Vercel/Render)
 - [ ] Enable database backups (Render PostgreSQL)
 - [ ] Set up error monitoring (Sentry recommended)
@@ -254,7 +254,7 @@ Before going to production, complete these steps:
 - [ ] Load test for concurrent users
 
 ### Operations
-- [ ] Set up support email (support@intelliwheels.com)
+- [ ] Set up support email (support@intelliwheels.co)
 - [ ] Set up WhatsApp Business
 - [ ] Create social media accounts
 - [ ] Prepare dealer onboarding materials

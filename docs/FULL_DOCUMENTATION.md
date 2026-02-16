@@ -965,7 +965,7 @@ Response:
 
      USERS
        │
-       │  DNS: intelliwheels.com
+       │  DNS: intelliwheels.co
        ▼
 ┌──────────────────┐
 │   Cloudflare     │◄── CDN, DDoS protection, SSL

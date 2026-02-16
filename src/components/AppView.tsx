@@ -3037,7 +3037,7 @@ export function AppView() {
     }
 
     // For development: Show a note about admin access (in production, check user.is_admin)
-    const isAdmin = user.is_admin || user.email === 'admin@intelliwheels.com' || user.username === 'admin';
+    const isAdmin = user.is_admin || user.email === 'admin@intelliwheels.co' || user.username === 'admin';
 
     if (!isAdmin) {
       return (
@@ -3046,7 +3046,7 @@ export function AppView() {
           <h2 className={`text-2xl font-bold ${resolvedTheme === 'dark' ? 'text-white' : 'text-slate-900'}`}>Access Denied</h2>
           <p className={`mt-2 ${resolvedTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>You don&apos;t have admin privileges. Contact the system administrator.</p>
           <p className={`mt-4 text-sm ${resolvedTheme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
-            <strong>Dev tip:</strong> Create a user with username &quot;admin&quot; or email &quot;admin@intelliwheels.com&quot; to access this panel.
+            <strong>Dev tip:</strong> Create a user with username &quot;admin&quot; or email &quot;admin@intelliwheels.co&quot; to access this panel.
           </p>
         </div>
       );
@@ -4919,7 +4919,7 @@ export function AppView() {
                 { key: 'chatbot', label: copy.navChatbot },
                 { key: 'myListings', label: copy.navMyListings },
                 // Admin link - show only for admin users
-                ...(user?.is_admin || user?.username === 'admin' || user?.email === 'admin@intelliwheels.com'
+                ...(user?.is_admin || user?.username === 'admin' || user?.email === 'admin@intelliwheels.co'
                   ? [{ key: 'admin', label: copy.navAdmin }]
                   : []),
               ].map((item) => (

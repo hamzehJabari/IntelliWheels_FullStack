@@ -73,6 +73,11 @@ credentials.json
 service-account*.json
 **/secrets/
 .secrets
+ADMIN_CREDENTIALS.txt
+*CREDENTIALS*
+*credentials*
+*password*
+*_secret*
 
 # =============================================================================
 # NEXT.JS
@@ -180,7 +185,41 @@ docs/generated_images/
 docs/legal/*.docx
 
 # =============================================================================
+# MEDIA FILES (Don't bloat repo)
+# =============================================================================
+*.mp4
+*.mp3
+*.wav
+*.avi
+*.mov
+*.docx
+*.pptx
+*.xlsx
+Kimi_Agent_IntelliWheels Roll-up Banner/
+
+# =============================================================================
 # ARCHIVES & ROOT ASSETS
 # =============================================================================
 *.zip
+*.rar
+*.7z
 /IntelliWheels_Logo_*.png
+/IntelliWheels.svg
+/Intelli_Wheels.png
+/intellliwheels_logo_concept_dynamic.png
+Important.zip
+cars.xlsx
+
+# =============================================================================
+# LOCAL DATABASE FILES
+# =============================================================================
+*.db
+*.sqlite
+*.sqlite3
+intelliwheels.db
+
+# =============================================================================
+# TEST FILES (One-time scripts)
+# =============================================================================
+test_*.py
+!backend/app/routes/test_*.py

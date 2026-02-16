@@ -280,7 +280,7 @@ You may not assign these Terms. We may assign our rights freely.
 For questions about these Terms:
 
 **IntelliWheels**  
-Email: legal@intelliwheels.com  
+Email: legal@intelliwheels.co  
 Address: [INSERT ADDRESS], Amman, Jordan  
 Phone: [INSERT PHONE]
 
