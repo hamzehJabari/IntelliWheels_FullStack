@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { withSentryConfig } from '@sentry/nextjs';
 
 const nextConfig: NextConfig = {
   reactCompiler: true,
@@ -48,4 +49,19 @@ const nextConfig: NextConfig = {
   }),
 };
 
-export default nextConfig;
+export default withSentryConfig(nextConfig, {
+  org: 'intelliwheels',
+  project: 'intelliwheels-frontend',
+
+  // Suppress source map upload logs
+  silent: !process.env.CI,
+
+  // Upload source maps for readable stack traces in Sentry
+  widenClientFileUpload: true,
+
+  // Automatically tree-shake Sentry logger statements to reduce bundle size
+  disableLogger: true,
+
+  // Automatically instrument Next.js Data Fetching methods
+  autoInstrumentServerFunctions: true,
+});
