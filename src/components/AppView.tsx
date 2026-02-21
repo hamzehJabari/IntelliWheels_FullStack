@@ -52,6 +52,7 @@ import {
 } from '@/lib/types';
 import { CHAT_HISTORY_LIMIT, STORAGE_KEYS } from '@/lib/config';
 import { getAllMakes, getModelsForMake } from '@/lib/vehicleDatabase';
+import { CookiePolicyPage, DisclaimerPage, FAQPage, AboutPage, HowItWorksPage, ContactPage, PricingPage } from './InfoPages';
 
 // Dynamic import for map component (client-side only)
 const DealerMap = dynamic(() => import('./DealerMap').then(mod => ({ default: mod.DealerMap })), {
@@ -83,7 +84,8 @@ const NAV_CONFIG = [
   { key: 'admin', labelKey: 'navAdmin', descriptionKey: 'navAdminDesc' },
 ] as const;
 
-type PageKey = (typeof NAV_CONFIG)[number]['key'];
+type InfoPageKey = 'about' | 'howItWorks' | 'pricing' | 'faq' | 'contact' | 'cookiePolicy' | 'disclaimer';
+type PageKey = (typeof NAV_CONFIG)[number]['key'] | InfoPageKey;
 
 const SERVICE_CONFIG = [
   { key: 'marketplace', labelKey: 'serviceMarketplace', descriptionKey: 'serviceMarketplaceDesc', defaultPage: 'home' as PageKey },
@@ -4878,6 +4880,20 @@ export function AppView() {
         return renderAnalytics();
       case 'admin':
         return renderAdminPanel();
+      case 'about':
+        return <AboutPage theme={resolvedTheme} language={language} onNavigate={(p) => setActivePage(p as PageKey)} />;
+      case 'howItWorks':
+        return <HowItWorksPage theme={resolvedTheme} language={language} onNavigate={(p) => setActivePage(p as PageKey)} />;
+      case 'pricing':
+        return <PricingPage theme={resolvedTheme} language={language} onNavigate={(p) => setActivePage(p as PageKey)} />;
+      case 'faq':
+        return <FAQPage theme={resolvedTheme} language={language} onNavigate={(p) => setActivePage(p as PageKey)} />;
+      case 'contact':
+        return <ContactPage theme={resolvedTheme} language={language} onNavigate={(p) => setActivePage(p as PageKey)} />;
+      case 'cookiePolicy':
+        return <CookiePolicyPage theme={resolvedTheme} language={language} onNavigate={(p) => setActivePage(p as PageKey)} />;
+      case 'disclaimer':
+        return <DisclaimerPage theme={resolvedTheme} language={language} onNavigate={(p) => setActivePage(p as PageKey)} />;
       default:
         return null;
     }
@@ -5131,7 +5147,16 @@ export function AppView() {
               </div>
             </div>
           </div>
-          <p className="mt-6 text-xs text-slate-400">© {currentYear} IntelliWheels. {copy.footerRights}</p>
+          <div className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-slate-700/50 pt-4">
+            <button onClick={() => setActivePage('about')} className="text-xs text-slate-400 hover:text-white transition">{language === 'ar' ? 'من نحن' : 'About'}</button>
+            <button onClick={() => setActivePage('howItWorks')} className="text-xs text-slate-400 hover:text-white transition">{language === 'ar' ? 'كيف يعمل' : 'How It Works'}</button>
+            <button onClick={() => setActivePage('pricing')} className="text-xs text-slate-400 hover:text-white transition">{language === 'ar' ? 'الأسعار' : 'Pricing'}</button>
+            <button onClick={() => setActivePage('faq')} className="text-xs text-slate-400 hover:text-white transition">{language === 'ar' ? 'الأسئلة الشائعة' : 'FAQ'}</button>
+            <button onClick={() => setActivePage('contact')} className="text-xs text-slate-400 hover:text-white transition">{language === 'ar' ? 'تواصل معنا' : 'Contact'}</button>
+            <button onClick={() => setActivePage('cookiePolicy')} className="text-xs text-slate-400 hover:text-white transition">{language === 'ar' ? 'سياسة الكوكيز' : 'Cookies'}</button>
+            <button onClick={() => setActivePage('disclaimer')} className="text-xs text-slate-400 hover:text-white transition">{language === 'ar' ? 'إخلاء المسؤولية' : 'Disclaimer'}</button>
+          </div>
+          <p className="mt-3 text-xs text-slate-400">© {currentYear} IntelliWheels. {copy.footerRights}</p>
         </div>
       </footer>
       
